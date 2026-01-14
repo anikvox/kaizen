@@ -1,0 +1,24 @@
+{
+  "name": "kaizen-server",
+  "version": "1.0.0",
+  "description": "Express server with Gemini via Opik",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "@google/genai": "^1.0.0",
+    "opik-gemini": "^1.0.0",
+    "opik": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
