@@ -3,8 +3,10 @@
   "private": true,
   "scripts": {
     "dev:extension": "pnpm --filter kaizen-extension dev",
+    "dev:frontend": "pnpm --filter kaizen-frontend dev",
     "dev:server": "pnpm --filter kaizen-server dev",
     "build:extension": "pnpm --filter kaizen-extension build",
+    "build:frontend": "pnpm --filter kaizen-frontend build",
     "build:server": "pnpm --filter kaizen-server build"
   }
 }
