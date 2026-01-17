@@ -120,7 +120,7 @@ export async function fetchAttentionData(
   if (parentTrace) {
     return withSpan(parentTrace, fetchData, {
       name: "fetchAttentionData",
-      type: "retrieval",
+      type: "general",
       metadata: {
         windowStart: windowStart.toISOString(),
         windowEnd: windowEnd.toISOString(),

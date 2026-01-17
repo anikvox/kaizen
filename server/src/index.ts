@@ -8,7 +8,7 @@ import { startFocusScheduler, stopFocusScheduler } from "./lib/scheduler";
 import { opikClient, flushTraces } from "./lib/opik";
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3001;
 
 app.use(express.json());
 

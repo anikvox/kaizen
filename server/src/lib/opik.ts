@@ -22,7 +22,7 @@ export interface TraceOptions {
  */
 export interface SpanOptions {
   name: string;
-  type?: "general" | "llm" | "tool" | "retrieval";
+  type?: "general" | "llm" | "tool";
   metadata?: Record<string, unknown>;
 }
 
