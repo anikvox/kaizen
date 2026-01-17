@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express, { Request, Response } from "express";
+import cors from "cors";
 import { GoogleGenAI } from "@google/genai";
 import { trackGemini } from "opik-gemini";
 import routes from "./routes";
@@ -9,6 +10,15 @@ import { opikClient, flushTraces } from "./lib/opik";
 
 const app = express();
 const port = process.env.PORT || 3001;
+
+// CORS configuration
+app.use(cors({
+  origin: [
+    "http://localhost:3000",
+    "https://kaizen.apps.sandipan.dev"
+  ],
+  credentials: true
+}));
 
 app.use(express.json());
 

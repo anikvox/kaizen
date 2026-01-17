@@ -13,3 +13,32 @@
   text-decoration: none;
   width: 100%;
 }
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #fff;
+}
+
+/* Custom styles for Clerk components if needed */
+.cl-rootBox {
+  width: 100%;
+}
+
+.cl-card {
+  box-shadow: none !important;
+  border: none !important;
+  padding: 0 !important;
+}

@@ -17,9 +17,13 @@ model TextAttention {
   readingTime Int?     // Estimated reading time in minutes
   timestamp   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  userId      String   // Link to user
+
+  user        User     @relation(fields: [userId], references: [id])
 
   @@index([timestamp])
   @@index([url])
+  @@index([userId])
 }
 
 // Image-based attention activities (viewing images, photos, infographics)
@@ -34,9 +38,13 @@ model ImageAttention {
   mimeType    String?
   timestamp   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  userId      String   // Link to user
+
+  user        User     @relation(fields: [userId], references: [id])
 
   @@index([timestamp])
   @@index([url])
+  @@index([userId])
 }
 
 // YouTube video watching activities
@@ -48,8 +56,12 @@ model YoutubeAttention {
   thumbnailUrl String?
   watchedAt    DateTime @default(now())
   lastUpdated  DateTime @updatedAt
+  userId       String   // Link to user
+
+  user         User     @relation(fields: [userId], references: [id])
 
   @@index([watchedAt])
+  @@index([userId])
 }
 
 // Audio listening activities (podcasts, music, audiobooks)
@@ -63,9 +75,13 @@ model AudioAttention {
   mimeType    String?
   timestamp   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  userId      String   // Link to user
+
+  user        User     @relation(fields: [userId], references: [id])
 
   @@index([timestamp])
   @@index([url])
+  @@index([userId])
 }
 
 // Focus scores calculated from attention data
@@ -92,8 +108,28 @@ model Focus {
   
   timestamp       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  userId          String   // Link to user
+
+  user            User     @relation(fields: [userId], references: [id])
 
   @@index([timestamp])
   @@index([windowStart, windowEnd])
   @@index([category])
+  @@index([userId])
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  image         String?
+  password      String?   // Hashed password for email/password login
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  textAttentions    TextAttention[]
+  imageAttentions   ImageAttention[]
+  youtubeAttentions YoutubeAttention[]
+  audioAttentions   AudioAttention[]
+  focusScores       Focus[]
 }

@@ -1,5 +1,6 @@
 import { computeFocusForLastHours } from "./inference";
 import { createTrace } from "./opik";
+import { prisma } from "./prisma";
 
 const FOCUS_INTERVAL_MS = 5 * 60 * 1000; // Compute focus every 5 minutes
 const FOCUS_WINDOW_HOURS = 1; // Analyze the last 1 hour of attention data
@@ -8,7 +9,48 @@ let schedulerInterval: NodeJS.Timeout | null = null;
 let isRunning = false;
 
 /**
- * Runs a single focus computation cycle
+ * Gets all users who have had activity in the specified time window
+ */
+async function getUsersWithRecentActivity(windowHours: number): Promise<string[]> {
+  const windowStart = new Date(Date.now() - windowHours * 60 * 60 * 1000);
+
+  // Get unique user IDs from all activity types within the window
+  const [textUsers, imageUsers, youtubeUsers, audioUsers] = await Promise.all([
+    prisma.textAttention.findMany({
+      where: { timestamp: { gte: windowStart } },
+      select: { userId: true },
+      distinct: ["userId"],
+    }),
+    prisma.imageAttention.findMany({
+      where: { timestamp: { gte: windowStart } },
+      select: { userId: true },
+      distinct: ["userId"],
+    }),
+    prisma.youtubeAttention.findMany({
+      where: { watchedAt: { gte: windowStart } },
+      select: { userId: true },
+      distinct: ["userId"],
+    }),
+    prisma.audioAttention.findMany({
+      where: { timestamp: { gte: windowStart } },
+      select: { userId: true },
+      distinct: ["userId"],
+    }),
+  ]);
+
+  // Combine and deduplicate user IDs
+  const allUserIds = new Set([
+    ...textUsers.map((u) => u.userId),
+    ...imageUsers.map((u) => u.userId),
+    ...youtubeUsers.map((u) => u.userId),
+    ...audioUsers.map((u) => u.userId),
+  ]);
+
+  return Array.from(allUserIds);
+}
+
+/**
+ * Runs a single focus computation cycle for all active users
  */
 async function runFocusCycle(): Promise<void> {
   if (isRunning) {
@@ -32,17 +74,40 @@ async function runFocusCycle(): Promise<void> {
 
   try {
     console.log("[Scheduler] Starting focus computation...");
-    const result = await computeFocusForLastHours(FOCUS_WINDOW_HOURS);
+    
+    // Get all users with recent activity
+    const userIds = await getUsersWithRecentActivity(FOCUS_WINDOW_HOURS);
+    
+    if (userIds.length === 0) {
+      console.log("[Scheduler] No users with recent activity, skipping...");
+      trace.update({
+        output: { skipped: true, reason: "No users with recent activity" },
+      });
+      trace.end();
+      return;
+    }
+
+    console.log(`[Scheduler] Computing focus for ${userIds.length} user(s)...`);
+    
+    // Compute focus for each user
+    const results = await Promise.allSettled(
+      userIds.map((userId) => computeFocusForLastHours(FOCUS_WINDOW_HOURS, userId))
+    );
+
     const duration = Date.now() - startTime;
+    const successCount = results.filter((r) => r.status === "fulfilled").length;
+    const failureCount = results.filter((r) => r.status === "rejected").length;
 
     console.log(
-      `[Scheduler] Focus computed: score=${result.score}, category=${result.category} (took ${duration}ms)`
+      `[Scheduler] Focus computed for ${successCount} users, ${failureCount} failures (took ${duration}ms)`
     );
 
     // Update trace with successful result
     trace.update({
       output: {
-        ...result,
+        userCount: userIds.length,
+        successCount,
+        failureCount,
         durationMs: duration,
       },
     });

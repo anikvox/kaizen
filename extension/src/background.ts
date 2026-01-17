@@ -2,13 +2,40 @@ import { SERVER_URL } from "./default-settings"
 
 console.log("Kaizen background script initialized")
 
+// Storage key for auth token (set by popup when user signs in)
+const AUTH_TOKEN_KEY = "kaizen_auth_token"
+
+// Helper to get auth token from storage
+async function getAuthToken(): Promise<string | null> {
+  try {
+    const result = await chrome.storage.local.get(AUTH_TOKEN_KEY)
+    return result[AUTH_TOKEN_KEY] || null
+  } catch (error) {
+    console.error("Error getting auth token:", error)
+  }
+  return null
+}
+
 // Message types
 const COGNITIVE_ATTENTION_TEXT_MESSAGE_NAME = "cognitive-attention-text"
 const COGNITIVE_ATTENTION_IMAGE_MESSAGE_NAME = "cognitive-attention-image"
 const COGNITIVE_ATTENTION_AUDIO_MESSAGE_NAME = "cognitive-attention-audio"
 
-// Listen for messages from content scripts
+// Unified message listener for all message types
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  // Handle auth token messages from popup
+  if (message.type === "SET_AUTH_TOKEN") {
+    chrome.storage.local.set({ [AUTH_TOKEN_KEY]: message.token })
+    sendResponse({ success: true })
+    return true
+  }
+  if (message.type === "CLEAR_AUTH_TOKEN") {
+    chrome.storage.local.remove(AUTH_TOKEN_KEY)
+    sendResponse({ success: true })
+    return true
+  }
+
+  // Handle attention messages from content scripts
   if (!message.type || !message.payload) {
     return
   }
@@ -43,11 +70,18 @@ interface TextAttentionPayload {
 async function handleTextAttention(payload: TextAttentionPayload) {
   console.log("Received text attention:", payload)
 
+  const token = await getAuthToken()
+  if (!token) {
+    console.warn("No auth token available, skipping upload")
+    return
+  }
+
   try {
     const response = await fetch(`${SERVER_URL}/activities/text`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
       },
       body: JSON.stringify({
         url: payload.url,
@@ -87,11 +121,18 @@ interface ImageAttentionPayload {
 async function handleImageAttention(payload: ImageAttentionPayload) {
   console.log("Received image attention:", payload)
 
+  const token = await getAuthToken()
+  if (!token) {
+    console.warn("No auth token available, skipping upload")
+    return
+  }
+
   try {
     const response = await fetch(`${SERVER_URL}/activities/image`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
       },
       body: JSON.stringify({
         url: payload.src,
@@ -130,11 +171,18 @@ interface AudioAttentionPayload {
 async function handleAudioAttention(payload: AudioAttentionPayload) {
   console.log("Received audio attention:", payload)
 
+  const token = await getAuthToken()
+  if (!token) {
+    console.warn("No auth token available, skipping upload")
+    return
+  }
+
   try {
     const response = await fetch(`${SERVER_URL}/activities/audio`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
       },
       body: JSON.stringify({
         url: payload.src,

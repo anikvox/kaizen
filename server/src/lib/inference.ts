@@ -65,6 +65,7 @@ interface FocusResult {
 export async function fetchAttentionData(
   windowStart: Date,
   windowEnd: Date,
+  userId: string,
   parentTrace?: Trace
 ): Promise<AttentionData> {
   const fetchData = async () => {
@@ -72,6 +73,7 @@ export async function fetchAttentionData(
       await Promise.all([
         prisma.textAttention.findMany({
           where: {
+            userId,
             timestamp: {
               gte: windowStart,
               lte: windowEnd,
@@ -81,6 +83,7 @@ export async function fetchAttentionData(
         }),
         prisma.imageAttention.findMany({
           where: {
+            userId,
             timestamp: {
               gte: windowStart,
               lte: windowEnd,
@@ -90,6 +93,7 @@ export async function fetchAttentionData(
         }),
         prisma.youtubeAttention.findMany({
           where: {
+            userId,
             watchedAt: {
               gte: windowStart,
               lte: windowEnd,
@@ -99,6 +103,7 @@ export async function fetchAttentionData(
         }),
         prisma.audioAttention.findMany({
           where: {
+            userId,
             timestamp: {
               gte: windowStart,
               lte: windowEnd,
@@ -124,6 +129,7 @@ export async function fetchAttentionData(
       metadata: {
         windowStart: windowStart.toISOString(),
         windowEnd: windowEnd.toISOString(),
+        userId,
       },
     });
   }
@@ -300,7 +306,8 @@ Respond ONLY with valid JSON matching this schema:
  */
 export async function computeAndSaveFocus(
   windowStart: Date,
-  windowEnd: Date
+  windowEnd: Date,
+  userId: string
 ): Promise<{
   id: number;
   score: number;
@@ -315,12 +322,13 @@ export async function computeAndSaveFocus(
     metadata: {
       windowStart: windowStart.toISOString(),
       windowEnd: windowEnd.toISOString(),
+      userId,
     },
   });
 
   try {
     // Fetch attention data (traced as a span)
-    const attentionData = await fetchAttentionData(windowStart, windowEnd, trace);
+    const attentionData = await fetchAttentionData(windowStart, windowEnd, userId, trace);
 
     // Calculate focus using AI (traced as a span)
     const focusResult = await calculateFocus(attentionData, trace);
@@ -342,6 +350,7 @@ export async function computeAndSaveFocus(
             youtubeCount: attentionData.youtubeActivities.length,
             audioCount: attentionData.audioActivities.length,
             modelUsed: MODEL_NAME,
+            userId,
           },
         });
       },
@@ -351,6 +360,7 @@ export async function computeAndSaveFocus(
         metadata: {
           score: focusResult.score,
           category: focusResult.category,
+          userId,
         },
       }
     );
@@ -386,20 +396,22 @@ export async function computeAndSaveFocus(
  * This is a convenience wrapper that creates a time window and delegates to computeAndSaveFocus
  */
 export async function computeFocusForLastHours(
-  hours: number = 1
+  hours: number = 1,
+  userId: string
 ): Promise<ReturnType<typeof computeAndSaveFocus>> {
   const windowEnd = new Date();
   const windowStart = new Date(windowEnd.getTime() - hours * 60 * 60 * 1000);
 
   // The actual tracing happens in computeAndSaveFocus
-  return computeAndSaveFocus(windowStart, windowEnd);
+  return computeAndSaveFocus(windowStart, windowEnd, userId);
 }
 
 /**
  * Gets focus history with pagination
  */
-export async function getFocusHistory(limit: number = 10, offset: number = 0) {
+export async function getFocusHistory(limit: number = 10, offset: number = 0, userId: string) {
   return prisma.focus.findMany({
+    where: { userId },
     orderBy: { timestamp: "desc" },
     take: limit,
     skip: offset,
@@ -411,10 +423,12 @@ export async function getFocusHistory(limit: number = 10, offset: number = 0) {
  */
 export async function getAverageFocus(
   windowStart: Date,
-  windowEnd: Date
+  windowEnd: Date,
+  userId: string
 ): Promise<{ average: number; count: number }> {
   const result = await prisma.focus.aggregate({
     where: {
+      userId,
       timestamp: {
         gte: windowStart,
         lte: windowEnd,

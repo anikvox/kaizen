@@ -1,7 +1,22 @@
 import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma";
+import { AuthRequest } from "../middleware/auth";
 
 const router = Router();
+
+// Helper to ensure user exists in our DB
+async function ensureUser(clerkId: string) {
+  const user = await prisma.user.findUnique({ where: { id: clerkId } });
+  if (!user) {
+    // In a real app, you might get more info from Clerk SDK here
+    await prisma.user.create({
+      data: {
+        id: clerkId,
+        email: "unknown@example.com", // This should be updated via webhook or Clerk SDK
+      },
+    });
+  }
+}
 
 // =============================================================================
 // TEXT ATTENTION ROUTES
@@ -15,10 +30,12 @@ interface CreateTextAttentionBody {
   readingTime?: number;
 }
 
-// GET /activities/text - List all text attention activities
-router.get("/text", async (_req: Request, res: Response) => {
+// GET /activities/text - List all text attention activities for current user
+router.get("/text", async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.auth!.userId;
     const activities = await prisma.textAttention.findMany({
+      where: { userId },
       orderBy: { timestamp: "desc" },
     });
     res.json(activities);
@@ -29,11 +46,12 @@ router.get("/text", async (_req: Request, res: Response) => {
 });
 
 // GET /activities/text/:id - Get a single text attention activity
-router.get("/text/:id", async (req: Request, res: Response) => {
+router.get("/text/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
+    const userId = req.auth!.userId;
     const activity = await prisma.textAttention.findUnique({
-      where: { id },
+      where: { id, userId },
     });
 
     if (!activity) {
@@ -49,17 +67,20 @@ router.get("/text/:id", async (req: Request, res: Response) => {
 });
 
 // POST /activities/text - Create a new text attention activity
-router.post("/text", async (req: Request<{}, {}, CreateTextAttentionBody>, res: Response) => {
+router.post("/text", async (req: AuthRequest<{}, {}, CreateTextAttentionBody>, res: Response) => {
   try {
     const { url, title, content, wordCount, readingTime } = req.body;
+    const userId = req.auth!.userId;
 
     if (!title || !content) {
       res.status(400).json({ error: "title and content are required" });
       return;
     }
 
+    await ensureUser(userId);
+
     const activity = await prisma.textAttention.create({
-      data: { url, title, content, wordCount, readingTime },
+      data: { url, title, content, wordCount, readingTime, userId },
     });
 
     res.status(201).json(activity);
@@ -70,11 +91,12 @@ router.post("/text", async (req: Request<{}, {}, CreateTextAttentionBody>, res: 
 });
 
 // DELETE /activities/text/:id - Delete a text attention activity
-router.delete("/text/:id", async (req: Request, res: Response) => {
+router.delete("/text/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
+    const userId = req.auth!.userId;
 
-    const existing = await prisma.textAttention.findUnique({ where: { id } });
+    const existing = await prisma.textAttention.findUnique({ where: { id, userId } });
     if (!existing) {
       res.status(404).json({ error: "Text activity not found" });
       return;
@@ -103,9 +125,11 @@ interface CreateImageAttentionBody {
 }
 
 // GET /activities/image - List all image attention activities
-router.get("/image", async (_req: Request, res: Response) => {
+router.get("/image", async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.auth!.userId;
     const activities = await prisma.imageAttention.findMany({
+      where: { userId },
       orderBy: { timestamp: "desc" },
     });
     res.json(activities);
@@ -116,11 +140,12 @@ router.get("/image", async (_req: Request, res: Response) => {
 });
 
 // GET /activities/image/:id - Get a single image attention activity
-router.get("/image/:id", async (req: Request, res: Response) => {
+router.get("/image/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
+    const userId = req.auth!.userId;
     const activity = await prisma.imageAttention.findUnique({
-      where: { id },
+      where: { id, userId },
     });
 
     if (!activity) {
@@ -136,17 +161,20 @@ router.get("/image/:id", async (req: Request, res: Response) => {
 });
 
 // POST /activities/image - Create a new image attention activity
-router.post("/image", async (req: Request<{}, {}, CreateImageAttentionBody>, res: Response) => {
+router.post("/image", async (req: AuthRequest<{}, {}, CreateImageAttentionBody>, res: Response) => {
   try {
     const { url, title, description, width, height, fileSize, mimeType } = req.body;
+    const userId = req.auth!.userId;
 
     if (!url || !title) {
       res.status(400).json({ error: "url and title are required" });
       return;
     }
 
+    await ensureUser(userId);
+
     const activity = await prisma.imageAttention.create({
-      data: { url, title, description, width, height, fileSize, mimeType },
+      data: { url, title, description, width, height, fileSize, mimeType, userId },
     });
 
     res.status(201).json(activity);
@@ -157,11 +185,12 @@ router.post("/image", async (req: Request<{}, {}, CreateImageAttentionBody>, res
 });
 
 // DELETE /activities/image/:id - Delete an image attention activity
-router.delete("/image/:id", async (req: Request, res: Response) => {
+router.delete("/image/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
+    const userId = req.auth!.userId;
 
-    const existing = await prisma.imageAttention.findUnique({ where: { id } });
+    const existing = await prisma.imageAttention.findUnique({ where: { id, userId } });
     if (!existing) {
       res.status(404).json({ error: "Image activity not found" });
       return;
@@ -188,9 +217,11 @@ interface CreateYoutubeAttentionBody {
 }
 
 // GET /activities/youtube - List all YouTube attention activities
-router.get("/youtube", async (_req: Request, res: Response) => {
+router.get("/youtube", async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.auth!.userId;
     const activities = await prisma.youtubeAttention.findMany({
+      where: { userId },
       orderBy: { watchedAt: "desc" },
     });
     res.json(activities);
@@ -201,11 +232,12 @@ router.get("/youtube", async (_req: Request, res: Response) => {
 });
 
 // GET /activities/youtube/:id - Get a single YouTube attention activity
-router.get("/youtube/:id", async (req: Request, res: Response) => {
+router.get("/youtube/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
+    const userId = req.auth!.userId;
     const activity = await prisma.youtubeAttention.findUnique({
-      where: { id },
+      where: { id, userId },
     });
 
     if (!activity) {
@@ -221,17 +253,20 @@ router.get("/youtube/:id", async (req: Request, res: Response) => {
 });
 
 // POST /activities/youtube - Create a new YouTube attention activity
-router.post("/youtube", async (req: Request<{}, {}, CreateYoutubeAttentionBody>, res: Response) => {
+router.post("/youtube", async (req: AuthRequest<{}, {}, CreateYoutubeAttentionBody>, res: Response) => {
   try {
     const { id, title, channelName, duration, thumbnailUrl } = req.body;
+    const userId = req.auth!.userId;
 
     if (!id || !title) {
       res.status(400).json({ error: "id and title are required" });
       return;
     }
 
+    await ensureUser(userId);
+
     const activity = await prisma.youtubeAttention.create({
-      data: { id, title, channelName, duration, thumbnailUrl },
+      data: { id, title, channelName, duration, thumbnailUrl, userId },
     });
 
     res.status(201).json(activity);
@@ -242,11 +277,12 @@ router.post("/youtube", async (req: Request<{}, {}, CreateYoutubeAttentionBody>,
 });
 
 // DELETE /activities/youtube/:id - Delete a YouTube attention activity
-router.delete("/youtube/:id", async (req: Request, res: Response) => {
+router.delete("/youtube/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
+    const userId = req.auth!.userId;
 
-    const existing = await prisma.youtubeAttention.findUnique({ where: { id } });
+    const existing = await prisma.youtubeAttention.findUnique({ where: { id, userId } });
     if (!existing) {
       res.status(404).json({ error: "YouTube activity not found" });
       return;
@@ -274,9 +310,11 @@ interface CreateAudioAttentionBody {
 }
 
 // GET /activities/audio - List all audio attention activities
-router.get("/audio", async (_req: Request, res: Response) => {
+router.get("/audio", async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.auth!.userId;
     const activities = await prisma.audioAttention.findMany({
+      where: { userId },
       orderBy: { timestamp: "desc" },
     });
     res.json(activities);
@@ -287,11 +325,12 @@ router.get("/audio", async (_req: Request, res: Response) => {
 });
 
 // GET /activities/audio/:id - Get a single audio attention activity
-router.get("/audio/:id", async (req: Request, res: Response) => {
+router.get("/audio/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
+    const userId = req.auth!.userId;
     const activity = await prisma.audioAttention.findUnique({
-      where: { id },
+      where: { id, userId },
     });
 
     if (!activity) {
@@ -307,17 +346,20 @@ router.get("/audio/:id", async (req: Request, res: Response) => {
 });
 
 // POST /activities/audio - Create a new audio attention activity
-router.post("/audio", async (req: Request<{}, {}, CreateAudioAttentionBody>, res: Response) => {
+router.post("/audio", async (req: AuthRequest<{}, {}, CreateAudioAttentionBody>, res: Response) => {
   try {
     const { url, title, artist, duration, fileSize, mimeType } = req.body;
+    const userId = req.auth!.userId;
 
     if (!title) {
       res.status(400).json({ error: "title is required" });
       return;
     }
 
+    await ensureUser(userId);
+
     const activity = await prisma.audioAttention.create({
-      data: { url, title, artist, duration, fileSize, mimeType },
+      data: { url, title, artist, duration, fileSize, mimeType, userId },
     });
 
     res.status(201).json(activity);
@@ -328,11 +370,12 @@ router.post("/audio", async (req: Request<{}, {}, CreateAudioAttentionBody>, res
 });
 
 // DELETE /activities/audio/:id - Delete an audio attention activity
-router.delete("/audio/:id", async (req: Request, res: Response) => {
+router.delete("/audio/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
+    const userId = req.auth!.userId;
 
-    const existing = await prisma.audioAttention.findUnique({ where: { id } });
+    const existing = await prisma.audioAttention.findUnique({ where: { id, userId } });
     if (!existing) {
       res.status(404).json({ error: "Audio activity not found" });
       return;

@@ -23,7 +23,7 @@ dev-up:
 	@echo "Waiting for database to be ready..."
 	@sleep 2
 	@echo "Resetting database..."
-	cd server && pnpm db:push -- --force-reset
+	cd server && pnpm db:push -- --force-reset && pnpm db:generate
 	@echo "Starting all services..."
 	@$(MAKE) dev
 

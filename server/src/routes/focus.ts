@@ -11,8 +11,23 @@ import {
   getSchedulerConfig,
 } from "../lib/scheduler";
 import { prisma } from "../lib/prisma";
+import { AuthRequest } from "../middleware/auth";
 
 const router = Router();
+
+// Helper to ensure user exists in our DB
+async function ensureUser(clerkId: string) {
+  const user = await prisma.user.findUnique({ where: { id: clerkId } });
+  if (!user) {
+    // In a real app, you might get more info from Clerk SDK here
+    await prisma.user.create({
+      data: {
+        id: clerkId,
+        email: "unknown@example.com", // This should be updated via webhook or Clerk SDK
+      },
+    });
+  }
+}
 
 // =============================================================================
 // FOCUS INFERENCE ROUTES
@@ -34,9 +49,13 @@ interface ComputeFocusBody {
  */
 router.post(
   "/compute",
-  async (req: Request<{}, {}, ComputeFocusBody>, res: Response) => {
+  async (req: AuthRequest<{}, {}, ComputeFocusBody>, res: Response) => {
     try {
       const { windowStart, windowEnd, hours } = req.body;
+      const userId = req.auth!.userId;
+
+      // Ensure user exists before computing focus
+      await ensureUser(userId);
 
       let result;
 
@@ -55,11 +74,11 @@ router.post(
           return;
         }
 
-        result = await computeAndSaveFocus(start, end);
+        result = await computeAndSaveFocus(start, end, userId);
       } else {
         // Use hours (default to 1)
         const hoursToCompute = hours && hours > 0 ? hours : 1;
-        result = await computeFocusForLastHours(hoursToCompute);
+        result = await computeFocusForLastHours(hoursToCompute, userId);
       }
 
       res.status(201).json(result);
@@ -77,12 +96,13 @@ router.post(
  * - limit: number (default 10)
  * - offset: number (default 0)
  */
-router.get("/", async (req: Request, res: Response) => {
+router.get("/", async (req: AuthRequest, res: Response) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 10, 100);
     const offset = parseInt(req.query.offset as string) || 0;
+    const userId = req.auth!.userId;
 
-    const history = await getFocusHistory(limit, offset);
+    const history = await getFocusHistory(limit, offset, userId);
     res.json(history);
   } catch (error) {
     console.error("Error fetching focus history:", error);
@@ -93,9 +113,11 @@ router.get("/", async (req: Request, res: Response) => {
 /**
  * GET /focus/latest - Get the most recent focus calculation
  */
-router.get("/latest", async (_req: Request, res: Response) => {
+router.get("/latest", async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.auth!.userId;
     const latest = await prisma.focus.findFirst({
+      where: { userId },
       orderBy: { timestamp: "desc" },
     });
 
@@ -118,9 +140,10 @@ router.get("/latest", async (_req: Request, res: Response) => {
  * - windowStart: ISO date string (required)
  * - windowEnd: ISO date string (required)
  */
-router.get("/average", async (req: Request, res: Response) => {
+router.get("/average", async (req: AuthRequest, res: Response) => {
   try {
     const { windowStart, windowEnd } = req.query;
+    const userId = req.auth!.userId;
 
     if (!windowStart || !windowEnd) {
       res
@@ -137,7 +160,7 @@ router.get("/average", async (req: Request, res: Response) => {
       return;
     }
 
-    const result = await getAverageFocus(start, end);
+    const result = await getAverageFocus(start, end, userId);
     res.json(result);
   } catch (error) {
     console.error("Error calculating average focus:", error);
@@ -148,9 +171,10 @@ router.get("/average", async (req: Request, res: Response) => {
 /**
  * GET /focus/:id - Get a specific focus calculation by ID
  */
-router.get("/:id", async (req: Request, res: Response) => {
+router.get("/:id", async (req: AuthRequest, res: Response) => {
   try {
     const id = parseInt(req.params.id);
+    const userId = req.auth!.userId;
 
     if (isNaN(id)) {
       res.status(400).json({ error: "Invalid focus ID" });
@@ -158,7 +182,7 @@ router.get("/:id", async (req: Request, res: Response) => {
     }
 
     const focus = await prisma.focus.findUnique({
-      where: { id },
+      where: { id, userId },
     });
 
     if (!focus) {
@@ -176,16 +200,17 @@ router.get("/:id", async (req: Request, res: Response) => {
 /**
  * DELETE /focus/:id - Delete a focus record
  */
-router.delete("/:id", async (req: Request, res: Response) => {
+router.delete("/:id", async (req: AuthRequest, res: Response) => {
   try {
     const id = parseInt(req.params.id);
+    const userId = req.auth!.userId;
 
     if (isNaN(id)) {
       res.status(400).json({ error: "Invalid focus ID" });
       return;
     }
 
-    const existing = await prisma.focus.findUnique({ where: { id } });
+    const existing = await prisma.focus.findUnique({ where: { id, userId } });
     if (!existing) {
       res.status(404).json({ error: "Focus record not found" });
       return;
@@ -202,15 +227,17 @@ router.delete("/:id", async (req: Request, res: Response) => {
 /**
  * GET /focus/stats/today - Get today's focus statistics
  */
-router.get("/stats/today", async (_req: Request, res: Response) => {
+router.get("/stats/today", async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.auth!.userId;
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     const [average, focusRecords] = await Promise.all([
-      getAverageFocus(startOfDay, now),
+      getAverageFocus(startOfDay, now, userId),
       prisma.focus.findMany({
         where: {
+          userId,
           timestamp: {
             gte: startOfDay,
             lte: now,
@@ -246,6 +273,13 @@ router.get("/stats/today", async (_req: Request, res: Response) => {
     res.status(500).json({ error: "Failed to fetch today's stats" });
   }
 });
+
+// =============================================================================
+// SCHEDULER CONTROL ROUTES
+// =============================================================================
+
+// For now, scheduler is global or needs further thought for multi-user
+// We'll keep it as is but it might need userId in the future
 
 // =============================================================================
 // SCHEDULER CONTROL ROUTES

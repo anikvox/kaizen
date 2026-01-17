@@ -14,12 +14,15 @@
     "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@clerk/clerk-sdk-node": "^5.1.6",
+    "@google/genai": "^1.0.0",
     "@prisma/client": "^6.2.1",
+    "@types/cors": "^2.8.19",
+    "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "@google/genai": "^1.0.0",
-    "opik-gemini": "^1.0.0",
-    "opik": "^1.0.0"
+    "opik": "^1.0.0",
+    "opik-gemini": "^1.0.0"
   },
   "devDependencies": {
     "@faker-js/faker": "^9.4.0",
