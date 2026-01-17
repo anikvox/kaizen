@@ -2,20 +2,15 @@ import "dotenv/config";
 import express, { Request, Response } from "express";
 import { GoogleGenAI } from "@google/genai";
 import { trackGemini } from "opik-gemini";
-import { Opik } from "opik";
 import routes from "./routes";
 import { prisma } from "./lib/prisma";
+import { startFocusScheduler, stopFocusScheduler } from "./lib/scheduler";
+import { opikClient, flushTraces } from "./lib/opik";
 
 const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(express.json());
-
-// Initialize Opik client with API key
-const opikClient = new Opik({
-  apiKey: process.env.OPIK_API_KEY!,
-  projectName: "kaizen",
-});
 
 // Initialize Google GenAI client
 const genAI = new GoogleGenAI({
@@ -70,11 +65,17 @@ app.get("/health", (_req: Request, res: Response) => {
 
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
+
+  // Start the background focus computation scheduler
+  startFocusScheduler();
 });
 
-// Graceful shutdown - flush remaining traces and disconnect Prisma
+// Graceful shutdown - stop scheduler, flush traces, and disconnect Prisma
 async function gracefulShutdown() {
-  await trackedGenAI.flush();
+  console.log("Shutting down gracefully...");
+  stopFocusScheduler();
+  // Flush both the tracked Gemini client and the shared Opik client
+  await Promise.all([trackedGenAI.flush(), flushTraces()]);
   await prisma.$disconnect();
   process.exit(0);
 }
