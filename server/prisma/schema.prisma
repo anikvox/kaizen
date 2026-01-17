@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Text-based attention activities (reading articles, documents, etc.)
+model TextAttention {
+  id          Int      @id @default(autoincrement())
+  url         String?  // Optional URL if reading from a webpage
+  title       String
+  content     String   @db.Text
+  wordCount   Int?
+  readingTime Int?     // Estimated reading time in minutes
+  timestamp   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([timestamp])
+  @@index([url])
+}
+
+// Image-based attention activities (viewing images, photos, infographics)
+model ImageAttention {
+  id          Int      @id @default(autoincrement())
+  url         String   // URL to the image
+  title       String
+  description String?  @db.Text
+  width       Int?
+  height      Int?
+  fileSize    Int?     // Size in bytes
+  mimeType    String?
+  timestamp   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([timestamp])
+  @@index([url])
+}
+
+// YouTube video watching activities
+model YoutubeAttention {
+  id           String   @id // YouTube video ID
+  title        String
+  channelName  String?
+  duration     Int?     // Duration in seconds
+  thumbnailUrl String?
+  watchedAt    DateTime @default(now())
+  lastUpdated  DateTime @updatedAt
+
+  @@index([watchedAt])
+}
+
+// Audio listening activities (podcasts, music, audiobooks)
+model AudioAttention {
+  id          Int      @id @default(autoincrement())
+  url         String?  // Optional URL to the audio source
+  title       String
+  artist      String?
+  duration    Int?     // Duration in seconds
+  fileSize    Int?     // Size in bytes
+  mimeType    String?
+  timestamp   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([timestamp])
+  @@index([url])
+}

@@ -3,6 +3,8 @@ import express, { Request, Response } from "express";
 import { GoogleGenAI } from "@google/genai";
 import { trackGemini } from "opik-gemini";
 import { Opik } from "opik";
+import routes from "./routes";
+import { prisma } from "./lib/prisma";
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -32,6 +34,9 @@ const trackedGenAI = trackGemini(genAI, {
 interface MessageRequest {
   message: string;
 }
+
+// Mount API routes
+app.use("/api", routes);
 
 app.post("/message", async (req: Request<{}, {}, MessageRequest>, res: Response) => {
   const { message } = req.body;
@@ -67,13 +72,12 @@ app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
 });
 
-// Graceful shutdown - flush remaining traces
-process.on("SIGTERM", async () => {
+// Graceful shutdown - flush remaining traces and disconnect Prisma
+async function gracefulShutdown() {
   await trackedGenAI.flush();
+  await prisma.$disconnect();
   process.exit(0);
-});
+}
 
-process.on("SIGINT", async () => {
-  await trackedGenAI.flush();
-  process.exit(0);
-});
+process.on("SIGTERM", gracefulShutdown);
+process.on("SIGINT", gracefulShutdown);
