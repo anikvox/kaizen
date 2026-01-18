@@ -2,3 +2,4 @@ packages:
   - extension
   - frontend
   - server
+  - packages/*

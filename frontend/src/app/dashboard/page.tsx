@@ -4,17 +4,30 @@ import React, { useEffect, useState } from "react";
 import { useAuth, UserButton, SignOutButton } from "@clerk/nextjs";
 import { 
   Activity, 
-  Brain, 
-  Clock, 
   FileText, 
   Image as ImageIcon, 
   Youtube, 
   Headphones,
-  TrendingUp,
   LayoutDashboard,
-  LogOut
+  LogOut,
+  TrendingUp,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  Hash
 } from "lucide-react";
 import Link from "next/link";
+import { 
+  FocusSection, 
+  PulseSection, 
+  QuizSection, 
+  JourneyGraph, 
+  ChatWindow, 
+  StatsSection,
+  ActivityCard,
+  Card,
+  CardHeader
+} from "@kaizen/ui";
 
 interface FocusData {
   score: number;
@@ -23,12 +36,109 @@ interface FocusData {
   timestamp: string;
 }
 
-interface ActivityCount {
-  text: number;
-  image: number;
-  youtube: number;
-  audio: number;
-}
+const DUMMY_PULSE = [
+  {
+    id: "1",
+    type: "text",
+    content: "Review your notes on Fundamental theorem of calculus - Wikipedia",
+    timestamp: "5 minutes ago",
+    icon: FileText
+  },
+  {
+    id: "2",
+    type: "stats",
+    content: "You've explored 15 resources - try practicing what you learned",
+    timestamp: "5 minutes ago",
+    icon: Activity
+  },
+  {
+    id: "3",
+    type: "focus",
+    content: "Connect Famous landmarks with Historical landmarks for context",
+    timestamp: "5 minutes ago",
+    icon: TrendingUp
+  },
+  {
+    id: "4",
+    type: "reminder",
+    content: "Remember: The fundamental theorem connects differentiation & integration",
+    timestamp: "5 minutes ago",
+    icon: Clock
+  },
+  {
+    id: "5",
+    type: "progress",
+    content: "You've spent 0.2h on Calculus - great progress!",
+    timestamp: "5 minutes ago",
+    icon: Activity
+  }
+];
+
+const DUMMY_QUIZ = [
+  {
+    id: "1",
+    question: "Which of these is NOT a wonder?",
+    options: ["Great Pyramid of Giza", "Sydney Opera House"]
+  }
+];
+
+const DUMMY_JOURNEY = [
+  {
+    id: "g1",
+    title: "Guide, Bitcoin, Design",
+    tags: ["guide", "bitcoin", "design", "website", "offers"],
+    timestamp: "04:41",
+    totalTime: "9m total",
+    journeys: [
+      {
+        id: "j1",
+        title: "Bitcoin Design",
+        url: "https://bitcoin.design",
+        timestamp: "04:41",
+        duration: "3m",
+        children: [
+          { id: "s1", title: "Guide", url: "https://bitcoin.design/guide", timestamp: "04:41", duration: "1m" },
+          { id: "s2", title: "Principles", url: "https://bitcoin.design/guide/principles", timestamp: "04:42", duration: "1m" },
+          { id: "s3", title: "Units", url: "https://bitcoin.design/guide/units", timestamp: "04:43", duration: "1m" }
+        ]
+      }
+    ]
+  },
+  {
+    id: "g2",
+    title: "Sandipan, Software, Engineer",
+    tags: ["sandipan", "software", "engineer", "website", "personal"],
+    timestamp: "04:33",
+    totalTime: "5m total",
+    journeys: [
+      {
+        id: "j2",
+        title: "Portfolio",
+        url: "https://sandipan.dev",
+        timestamp: "04:33",
+        duration: "5m",
+        children: [
+          { id: "s4", title: "Home", url: "https://sandipan.dev", timestamp: "04:33", duration: "5m" }
+        ]
+      }
+    ]
+  }
+];
+
+const DUMMY_CHATS = [
+  {
+    id: "1",
+    role: "user" as const,
+    content: "hi what was I reading about?",
+    timestamp: "12:45"
+  },
+  {
+    id: "2",
+    role: "assistant" as const,
+    content: "You've been reading about the Wonders of the World! Specifically, you've looked at Wikipedia pages detailing the Seven Wonders of the Ancient World and a broader list of Wonders of the World, including modern contenders. https://en.wikipedia.org/wiki/Seven_Wonders_of_the_Ancient_World and https://en.wikipedia.org/wiki/Wonders_of_the_World",
+    timestamp: "12:46"
+  }
+];
 
 export default function DashboardPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -107,78 +217,128 @@ export default function DashboardPage() {
       </nav>
 
       <main className="relative z-10 max-w-7xl mx-auto px-8 py-12">
-        <header className="mb-12">
-          <div className="flex items-center gap-2 text-xs font-mono text-gray-500 mb-2 uppercase tracking-widest">
-            <LayoutDashboard className="w-3 h-3" />
-            Control_Center_v1.0
+        <header className="mb-12 flex justify-between items-end">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-mono text-gray-500 mb-2 uppercase tracking-widest">
+              <LayoutDashboard className="w-3 h-3" />
+              Control_Center_v1.0
+            </div>
+            <h1 className="text-4xl font-bold tracking-tight">Attention Analytics</h1>
           </div>
-          <h1 className="text-4xl font-bold tracking-tight">Attention Analytics</h1>
+          <div className="flex gap-4">
+             <div className="px-4 py-2 border border-white/10 bg-white/5 text-[10px] font-mono text-gray-400 uppercase">
+                Last Sync: 2m ago
+             </div>
+          </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          {/* Focus Score Card */}
-          <div className="md:col-span-2 bg-white/5 border border-white/10 p-8 rounded-none relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-              <Brain className="w-32 h-32" />
-            </div>
-            
-            <div className="relative z-10">
-              <div className="text-sm font-mono text-gray-500 mb-8 uppercase tracking-widest">Current_Focus_Score</div>
-              <div className="flex items-end gap-4 mb-4">
-                <span className="text-8xl font-bold tracking-tighter">{latestFocus?.score ?? "--"}</span>
-                <span className="text-2xl font-mono text-gray-500 mb-4">/100</span>
-              </div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-white text-black text-[10px] font-bold uppercase tracking-widest mb-6">
-                {latestFocus?.category.replace('_', ' ') ?? "NO_DATA"}
-              </div>
-              <p className="text-gray-400 max-w-md leading-relaxed">
-                {latestFocus?.summary ?? "No recent focus sessions analyzed. Start browsing with the Kaizen extension to see your analytics here."}
-              </p>
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-12">
+          {/* Focus Score Section */}
+          <div className="md:col-span-8 space-y-6">
+            <FocusSection 
+              title={latestFocus?.category.replace('_', ' ') || "Bitcoin design is emphasized"}
+              elapsedTime="1m"
+              category={latestFocus?.category || "DEEP WORK"}
+              summary={latestFocus?.summary || "You're currently focusing on decentralized interface patterns and Bitcoin design systems."}
+              isLive={true}
+              className="h-full"
+            />
           </div>
 
-          {/* Quick Stats */}
-          <div className="space-y-6">
-            <div className="bg-white/5 border border-white/10 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">Temporal_Drift</span>
-                <TrendingUp className="w-4 h-4 text-green-500" />
-              </div>
-              <div className="text-2xl font-bold">+12%</div>
-              <div className="text-[10px] text-gray-500 mt-1 uppercase">Vs Last 24 Hours</div>
-            </div>
-            
-            <div className="bg-white/5 border border-white/10 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">Deep_Work_Time</span>
-                <Clock className="w-4 h-4 text-white" />
-              </div>
-              <div className="text-2xl font-bold">4h 12m</div>
-              <div className="text-[10px] text-gray-500 mt-1 uppercase">Cumulative Today</div>
-            </div>
+          {/* Quick Stats Column */}
+          <div className="md:col-span-4 space-y-6">
+             <Card>
+                <CardHeader className="flex justify-between items-center">
+                   Inferred Parameters
+                   <Hash className="w-3 h-3" />
+                </CardHeader>
+                <div className="space-y-4">
+                   <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                      <span className="text-[10px] text-gray-500 uppercase">Cognitive Load</span>
+                      <span className="text-xs font-bold text-green-500">OPT_OPTIMAL</span>
+                   </div>
+                   <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                      <span className="text-[10px] text-gray-500 uppercase">Retention Rate</span>
+                      <span className="text-xs font-bold text-white">84%</span>
+                   </div>
+                   <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                      <span className="text-[10px] text-gray-500 uppercase">Focus Consistency</span>
+                      <span className="text-xs font-bold text-white">0.92</span>
+                   </div>
+                   <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-gray-500 uppercase">Attention Span</span>
+                      <span className="text-xs font-bold text-blue-500">INCREASING</span>
+                   </div>
+                </div>
+             </Card>
+
+             <div className="grid grid-cols-2 gap-4">
+                <Card className="p-4">
+                   <div className="text-[8px] text-gray-500 uppercase mb-1">Drift</div>
+                   <div className="text-xl font-bold">+12%</div>
+                </Card>
+                <Card className="p-4">
+                   <div className="text-[8px] text-gray-500 uppercase mb-1">Streak</div>
+                   <div className="text-xl font-bold">5d</div>
+                </Card>
+             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-12">
+           <div className="md:col-span-4">
+              <PulseSection items={DUMMY_PULSE} />
+           </div>
+           <div className="md:col-span-8">
+              <QuizSection 
+                 questions={DUMMY_QUIZ} 
+                 currentIdx={0} 
+                 onSelect={() => {}} 
+                 className="h-full"
+              />
+           </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-12">
+           <div className="md:col-span-12">
+              <JourneyGraph groups={DUMMY_JOURNEY} />
+           </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+           <div className="md:col-span-7">
+              <StatsSection 
+                totalFocusTime="19m"
+                activities={[
+                  { label: "Historical landmarks", value: "5m", color: "#3b82f6", count: 5 },
+                  { label: "Famous landmarks", value: "4m", color: "#8b5cf6", count: 4 },
+                  { label: "Calculus", value: "2m", color: "#10b981", count: 2 },
+                  { label: "News publishing platform", value: "2m", color: "#f59e0b", count: 2 },
+                  { label: "Football and Substack", value: "2m", color: "#ef4444", count: 2 }
+                ]}
+                topActivity={{
+                  label: "Historical landmarks",
+                  value: "5m",
+                  percentage: 26
+                }}
+              />
+           </div>
+           <div className="md:col-span-5">
+              <ChatWindow 
+                 messages={DUMMY_CHATS} 
+                 onSend={() => {}} 
+                 isDetailed={true} 
+              />
+           </div>
+        </div>
+
+        <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-6">
           <ActivityCard icon={FileText} label="Text" value="24" sub="Articles" />
           <ActivityCard icon={ImageIcon} label="Images" value="156" sub="Visuals" />
           <ActivityCard icon={Youtube} label="Video" value="8" sub="Sessions" />
           <ActivityCard icon={Headphones} label="Audio" value="3" sub="Streams" />
         </div>
       </main>
-    </div>
-  );
-}
-
-function ActivityCard({ icon: Icon, label, value, sub }: { icon: any, label: string, value: string, sub: string }) {
-  return (
-    <div className="bg-white/5 border border-white/10 p-6 hover:bg-white/10 transition-colors group">
-      <div className="flex items-center justify-between mb-6">
-        <Icon className="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" />
-        <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">{label}</span>
-      </div>
-      <div className="text-3xl font-bold mb-1 tracking-tight">{value}</div>
-      <div className="text-[10px] text-gray-500 uppercase tracking-widest">{sub}</div>
     </div>
   );
 }
