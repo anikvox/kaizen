@@ -20,34 +20,46 @@ const trackedGenAI = trackGemini(genAI, {
 const MODEL_NAME = "gemini-2.5-flash-lite";
 
 interface AttentionData {
+  websiteVisits: Array<{
+    id: number;
+    url: string;
+    title: string;
+    activeTime: number;
+    openedAt: Date;
+    closedAt: Date | null;
+  }>;
   textActivities: Array<{
     id: number;
-    title: string;
-    content: string;
-    url: string | null;
-    wordCount: number | null;
-    readingTime: number | null;
+    url: string;
+    text: string;
     timestamp: Date;
   }>;
   imageActivities: Array<{
     id: number;
-    title: string;
-    description: string | null;
     url: string;
+    src: string;
+    alt: string;
+    title: string;
+    width: number;
+    caption: string;
     timestamp: Date;
   }>;
   youtubeActivities: Array<{
     id: string;
+    videoId: string;
     title: string;
-    channelName: string | null;
-    duration: number | null;
-    watchedAt: Date;
+    channelName: string;
+    caption: string | null;
+    activeWatchTime: number | null;
+    timestamp: Date;
   }>;
   audioActivities: Array<{
     id: number;
+    url: string;
+    src: string;
     title: string;
-    artist: string | null;
-    duration: number | null;
+    duration: number;
+    summary: string;
     timestamp: Date;
   }>;
 }
@@ -69,8 +81,18 @@ export async function fetchAttentionData(
   parentTrace?: Trace
 ): Promise<AttentionData> {
   const fetchData = async () => {
-    const [textActivities, imageActivities, youtubeActivities, audioActivities] =
+    const [websiteVisits, textActivities, imageActivities, youtubeActivities, audioActivities] =
       await Promise.all([
+        prisma.websiteVisit.findMany({
+          where: {
+            userId,
+            openedAt: {
+              gte: windowStart,
+              lte: windowEnd,
+            },
+          },
+          orderBy: { openedAt: "desc" },
+        }),
         prisma.textAttention.findMany({
           where: {
             userId,
@@ -94,12 +116,12 @@ export async function fetchAttentionData(
         prisma.youtubeAttention.findMany({
           where: {
             userId,
-            watchedAt: {
+            timestamp: {
               gte: windowStart,
               lte: windowEnd,
             },
           },
-          orderBy: { watchedAt: "desc" },
+          orderBy: { timestamp: "desc" },
         }),
         prisma.audioAttention.findMany({
           where: {
@@ -114,6 +136,7 @@ export async function fetchAttentionData(
       ]);
 
     return {
+      websiteVisits,
       textActivities,
       imageActivities,
       youtubeActivities,
@@ -143,46 +166,52 @@ export async function fetchAttentionData(
 function formatAttentionForPrompt(data: AttentionData): string {
   const sections: string[] = [];
 
+  if (data.websiteVisits.length > 0) {
+    sections.push("## Websites Visited");
+    data.websiteVisits.forEach((w, i) => {
+      const activeMinutes = Math.round(w.activeTime / 60000);
+      sections.push(`${i + 1}. "${w.title}" - ${w.url}`);
+      sections.push(`   Active time: ${activeMinutes} minutes`);
+    });
+  }
+
   if (data.textActivities.length > 0) {
-    sections.push("## Text Content Consumed");
+    sections.push("\n## Text Content Consumed");
     data.textActivities.forEach((t, i) => {
-      sections.push(
-        `${i + 1}. "${t.title}" (${t.wordCount || "unknown"} words, ${t.readingTime || "unknown"} min read)`
-      );
-      sections.push(`   URL: ${t.url || "N/A"}`);
-      sections.push(`   Content preview: ${t.content.substring(0, 200)}...`);
+      sections.push(`${i + 1}. URL: ${t.url}`);
+      sections.push(`   Text preview: ${t.text.substring(0, 200)}...`);
     });
   }
 
   if (data.imageActivities.length > 0) {
     sections.push("\n## Images Viewed");
     data.imageActivities.forEach((img, i) => {
-      sections.push(`${i + 1}. "${img.title}"`);
-      if (img.description) sections.push(`   Description: ${img.description}`);
+      sections.push(`${i + 1}. "${img.title}" (${img.alt})`);
+      sections.push(`   Caption: ${img.caption}`);
     });
   }
 
   if (data.youtubeActivities.length > 0) {
     sections.push("\n## YouTube Videos Watched");
     data.youtubeActivities.forEach((yt, i) => {
-      const duration = yt.duration
-        ? `${Math.floor(yt.duration / 60)}m ${yt.duration % 60}s`
-        : "unknown duration";
+      const watchTime = yt.activeWatchTime
+        ? `${Math.floor(yt.activeWatchTime / 60)}m ${yt.activeWatchTime % 60}s active watch time`
+        : "unknown watch time";
       sections.push(
-        `${i + 1}. "${yt.title}" by ${yt.channelName || "Unknown"} (${duration})`
+        `${i + 1}. "${yt.title}" by ${yt.channelName} (${watchTime})`
       );
+      if (yt.caption) {
+        sections.push(`   Captions: ${yt.caption.substring(0, 200)}...`);
+      }
     });
   }
 
   if (data.audioActivities.length > 0) {
     sections.push("\n## Audio Content");
     data.audioActivities.forEach((a, i) => {
-      const duration = a.duration
-        ? `${Math.floor(a.duration / 60)}m ${a.duration % 60}s`
-        : "unknown duration";
-      sections.push(
-        `${i + 1}. "${a.title}" by ${a.artist || "Unknown"} (${duration})`
-      );
+      const duration = `${Math.floor(a.duration / 60)}m ${a.duration % 60}s`;
+      sections.push(`${i + 1}. "${a.title}" (${duration})`);
+      sections.push(`   Summary: ${a.summary}`);
     });
   }
 
@@ -197,6 +226,7 @@ export async function calculateFocus(
   parentTrace?: Trace
 ): Promise<FocusResult> {
   const totalActivities =
+    data.websiteVisits.length +
     data.textActivities.length +
     data.imageActivities.length +
     data.youtubeActivities.length +

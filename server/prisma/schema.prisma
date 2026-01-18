@@ -7,19 +7,35 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Website visit tracking
+model WebsiteVisit {
+  id        Int      @id @default(autoincrement())
+  url       String   @unique // URL is unique per user visit
+  title     String
+  metadata  Json     @default("{}")
+  openedAt  DateTime @default(now())
+  closedAt  DateTime?
+  activeTime Int     @default(0) // Active time in milliseconds
+  referrer  String?
+  updatedAt DateTime @updatedAt
+  userId    String   // Link to user
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([openedAt])
+  @@index([updatedAt])
+  @@index([userId])
+}
+
 // Text-based attention activities (reading articles, documents, etc.)
 model TextAttention {
-  id          Int      @id @default(autoincrement())
-  url         String?  // Optional URL if reading from a webpage
-  title       String
-  content     String   @db.Text
-  wordCount   Int?
-  readingTime Int?     // Estimated reading time in minutes
-  timestamp   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  userId      String   // Link to user
+  id        Int      @id @default(autoincrement())
+  url       String
+  text      String   @db.Text
+  timestamp DateTime @default(now())
+  userId    String   // Link to user
 
-  user        User     @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 
   @@index([timestamp])
   @@index([url])
@@ -28,19 +44,17 @@ model TextAttention {
 
 // Image-based attention activities (viewing images, photos, infographics)
 model ImageAttention {
-  id          Int      @id @default(autoincrement())
-  url         String   // URL to the image
-  title       String
-  description String?  @db.Text
-  width       Int?
-  height      Int?
-  fileSize    Int?     // Size in bytes
-  mimeType    String?
-  timestamp   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  userId      String   // Link to user
+  id        Int      @id @default(autoincrement())
+  url       String   // URL of the page
+  src       String   // URL to the image
+  alt       String
+  title     String
+  width     Int
+  caption   String   @db.Text
+  timestamp DateTime @default(now())
+  userId    String   // Link to user
 
-  user        User     @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 
   @@index([timestamp])
   @@index([url])
@@ -49,35 +63,34 @@ model ImageAttention {
 
 // YouTube video watching activities
 model YoutubeAttention {
-  id           String   @id // YouTube video ID
-  title        String
-  channelName  String?
-  duration     Int?     // Duration in seconds
-  thumbnailUrl String?
-  watchedAt    DateTime @default(now())
-  lastUpdated  DateTime @updatedAt
-  userId       String   // Link to user
+  id              String   @id @default(cuid()) // Internal ID
+  videoId         String   // YouTube video ID
+  title           String
+  channelName     String
+  caption         String?  @db.Text
+  activeWatchTime Int?     // Active watch time in seconds
+  timestamp       DateTime @default(now())
+  userId          String   // Link to user
 
-  user         User     @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 
-  @@index([watchedAt])
+  @@index([timestamp])
+  @@index([videoId])
   @@index([userId])
 }
 
 // Audio listening activities (podcasts, music, audiobooks)
 model AudioAttention {
-  id          Int      @id @default(autoincrement())
-  url         String?  // Optional URL to the audio source
-  title       String
-  artist      String?
-  duration    Int?     // Duration in seconds
-  fileSize    Int?     // Size in bytes
-  mimeType    String?
-  timestamp   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  userId      String   // Link to user
+  id        Int      @id @default(autoincrement())
+  url       String   // URL of the page
+  src       String   // URL to the audio source
+  title     String
+  duration  Int      // Duration in seconds
+  summary   String   @db.Text
+  timestamp DateTime @default(now())
+  userId    String   // Link to user
 
-  user        User     @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 
   @@index([timestamp])
   @@index([url])
@@ -127,6 +140,7 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  websiteVisits     WebsiteVisit[]
   textAttentions    TextAttention[]
   imageAttentions   ImageAttention[]
   youtubeAttentions YoutubeAttention[]

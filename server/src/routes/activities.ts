@@ -19,15 +19,155 @@ async function ensureUser(clerkId: string) {
 }
 
 // =============================================================================
+// WEBSITE VISIT ROUTES
+// =============================================================================
+
+interface WebsiteVisitOpenedBody {
+  event: "opened";
+  url: string;
+  title: string;
+  metadata?: Record<string, string>;
+  referrer?: string;
+  timestamp: number;
+}
+
+interface WebsiteVisitActiveTimeBody {
+  event: "active-time-update";
+  url: string;
+  time: number; // Active time in milliseconds
+  timestamp: number;
+}
+
+interface WebsiteVisitClosedBody {
+  event: "closed";
+  url: string;
+  time: number;
+  timestamp: number;
+}
+
+type WebsiteVisitBody = WebsiteVisitOpenedBody | WebsiteVisitActiveTimeBody | WebsiteVisitClosedBody;
+
+// GET /activities/website - List all website visits for current user
+router.get("/website", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.auth!.userId;
+    const visits = await prisma.websiteVisit.findMany({
+      where: { userId },
+      orderBy: { openedAt: "desc" },
+    });
+    res.json(visits);
+  } catch (error) {
+    console.error("Error fetching website visits:", error);
+    res.status(500).json({ error: "Failed to fetch website visits" });
+  }
+});
+
+// POST /activities/website - Handle website visit events (opened, active-time-update, closed)
+router.post("/website", async (req: AuthRequest<{}, {}, WebsiteVisitBody>, res: Response) => {
+  try {
+    const body = req.body;
+    const userId = req.auth!.userId;
+
+    if (!body.event || !body.url) {
+      res.status(400).json({ error: "event and url are required" });
+      return;
+    }
+
+    await ensureUser(userId);
+
+    switch (body.event) {
+      case "opened": {
+        // Upsert: create or update if URL already exists for this user
+        const visit = await prisma.websiteVisit.upsert({
+          where: {
+            url: body.url,
+          },
+          create: {
+            url: body.url,
+            title: body.title,
+            metadata: body.metadata || {},
+            openedAt: new Date(body.timestamp),
+            referrer: body.referrer === body.url ? null : body.referrer,
+            activeTime: 0,
+            userId,
+          },
+          update: {
+            title: body.title,
+            metadata: body.metadata || {},
+            openedAt: new Date(body.timestamp),
+            referrer: body.referrer === body.url ? null : body.referrer,
+            closedAt: null, // Reset closed time on re-open
+            activeTime: 0,  // Reset active time on re-open
+          },
+        });
+        res.status(201).json(visit);
+        break;
+      }
+      case "active-time-update": {
+        const visit = await prisma.websiteVisit.updateMany({
+          where: { url: body.url, userId },
+          data: {
+            activeTime: body.time,
+          },
+        });
+        if (visit.count === 0) {
+          res.status(404).json({ error: "Website visit not found" });
+          return;
+        }
+        res.json({ success: true, updated: visit.count });
+        break;
+      }
+      case "closed": {
+        const visit = await prisma.websiteVisit.updateMany({
+          where: { url: body.url, userId },
+          data: {
+            closedAt: new Date(body.timestamp),
+            activeTime: body.time,
+          },
+        });
+        if (visit.count === 0) {
+          res.status(404).json({ error: "Website visit not found" });
+          return;
+        }
+        res.json({ success: true, updated: visit.count });
+        break;
+      }
+      default:
+        res.status(400).json({ error: "Invalid event type" });
+    }
+  } catch (error) {
+    console.error("Error handling website visit:", error);
+    res.status(500).json({ error: "Failed to handle website visit" });
+  }
+});
+
+// DELETE /activities/website/:id - Delete a website visit
+router.delete("/website/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id as string);
+    const userId = req.auth!.userId;
+
+    const existing = await prisma.websiteVisit.findUnique({ where: { id } });
+    if (!existing || existing.userId !== userId) {
+      res.status(404).json({ error: "Website visit not found" });
+      return;
+    }
+
+    await prisma.websiteVisit.delete({ where: { id } });
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting website visit:", error);
+    res.status(500).json({ error: "Failed to delete website visit" });
+  }
+});
+
+// =============================================================================
 // TEXT ATTENTION ROUTES
 // =============================================================================
 
 interface CreateTextAttentionBody {
-  url?: string;
-  title: string;
-  content: string;
-  wordCount?: number;
-  readingTime?: number;
+  url: string;
+  text: string;
 }
 
 // GET /activities/text - List all text attention activities for current user
@@ -69,18 +209,18 @@ router.get("/text/:id", async (req: AuthRequest, res: Response) => {
 // POST /activities/text - Create a new text attention activity
 router.post("/text", async (req: AuthRequest<{}, {}, CreateTextAttentionBody>, res: Response) => {
   try {
-    const { url, title, content, wordCount, readingTime } = req.body;
+    const { url, text } = req.body;
     const userId = req.auth!.userId;
 
-    if (!title || !content) {
-      res.status(400).json({ error: "title and content are required" });
+    if (!url || !text) {
+      res.status(400).json({ error: "url and text are required" });
       return;
     }
 
     await ensureUser(userId);
 
     const activity = await prisma.textAttention.create({
-      data: { url, title, content, wordCount, readingTime, userId },
+      data: { url, text, userId },
     });
 
     res.status(201).json(activity);
@@ -115,13 +255,12 @@ router.delete("/text/:id", async (req: AuthRequest, res: Response) => {
 // =============================================================================
 
 interface CreateImageAttentionBody {
-  url: string;
+  url: string;   // URL of the page
+  src: string;   // URL to the image
+  alt: string;
   title: string;
-  description?: string;
-  width?: number;
-  height?: number;
-  fileSize?: number;
-  mimeType?: string;
+  width: number;
+  caption: string;
 }
 
 // GET /activities/image - List all image attention activities
@@ -163,18 +302,18 @@ router.get("/image/:id", async (req: AuthRequest, res: Response) => {
 // POST /activities/image - Create a new image attention activity
 router.post("/image", async (req: AuthRequest<{}, {}, CreateImageAttentionBody>, res: Response) => {
   try {
-    const { url, title, description, width, height, fileSize, mimeType } = req.body;
+    const { url, src, alt, title, width, caption } = req.body;
     const userId = req.auth!.userId;
 
-    if (!url || !title) {
-      res.status(400).json({ error: "url and title are required" });
+    if (!url || !src || !title || !caption) {
+      res.status(400).json({ error: "url, src, title, and caption are required" });
       return;
     }
 
     await ensureUser(userId);
 
     const activity = await prisma.imageAttention.create({
-      data: { url, title, description, width, height, fileSize, mimeType, userId },
+      data: { url, src, alt, title, width, caption, userId },
     });
 
     res.status(201).json(activity);
@@ -209,11 +348,11 @@ router.delete("/image/:id", async (req: AuthRequest, res: Response) => {
 // =============================================================================
 
 interface CreateYoutubeAttentionBody {
-  id: string; // YouTube video ID
+  videoId: string;  // YouTube video ID
   title: string;
-  channelName?: string;
-  duration?: number;
-  thumbnailUrl?: string;
+  channelName: string;
+  caption?: string;
+  activeWatchTime?: number;
 }
 
 // GET /activities/youtube - List all YouTube attention activities
@@ -222,7 +361,7 @@ router.get("/youtube", async (req: AuthRequest, res: Response) => {
     const userId = req.auth!.userId;
     const activities = await prisma.youtubeAttention.findMany({
       where: { userId },
-      orderBy: { watchedAt: "desc" },
+      orderBy: { timestamp: "desc" },
     });
     res.json(activities);
   } catch (error) {
@@ -255,18 +394,18 @@ router.get("/youtube/:id", async (req: AuthRequest, res: Response) => {
 // POST /activities/youtube - Create a new YouTube attention activity
 router.post("/youtube", async (req: AuthRequest<{}, {}, CreateYoutubeAttentionBody>, res: Response) => {
   try {
-    const { id, title, channelName, duration, thumbnailUrl } = req.body;
+    const { videoId, title, channelName, caption, activeWatchTime } = req.body;
     const userId = req.auth!.userId;
 
-    if (!id || !title) {
-      res.status(400).json({ error: "id and title are required" });
+    if (!videoId || !title || !channelName) {
+      res.status(400).json({ error: "videoId, title, and channelName are required" });
       return;
     }
 
     await ensureUser(userId);
 
     const activity = await prisma.youtubeAttention.create({
-      data: { id, title, channelName, duration, thumbnailUrl, userId },
+      data: { videoId, title, channelName, caption, activeWatchTime, userId },
     });
 
     res.status(201).json(activity);
@@ -301,12 +440,11 @@ router.delete("/youtube/:id", async (req: AuthRequest, res: Response) => {
 // =============================================================================
 
 interface CreateAudioAttentionBody {
-  url?: string;
+  url: string;    // URL of the page
+  src: string;    // URL to the audio source
   title: string;
-  artist?: string;
-  duration?: number;
-  fileSize?: number;
-  mimeType?: string;
+  duration: number;
+  summary: string;
 }
 
 // GET /activities/audio - List all audio attention activities
@@ -348,18 +486,18 @@ router.get("/audio/:id", async (req: AuthRequest, res: Response) => {
 // POST /activities/audio - Create a new audio attention activity
 router.post("/audio", async (req: AuthRequest<{}, {}, CreateAudioAttentionBody>, res: Response) => {
   try {
-    const { url, title, artist, duration, fileSize, mimeType } = req.body;
+    const { url, src, title, duration, summary } = req.body;
     const userId = req.auth!.userId;
 
-    if (!title) {
-      res.status(400).json({ error: "title is required" });
+    if (!url || !src || !title || !summary) {
+      res.status(400).json({ error: "url, src, title, and summary are required" });
       return;
     }
 
     await ensureUser(userId);
 
     const activity = await prisma.audioAttention.create({
-      data: { url, title, artist, duration, fileSize, mimeType, userId },
+      data: { url, src, title, duration, summary, userId },
     });
 
     res.status(201).json(activity);

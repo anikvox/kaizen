@@ -15,7 +15,12 @@ async function getUsersWithRecentActivity(windowHours: number): Promise<string[]
   const windowStart = new Date(Date.now() - windowHours * 60 * 60 * 1000);
 
   // Get unique user IDs from all activity types within the window
-  const [textUsers, imageUsers, youtubeUsers, audioUsers] = await Promise.all([
+  const [websiteUsers, textUsers, imageUsers, youtubeUsers, audioUsers] = await Promise.all([
+    prisma.websiteVisit.findMany({
+      where: { openedAt: { gte: windowStart } },
+      select: { userId: true },
+      distinct: ["userId"],
+    }),
     prisma.textAttention.findMany({
       where: { timestamp: { gte: windowStart } },
       select: { userId: true },
@@ -27,7 +32,7 @@ async function getUsersWithRecentActivity(windowHours: number): Promise<string[]
       distinct: ["userId"],
     }),
     prisma.youtubeAttention.findMany({
-      where: { watchedAt: { gte: windowStart } },
+      where: { timestamp: { gte: windowStart } },
       select: { userId: true },
       distinct: ["userId"],
     }),
@@ -40,6 +45,7 @@ async function getUsersWithRecentActivity(windowHours: number): Promise<string[]
 
   // Combine and deduplicate user IDs
   const allUserIds = new Set([
+    ...websiteUsers.map((u) => u.userId),
     ...textUsers.map((u) => u.userId),
     ...imageUsers.map((u) => u.userId),
     ...youtubeUsers.map((u) => u.userId),
