@@ -1,38 +1,21 @@
-.new-tab {
-  background-color: #f0f0f0;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  color: #333;
-  display: block;
-  font-size: 12px;
-  line-height: 16px;
-  margin: 0 0 10px;
-  padding: 10px;
-  position: relative;
-  text-decoration: none;
-  width: 100%;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-@keyframes pulse {
-  0% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-  100% {
-    opacity: 1;
-  }
+:root {
+  --background: #050505;
+  --foreground: #ffffff;
 }
 
 body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   margin: 0;
   padding: 0;
-  background-color: #fff;
 }
 
-/* Custom styles for Clerk components if needed */
+/* Custom styles for Clerk components */
 .cl-rootBox {
   width: 100%;
 }
@@ -41,4 +24,47 @@ body {
   box-shadow: none !important;
   border: none !important;
   padding: 0 !important;
+  background: transparent !important;
+}
+
+.cl-headerTitle {
+  color: white !important;
+}
+
+.cl-headerSubtitle {
+  color: #a1a1aa !important;
+}
+
+.cl-socialButtonsBlockButton {
+  background-color: white !important;
+  color: black !important;
+  border-radius: 0 !important;
+}
+
+.cl-formButtonPrimary {
+  background-color: white !important;
+  color: black !important;
+  border-radius: 0 !important;
+  text-transform: uppercase !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.05em !important;
+}
+
+.cl-footerActionText, .cl-footerActionLink {
+  color: #a1a1aa !important;
+}
+
+.cl-footerActionLink:hover {
+  color: white !important;
+}
+
+.cl-formFieldLabel {
+  color: #a1a1aa !important;
+}
+
+.cl-formFieldInput {
+  background-color: #0a0a0a !important;
+  border: 1px solid #27272a !important;
+  color: white !important;
+  border-radius: 0 !important;
 }

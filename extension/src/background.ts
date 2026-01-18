@@ -2,18 +2,18 @@ import { SERVER_URL } from "./default-settings"
 
 console.log("Kaizen background script initialized")
 
-// Storage key for auth token (set by popup when user signs in)
-const AUTH_TOKEN_KEY = "kaizen_auth_token"
+// Storage key for device token (set by popup when user links account)
+const DEVICE_TOKEN_KEY = "kaizen_device_token"
 
-// Helper to get auth token from storage
+// Helper to get device token from storage
 async function getAuthToken(): Promise<string | null> {
   try {
-    const result = await chrome.storage.local.get(AUTH_TOKEN_KEY)
-    return result[AUTH_TOKEN_KEY] || null
+    const result = await chrome.storage.local.get(DEVICE_TOKEN_KEY)
+    return result[DEVICE_TOKEN_KEY] || null
   } catch (error) {
-    console.error("Error getting auth token:", error)
+    console.error("Error getting device token:", error)
+    return null
   }
-  return null
 }
 
 // Message types
@@ -23,14 +23,16 @@ const COGNITIVE_ATTENTION_AUDIO_MESSAGE_NAME = "cognitive-attention-audio"
 
 // Unified message listener for all message types
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  // Handle auth token messages from popup
+  // Handle device token messages from popup
   if (message.type === "SET_AUTH_TOKEN") {
-    chrome.storage.local.set({ [AUTH_TOKEN_KEY]: message.token })
+    chrome.storage.local.set({ [DEVICE_TOKEN_KEY]: message.token })
+    console.log("Device token updated")
     sendResponse({ success: true })
     return true
   }
   if (message.type === "CLEAR_AUTH_TOKEN") {
-    chrome.storage.local.remove(AUTH_TOKEN_KEY)
+    chrome.storage.local.remove(DEVICE_TOKEN_KEY)
+    console.log("Device token cleared")
     sendResponse({ success: true })
     return true
   }

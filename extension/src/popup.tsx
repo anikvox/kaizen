@@ -1,188 +1,202 @@
-import { useEffect, useState } from "react"
-import { ClerkWrapper } from "./components/ClerkWrapper"
-import { SignedIn, SignedOut, UserButton, useAuth } from "@clerk/chrome-extension"
+import { useEffect, useState, useCallback } from "react"
 import { SERVER_URL } from "./default-settings"
+import { ExternalLink, Loader2, Link2, LogOut, User } from "lucide-react"
 
-// Component to sync auth token with background script
-function TokenSync() {
-  const { getToken, isSignedIn } = useAuth()
+import "./style.css"
 
-  useEffect(() => {
-    const syncToken = async () => {
-      if (isSignedIn) {
-        try {
-          const token = await getToken()
-          if (token) {
-            chrome.runtime.sendMessage({ type: "SET_AUTH_TOKEN", token })
-          }
-        } catch (error) {
-          console.error("Error syncing token:", error)
-        }
-      } else {
-        chrome.runtime.sendMessage({ type: "CLEAR_AUTH_TOKEN" })
-      }
-    }
+const WEBSITE_URL = process.env.PLASMO_PUBLIC_DASHBOARD_URL?.replace('/dashboard', '') || 'http://localhost:3000'
+const INSTALLATION_ID_KEY = "kaizen_installation_id"
+const DEVICE_TOKEN_KEY = "kaizen_device_token"
+const USER_DATA_KEY = "kaizen_user_data"
 
-    syncToken()
-    // Re-sync token periodically (tokens expire)
-    const interval = setInterval(syncToken, 60000) // Every minute
-    return () => clearInterval(interval)
-  }, [isSignedIn, getToken])
-
-  return null
+interface UserData {
+  email: string
+  name: string | null
+  image: string | null
 }
 
-// Component to handle signed out state - opens options page for login
-function SignedOutHandler() {
-  useEffect(() => {
-    // Open the options page for login
-    chrome.runtime.openOptionsPage()
-    // Close the popup after opening options
-    window.close()
-  }, [])
-
-  return (
-    <div style={{ padding: 24, minWidth: 250, textAlign: "center", fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      <div style={{ marginBottom: 16 }}>
-        <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, letterSpacing: '-0.025em' }}>KAIZEN</h1>
-      </div>
-      <p style={{ margin: 0, color: "#666", fontSize: "0.875rem" }}>Redirecting to login...</p>
-    </div>
-  )
+// Generate a unique installation ID for this extension install
+async function getOrCreateInstallationId(): Promise<string> {
+  const result = await chrome.storage.local.get(INSTALLATION_ID_KEY)
+  if (result[INSTALLATION_ID_KEY]) {
+    return result[INSTALLATION_ID_KEY]
+  }
+  
+  // Generate a new unique ID
+  const id = crypto.randomUUID()
+  await chrome.storage.local.set({ [INSTALLATION_ID_KEY]: id })
+  return id
 }
 
-function Dashboard() {
-  const { getToken } = useAuth()
-  const [stats, setStats] = useState<{ averageScore: number, totalRecords: number } | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const token = await getToken()
-        if (!token) return
-
-        const response = await fetch(`${SERVER_URL}/focus/stats/today`, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          setStats(data)
-        }
-      } catch (error) {
-        console.error("Error fetching stats:", error)
-      } finally {
-        setLoading(false)
-      }
+// Check device token status from server
+async function checkDeviceStatus(installationId: string): Promise<{
+  linked: boolean
+  token: string | null
+  user: UserData | null
+}> {
+  try {
+    const response = await fetch(`${SERVER_URL}/device-tokens/status/${installationId}`)
+    if (!response.ok) {
+      throw new Error("Failed to check status")
     }
-
-    fetchStats()
-  }, [getToken])
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        padding: 20,
-        minWidth: 300,
-        fontFamily: "system-ui, -apple-system, sans-serif",
-        color: "#1a1a1a"
-      }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <h1 style={{ margin: 0, fontSize: '1.25rem', letterSpacing: '-0.03em', fontWeight: 800 }}>KAIZEN</h1>
-        <UserButton afterSignOutUrl="/options.html" />
-      </div>
-
-      <div style={{ 
-        background: '#f8f9fa', 
-        padding: '16px', 
-        borderRadius: '12px',
-        border: '1px solid #e9ecef',
-        marginBottom: 16
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ fontSize: '0.75rem', color: '#6c757d', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Current Status</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#40c057' }}></div>
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#40c057' }}>ACTIVE</span>
-          </div>
-        </div>
-        
-        <div style={{ marginTop: 12 }}>
-          {loading ? (
-            <div style={{ height: '40px', background: '#e9ecef', borderRadius: '4px', animation: 'pulse 1.5s infinite' }}></div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{ fontSize: '1.5rem', fontWeight: 700 }}>
-                {stats ? `${Math.round(stats.averageScore * 100)}%` : '--%'}
-              </span>
-              <span style={{ fontSize: '0.75rem', color: '#6c757d' }}>Focus Score Today</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: 20 }}>
-        <div style={{ background: '#fff', padding: '12px', borderRadius: '10px', border: '1px solid #e9ecef' }}>
-          <div style={{ fontSize: '0.7rem', color: '#6c757d', marginBottom: '4px' }}>Sessions</div>
-          <div style={{ fontSize: '1rem', fontWeight: 600 }}>{stats?.totalRecords || 0}</div>
-        </div>
-        <div style={{ background: '#fff', padding: '12px', borderRadius: '10px', border: '1px solid #e9ecef' }}>
-          <div style={{ fontSize: '0.7rem', color: '#6c757d', marginBottom: '4px' }}>Level</div>
-          <div style={{ fontSize: '1rem', fontWeight: 600 }}>Pro</div>
-        </div>
-      </div>
-
-      <button 
-        onClick={() => {
-          const dashboardUrl = process.env.PLASMO_PUBLIC_DASHBOARD_URL || 'http://localhost:3000/dashboard';
-          chrome.tabs.create({ url: dashboardUrl });
-        }}
-        style={{
-          width: '100%',
-          padding: '12px',
-          background: '#000',
-          color: '#fff',
-          border: 'none',
-          borderRadius: '8px',
-          cursor: 'pointer',
-          fontSize: '0.875rem',
-          fontWeight: 600,
-          transition: 'background 0.2s',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '8px'
-        }}
-        onMouseOver={(e) => e.currentTarget.style.background = '#333'}
-        onMouseOut={(e) => e.currentTarget.style.background = '#000'}
-      >
-        Open Dashboard
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-          <polyline points="15 3 21 3 21 9"></polyline>
-          <line x1="10" y1="14" x2="21" y2="3"></line>
-        </svg>
-      </button>
-    </div>
-  )
+    return await response.json()
+  } catch (error) {
+    console.error("Error checking device status:", error)
+    return { linked: false, token: null, user: null }
+  }
 }
 
 function IndexPopup() {
+  const [isLoading, setIsLoading] = useState(true)
+  const [isLinked, setIsLinked] = useState(false)
+  const [user, setUser] = useState<UserData | null>(null)
+  const [installationId, setInstallationId] = useState<string | null>(null)
+
+  const checkStatus = useCallback(async () => {
+    const id = await getOrCreateInstallationId()
+    setInstallationId(id)
+
+    // First check local storage for cached data
+    const cached = await chrome.storage.local.get([DEVICE_TOKEN_KEY, USER_DATA_KEY])
+    if (cached[DEVICE_TOKEN_KEY] && cached[USER_DATA_KEY]) {
+      setIsLinked(true)
+      setUser(cached[USER_DATA_KEY])
+      setIsLoading(false)
+      
+      // Still verify with server in background
+      const status = await checkDeviceStatus(id)
+      if (!status.linked) {
+        // Token was revoked, clear local data
+        await chrome.storage.local.remove([DEVICE_TOKEN_KEY, USER_DATA_KEY])
+        setIsLinked(false)
+        setUser(null)
+      } else if (status.user) {
+        setUser(status.user)
+        await chrome.storage.local.set({ [USER_DATA_KEY]: status.user })
+      }
+      return
+    }
+
+    // Check with server
+    const status = await checkDeviceStatus(id)
+    if (status.linked && status.token) {
+      await chrome.storage.local.set({
+        [DEVICE_TOKEN_KEY]: status.token,
+        [USER_DATA_KEY]: status.user
+      })
+      // Notify background script
+      chrome.runtime.sendMessage({ type: "SET_AUTH_TOKEN", token: status.token })
+      setIsLinked(true)
+      setUser(status.user)
+    }
+    
+    setIsLoading(false)
+  }, [])
+
+  useEffect(() => {
+    checkStatus()
+    
+    // Poll for status changes (in case user links from website)
+    const interval = setInterval(checkStatus, 3000)
+    return () => clearInterval(interval)
+  }, [checkStatus])
+
+  const handleLinkAccount = () => {
+    if (!installationId) return
+    const linkUrl = `${WEBSITE_URL}/link-extension?installationId=${installationId}`
+    chrome.tabs.create({ url: linkUrl })
+  }
+
+  const handleUnlink = async () => {
+    await chrome.storage.local.remove([DEVICE_TOKEN_KEY, USER_DATA_KEY])
+    chrome.runtime.sendMessage({ type: "CLEAR_AUTH_TOKEN" })
+    setIsLinked(false)
+    setUser(null)
+  }
+
+  const handleOpenDashboard = () => {
+    chrome.tabs.create({ url: `${WEBSITE_URL}/dashboard` })
+    window.close()
+  }
+
+  if (isLoading) {
+    return (
+      <div className="p-6 min-w-[300px] bg-[#050505] text-white">
+        <div className="flex justify-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-gray-500" />
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <ClerkWrapper>
-      <TokenSync />
-      <SignedIn>
-        <Dashboard />
-      </SignedIn>
-      <SignedOut>
-        <SignedOutHandler />
-      </SignedOut>
-    </ClerkWrapper>
+    <div className="p-6 min-w-[300px] bg-[#050505] text-white">
+      {isLinked ? (
+        <div className="flex flex-col gap-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 bg-white flex items-center justify-center">
+                <div className="w-3 h-3 bg-black rotate-45" />
+              </div>
+              <h1 className="text-lg font-bold tracking-tighter uppercase">KAIZEN</h1>
+            </div>
+            <div className="flex items-center gap-2">
+              {user?.image ? (
+                <img src={user.image} alt="" className="w-7 h-7" />
+              ) : (
+                <div className="w-7 h-7 bg-white/10 flex items-center justify-center">
+                  <User className="w-4 h-4 text-gray-400" />
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="bg-[#0A0A0A] border border-white/10 p-4">
+            <p className="text-[10px] font-mono text-green-500 uppercase font-bold">Active</p>
+            <p className="text-xs text-gray-400 mt-1">
+              Linked as {user?.name || user?.email}
+            </p>
+          </div>
+
+          <button
+            onClick={handleOpenDashboard}
+            className="w-full py-3 bg-white text-black font-bold uppercase text-xs tracking-widest hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+          >
+            Open Dashboard
+            <ExternalLink className="w-3 h-3" />
+          </button>
+
+          <button
+            onClick={handleUnlink}
+            className="w-full py-2 bg-transparent border border-white/10 text-gray-400 font-medium uppercase text-[10px] tracking-widest hover:bg-white/5 hover:text-white transition-colors flex items-center justify-center gap-2"
+          >
+            <LogOut className="w-3 h-3" />
+            Unlink Account
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-4 py-2">
+          <div className="w-10 h-10 bg-white flex items-center justify-center mb-2">
+            <div className="w-5 h-5 bg-black rotate-45" />
+          </div>
+          <h1 className="text-xl font-bold tracking-tighter uppercase">KAIZEN</h1>
+          <p className="text-gray-400 text-sm text-center">
+            Link your account to start tracking focus
+          </p>
+          <button 
+            onClick={handleLinkAccount}
+            className="w-full py-3 bg-white text-black font-bold uppercase text-xs tracking-widest hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 group"
+          >
+            <Link2 className="w-3 h-3" />
+            Link Account
+            <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+          </button>
+          <p className="text-[10px] text-gray-500 text-center">
+            You'll be redirected to sign in on the website
+          </p>
+        </div>
+      )}
+    </div>
   )
 }
 

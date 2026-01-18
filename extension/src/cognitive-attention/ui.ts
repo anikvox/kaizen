@@ -89,17 +89,18 @@ class CognitiveAttentionTextUI {
       position: fixed;
       top: 10px;
       right: 10px;
-      background: rgba(0, 0, 0, 0.9);
-      color: #00ff00;
-      padding: 15px;
-      border-radius: 8px;
-      font-family: 'Courier New', monospace;
-      font-size: 12px;
+      background: rgba(5, 5, 5, 0.95);
+      color: #ffffff;
+      padding: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 11px;
       z-index: 999999;
-      max-width: 400px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+      max-width: 380px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
       max-height: 80vh;
       overflow-y: auto;
+      backdrop-filter: blur(10px);
     `
     document.body.appendChild(overlay)
   }
@@ -114,11 +115,12 @@ class CognitiveAttentionTextUI {
     }
 
     let html = `
-      <div style="border-bottom: 2px solid #00ff00; margin-bottom: 10px; padding-bottom: 5px;">
-        <strong>🧠 ATTENTION TRACKER</strong>
+      <div style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 12px; padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+        <div style="width: 8px; height: 8px; background: white; rotate: 45deg;"></div>
+        <strong style="letter-spacing: 0.1em; text-transform: uppercase; font-size: 10px;">Cognitive Telemetry</strong>
       </div>
-      <div style="margin-bottom: 10px; color: #ffff00;">
-        ${data.message}
+      <div style="margin-bottom: 12px; color: #a1a1aa; font-family: monospace; font-size: 10px; text-transform: uppercase;">
+        STATUS: ${data.message}
       </div>
     `
 
@@ -136,32 +138,33 @@ class CognitiveAttentionTextUI {
       const emptyBar = "░".repeat(10 - Math.floor(progress / 10))
       const metThreshold =
         sustained.duration >= sustained.cognitiveAttentionThreshold
-      const statusIcon = metThreshold ? "✓" : "⏱️"
-      const statusColor = metThreshold ? "#00ff00" : "#ffaa00"
+      const statusIcon = metThreshold ? "●" : "○"
+      const statusColor = metThreshold ? "#22c55e" : "#71717a"
 
       const readingInfo = `
-        <div style="color: #00ff88; font-size: 11px; margin-bottom: 3px;">
-          Reading: ${sustained.wordsRead} / ${sustained.totalWords} words (${sustained.readingProgress.toFixed(0)}%)
+        <div style="color: #ffffff; font-size: 10px; margin-bottom: 4px; font-family: monospace;">
+          READ_PROGRESS: ${sustained.wordsRead}/${sustained.totalWords} WDS (${sustained.readingProgress.toFixed(0)}%)
         </div>
-        <div style="color: #888; font-size: 10px;">
-          @ ${sustained.wordsPerMinute} WPM
+        <div style="color: #71717a; font-size: 9px; font-family: monospace;">
+          VELOCITY: ${sustained.wordsPerMinute} WPM
         </div>
       `
 
       const thresholdMet = metThreshold
-        ? '<div style="color: #00ff00; font-size: 10px; margin-top: 5px;">✓ Cognitive attention threshold met!</div>'
+        ? '<div style="color: #22c55e; font-size: 9px; margin-top: 8px; font-family: monospace; text-transform: uppercase; letter-spacing: 0.05em;">✓ Threshold reached. Context locked.</div>'
         : ""
 
       html += `
-        <div style="margin: 10px 0; padding: 10px; background: rgba(0,100,255,0.1); border: 2px solid ${statusColor}; border-radius: 5px;">
-          <div style="color: ${statusColor}; font-weight: bold; margin-bottom: 5px;">
-            ${statusIcon} SUSTAINED ATTENTION: ${(sustained.duration / 1000).toFixed(1)}s / ${(sustained.cognitiveAttentionThreshold / 1000).toFixed(0)}s
+        <div style="margin: 12px 0; padding: 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);">
+          <div style="color: ${statusColor}; font-weight: bold; margin-bottom: 8px; font-size: 10px; font-family: monospace; display: flex; align-items: center; gap: 6px;">
+            <span style="display: inline-block; width: 6px; height: 6px; background: ${statusColor}; border-radius: 50%;"></span>
+            SUSTAINED_ATTN: ${(sustained.duration / 1000).toFixed(1)}S / ${(sustained.cognitiveAttentionThreshold / 1000).toFixed(0)}S
           </div>
-          <div style="font-family: monospace; color: ${statusColor}; margin-bottom: 5px;">
+          <div style="font-family: monospace; color: ${statusColor}; margin-bottom: 8px; font-size: 10px; letter-spacing: 2px;">
             [${progressBar}${emptyBar}] ${progress.toFixed(0)}%
           </div>
-          <div style="color: #00aaff; font-size: 11px; margin-bottom: 3px;">
-            Confidence: ${sustained.confidence}%
+          <div style="color: #71717a; font-size: 9px; margin-bottom: 8px; font-family: monospace;">
+            CONFIDENCE_SCORE: ${sustained.confidence}%
           </div>
           ${readingInfo}
           ${thresholdMet}
@@ -169,23 +172,23 @@ class CognitiveAttentionTextUI {
       `
 
       html +=
-        '<div style="margin-top: 10px;"><strong>Top Candidates:</strong></div>'
+        '<div style="margin-top: 12px; font-size: 9px; text-transform: uppercase; color: #71717a; letter-spacing: 0.1em; margin-bottom: 8px;">Top_Candidates:</div>'
 
       data.topElements.forEach((elem, idx) => {
         const preview =
-          elem.text.substring(0, 60) + (elem.text.length > 60 ? "..." : "")
-        const color = idx === 0 ? "#00ff00" : idx === 1 ? "#ffff00" : "#888"
-        const cogBadge = elem.cognitivelyAttended ? " 🧠" : ""
+          elem.text.substring(0, 50) + (elem.text.length > 50 ? "..." : "")
+        const color = idx === 0 ? "#ffffff" : "#71717a"
+        const cogBadge = elem.cognitivelyAttended ? " [🧠]" : ""
 
         html += `
-          <div style="margin: 8px 0; padding: 8px; background: rgba(255,255,255,0.05); border-left: 3px solid ${color};">
-            <div style="color: ${color}; font-weight: bold;">
-              #${idx + 1} - Score: ${elem.score.toFixed(0)}${cogBadge}
+          <div style="margin: 4px 0; padding: 8px; background: rgba(255, 255, 255, 0.02); border-left: 1px solid ${idx === 0 ? 'white' : 'transparent'};">
+            <div style="color: ${color}; font-family: monospace; font-size: 9px;">
+              #${idx + 1} // SCR: ${elem.score.toFixed(0)}${cogBadge}
             </div>
-            <div style="font-size: 10px; color: #aaa; margin: 3px 0;">
-              ${elem.reasons.join(" + ")}
+            <div style="font-size: 9px; color: #52525b; margin: 2px 0; font-family: monospace;">
+              SIG: ${elem.reasons.join(" + ")}
             </div>
-            <div style="font-size: 11px; font-style: italic; margin-top: 5px;">
+            <div style="font-size: 10px; color: #a1a1aa; margin-top: 4px; line-height: 1.4;">
               "${preview}"
             </div>
           </div>
@@ -194,10 +197,10 @@ class CognitiveAttentionTextUI {
     }
 
     html += `
-      <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #333; font-size: 10px; color: #666;">
-        Scroll: ${data.state.scrollVelocity.toFixed(0)} px/s | 
-        Active: ${data.state.isPageActive ? "✓" : "✗"} | 
-        Elements: ${data.state.textElementsCount}
+      <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.05); font-size: 9px; color: #52525b; font-family: monospace; display: flex; justify-content: space-between;">
+        <span>VEL: ${data.state.scrollVelocity.toFixed(0)} PX/S</span>
+        <span>ACT: ${data.state.isPageActive ? "TRUE" : "FALSE"}</span>
+        <span>NODE: ${data.state.textElementsCount}</span>
       </div>
     `
 
@@ -229,11 +232,11 @@ class CognitiveAttentionTextUI {
       top: ${bounds.top + window.scrollY}px;
       width: ${bounds.width}px;
       height: ${bounds.height}px;
-      border: 2px solid #00ff00;
-      background: rgba(0, 255, 0, 0.1);
+      border: 1px solid white;
+      background: rgba(255, 255, 255, 0.05);
       pointer-events: none;
       z-index: 999998;
-      box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
     `
     document.body.appendChild(highlight)
 
@@ -256,12 +259,12 @@ class CognitiveAttentionTextUI {
           width: ${bounds.width}px;
           height: ${progressHeight}px;
           background: linear-gradient(to bottom, 
-            rgba(144, 238, 144, 0.3) 0%, 
-            rgba(144, 238, 144, 0.2) 80%,
-            rgba(144, 238, 144, 0) 100%);
+            rgba(255, 255, 255, 0.1) 0%, 
+            rgba(255, 255, 255, 0.05) 80%,
+            rgba(255, 255, 255, 0) 100%);
           pointer-events: none;
           z-index: 999999;
-          border-bottom: 2px dashed #90ee90;
+          border-bottom: 1px dashed white;
         `
         document.body.appendChild(progressOverlay)
 
@@ -273,16 +276,16 @@ class CognitiveAttentionTextUI {
             position: absolute;
             left: ${bounds.left + window.scrollX + bounds.width - 60}px;
             top: ${bounds.top + window.scrollY + progressHeight - 20}px;
-            background: rgba(144, 238, 144, 0.9);
-            color: #000;
+            background: white;
+            color: black;
             padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 11px;
+            font-size: 9px;
             font-family: monospace;
             font-weight: bold;
             pointer-events: none;
             z-index: 1000000;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            text-transform: uppercase;
           `
           label.textContent = `${sustainedAttention.readingProgress.toFixed(0)}% read`
           document.body.appendChild(label)
@@ -352,12 +355,12 @@ class CognitiveAttentionImageUI {
     rect.setAttribute("width", (width - 1).toString())
     rect.setAttribute("height", (height - 1).toString())
     rect.setAttribute("fill", "none")
-    rect.setAttribute("stroke", "#bfff00")
-    rect.setAttribute("stroke-width", "2")
+    rect.setAttribute("stroke", "#ffffff")
+    rect.setAttribute("stroke-width", "1")
     rect.setAttribute("stroke-dasharray", perimeter.toString())
     rect.setAttribute("stroke-dashoffset", perimeter.toString())
     rect.setAttribute("class", this.progressClassName)
-    rect.style.filter = "drop-shadow(0 0 4px rgba(191, 255, 0, 0.8))"
+    rect.style.filter = "drop-shadow(0 0 8px rgba(255, 255, 255, 0.4))"
 
     svg.appendChild(rect)
     document.body.appendChild(svg)
@@ -371,10 +374,9 @@ class CognitiveAttentionImageUI {
       top: ${bounds.top}px;
       width: ${bounds.width}px;
       height: ${bounds.height}px;
-      background: rgba(191, 255, 0, 0.08);
+      background: rgba(255, 255, 255, 0.05);
       pointer-events: none;
       z-index: 999996;
-      border-radius: 2px;
     `
     document.body.appendChild(overlay)
   }
@@ -495,16 +497,15 @@ class CognitiveAttentionAudioUI {
     const indicator = document.createElement("div")
     indicator.style.cssText = `
       position: absolute;
-      bottom: -4px;
+      bottom: -2px;
       left: 0;
       right: 0;
-      height: 4px;
-      background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%);
-      border-radius: 2px;
+      height: 2px;
+      background: white;
       pointer-events: none;
       z-index: 9999;
       transition: width 0.1s ease-out;
-      box-shadow: 0 1px 3px rgba(251, 191, 36, 0.5);
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
     `
 
     // Position indicator relative to audio element
@@ -541,19 +542,13 @@ class CognitiveAttentionAudioUI {
   ): void {
     indicator.style.width = `${progress}%`
 
-    // Change color as progress increases
+    // Monochromatic progress
     if (progress >= 100) {
-      indicator.style.background =
-        "linear-gradient(90deg, #10b981 0%, #059669 100%)"
-      indicator.style.boxShadow = "0 1px 3px rgba(16, 185, 129, 0.5)"
-    } else if (progress >= 75) {
-      indicator.style.background =
-        "linear-gradient(90deg, #f59e0b 0%, #d97706 100%)"
-      indicator.style.boxShadow = "0 1px 3px rgba(245, 158, 11, 0.5)"
+      indicator.style.background = "white"
+      indicator.style.boxShadow = "0 0 15px rgba(255, 255, 255, 0.8)"
     } else {
-      indicator.style.background =
-        "linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%)"
-      indicator.style.boxShadow = "0 1px 3px rgba(251, 191, 36, 0.5)"
+      indicator.style.background = "rgba(255, 255, 255, 0.7)"
+      indicator.style.boxShadow = "0 0 5px rgba(255, 255, 255, 0.3)"
     }
   }
 }
