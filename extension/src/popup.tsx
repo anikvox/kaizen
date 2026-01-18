@@ -59,20 +59,19 @@ function IndexPopup() {
     // First check local storage for cached data
     const cached = await chrome.storage.local.get([DEVICE_TOKEN_KEY, USER_DATA_KEY])
     if (cached[DEVICE_TOKEN_KEY] && cached[USER_DATA_KEY]) {
-      setIsLinked(true)
-      setUser(cached[USER_DATA_KEY])
-      setIsLoading(false)
-      
-      // Still verify with server in background
+      // User is already authenticated - open sidepanel instead
+      // Verify with server first
       const status = await checkDeviceStatus(id)
       if (!status.linked) {
         // Token was revoked, clear local data
         await chrome.storage.local.remove([DEVICE_TOKEN_KEY, USER_DATA_KEY])
-        setIsLinked(false)
-        setUser(null)
-      } else if (status.user) {
-        setUser(status.user)
-        await chrome.storage.local.set({ [USER_DATA_KEY]: status.user })
+        chrome.runtime.sendMessage({ type: "AUTH_STATE_CHANGED", isAuthenticated: false })
+        setIsLoading(false)
+      } else {
+        // Token is valid - switch to sidepanel
+        chrome.runtime.sendMessage({ type: "OPEN_SIDEPANEL" })
+        window.close()
+        return
       }
       return
     }
@@ -86,8 +85,15 @@ function IndexPopup() {
       })
       // Notify background script
       chrome.runtime.sendMessage({ type: "SET_AUTH_TOKEN", token: status.token })
+      // Notify about auth state change to switch to sidepanel mode
+      chrome.runtime.sendMessage({ type: "AUTH_STATE_CHANGED", isAuthenticated: true })
       setIsLinked(true)
       setUser(status.user)
+      
+      // Close popup and open sidepanel
+      chrome.runtime.sendMessage({ type: "OPEN_SIDEPANEL" })
+      window.close()
+      return
     }
     
     setIsLoading(false)
@@ -153,6 +159,7 @@ function IndexPopup() {
   return (
     <div className="p-6 min-w-[300px] bg-[#050505] text-white">
       {isLinked ? (
+        // Fallback UI for authenticated users if sidepanel can't open
         <div className="flex flex-col gap-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
@@ -176,6 +183,9 @@ function IndexPopup() {
             <p className="text-[10px] font-mono text-green-500 uppercase font-bold">Active</p>
             <p className="text-xs text-gray-400 mt-1">
               Linked as {user?.name || user?.email}
+            </p>
+            <p className="text-[10px] text-gray-500 mt-2">
+              Click the extension icon on a regular webpage to open the side panel.
             </p>
           </div>
 

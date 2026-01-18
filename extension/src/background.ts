@@ -4,6 +4,97 @@ console.log("Kaizen background script initialized")
 
 // Storage key for device token (set by popup when user links account)
 const DEVICE_TOKEN_KEY = "kaizen_device_token"
+const USER_DATA_KEY = "kaizen_user_data"
+
+// Check if user is authenticated
+async function isAuthenticated(): Promise<boolean> {
+  try {
+    const result = await chrome.storage.local.get(DEVICE_TOKEN_KEY)
+    return !!result[DEVICE_TOKEN_KEY]
+  } catch (error) {
+    return false
+  }
+}
+
+// Update action behavior based on auth state
+async function updateActionBehavior() {
+  const authenticated = await isAuthenticated()
+  
+  if (authenticated) {
+    // Disable popup so clicking opens sidepanel
+    await chrome.action.setPopup({ popup: "" })
+    
+    // Enable side panel globally
+    if (chrome.sidePanel) {
+      try {
+        await chrome.sidePanel.setOptions({
+          enabled: true
+        })
+        // Set the panel to open on action click (Chrome 116+)
+        if (chrome.sidePanel.setPanelBehavior) {
+          await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
+        }
+      } catch (error) {
+        console.error("Error setting up side panel:", error)
+      }
+    }
+    console.log("User authenticated - sidepanel mode enabled")
+  } else {
+    // Enable popup for unauthenticated users
+    await chrome.action.setPopup({ popup: "popup.html" })
+    
+    // Disable side panel auto-open when not authenticated
+    if (chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
+      try {
+        await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false })
+      } catch (error) {
+        console.error("Error disabling side panel behavior:", error)
+      }
+    }
+    console.log("User not authenticated - popup mode enabled")
+  }
+}
+
+// Handle extension icon click - open sidepanel when authenticated (fallback)
+// Note: This listener only fires when popup is empty AND openPanelOnActionClick is false/unavailable
+chrome.action.onClicked.addListener(async (tab) => {
+  if (tab.id) {
+    try {
+      // Check if sidePanel API is available (Chrome 114+)
+      if (chrome.sidePanel) {
+        // Ensure side panel is enabled for this tab
+        await chrome.sidePanel.setOptions({
+          tabId: tab.id,
+          enabled: true
+        })
+        // Try opening by windowId first (more reliable), fall back to tabId
+        if (tab.windowId) {
+          await chrome.sidePanel.open({ windowId: tab.windowId })
+        } else {
+          await chrome.sidePanel.open({ tabId: tab.id })
+        }
+      } else {
+        // Fallback for older Chrome versions - open popup manually
+        console.warn("sidePanel API not available, falling back to popup")
+        await chrome.action.setPopup({ popup: "popup.html" })
+      }
+    } catch (error) {
+      console.error("Error opening side panel:", error)
+      // Fallback to popup on error
+      await chrome.action.setPopup({ popup: "popup.html" })
+    }
+  }
+})
+
+// Initialize action behavior on startup
+updateActionBehavior()
+
+// Listen for storage changes to update behavior dynamically
+chrome.storage.local.onChanged.addListener((changes) => {
+  if (changes[DEVICE_TOKEN_KEY]) {
+    updateActionBehavior()
+  }
+})
 
 // Helper to get device token from storage
 async function getAuthToken(): Promise<string | null> {
@@ -33,6 +124,39 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "CLEAR_AUTH_TOKEN") {
     chrome.storage.local.remove(DEVICE_TOKEN_KEY)
     console.log("Device token cleared")
+    sendResponse({ success: true })
+    return true
+  }
+  if (message.type === "AUTH_STATE_CHANGED") {
+    updateActionBehavior()
+    sendResponse({ success: true })
+    return true
+  }
+  if (message.type === "OPEN_SIDEPANEL") {
+    // Request to open sidepanel from popup after successful auth
+    // First update behavior, then open
+    updateActionBehavior().then(() => {
+      chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+        if (tabs[0]?.id && chrome.sidePanel) {
+          try {
+            // Enable side panel for this tab first
+            await chrome.sidePanel.setOptions({
+              tabId: tabs[0].id,
+              enabled: true
+            })
+            // Try opening by windowId first (more reliable), fall back to tabId
+            const windowId = tabs[0].windowId
+            if (windowId) {
+              await chrome.sidePanel.open({ windowId })
+            } else {
+              await chrome.sidePanel.open({ tabId: tabs[0].id })
+            }
+          } catch (error) {
+            console.error("Error opening side panel:", error)
+          }
+        }
+      })
+    })
     sendResponse({ success: true })
     return true
   }
