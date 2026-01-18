@@ -1,4 +1,4 @@
-.PHONY: dev dev-up dev-extension dev-frontend dev-server db-seed
+.PHONY: dev dev-up dev-extension dev-frontend dev-server db-seed clean
 
 dev:
 	@echo "Starting all services in development mode..."
@@ -29,3 +29,13 @@ dev-up:
 
 db-seed:
 	cd server && pnpm db:seed
+
+clean:
+	cd server && docker compose down -v
+	find . -type d -name "node_modules" -exec rm -rf {} +
+	find . -type d -name ".next" -exec rm -rf {} +
+	find . -type d -name ".plasmo" -exec rm -rf {} +
+	find . -type d -name ".clerk" -exec rm -rf {} +
+	find . -type d -name "dist" -exec rm -rf {} +
+	find . -type d -name "build" -exec rm -rf {} +
+	pnpm install
