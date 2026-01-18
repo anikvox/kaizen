@@ -35,8 +35,8 @@
     "host_permissions": [
       "https://*/*",
       "http://*/*",
-      "http://localhost:3000/*",
-      "http://localhost:3001/*"
+      "http://localhost:60091/*",
+      "http://localhost:60092/*"
     ],
     "permissions": [
       "tabs",

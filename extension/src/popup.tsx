@@ -4,7 +4,7 @@ import { ExternalLink, Loader2, Link2, LogOut, User } from "lucide-react"
 
 import "./style.css"
 
-const WEBSITE_URL = process.env.PLASMO_PUBLIC_DASHBOARD_URL?.replace('/dashboard', '') || 'http://localhost:3000'
+const WEBSITE_URL = process.env.PLASMO_PUBLIC_DASHBOARD_URL?.replace('/dashboard', '') || 'http://localhost:60091'
 const INSTALLATION_ID_KEY = "kaizen_installation_id"
 const DEVICE_TOKEN_KEY = "kaizen_device_token"
 const USER_DATA_KEY = "kaizen_user_data"

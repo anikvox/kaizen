@@ -20,4 +20,4 @@ export const COGNITIVE_ATTENTION_SHOW_OVERLAY = {
 }
 
 // Server configuration
-export const SERVER_URL = process.env.PLASMO_PUBLIC_SERVER_URL || "https://api.kaizen.apps.sandipan.dev/api"
+export const SERVER_URL = process.env.PLASMO_PUBLIC_SERVER_URL || "http://localhost:60092/api"

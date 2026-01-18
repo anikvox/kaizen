@@ -4,7 +4,7 @@ import { SERVER_URL } from "./default-settings"
 
 import "./style.css"
 
-const WEBSITE_URL = process.env.PLASMO_PUBLIC_DASHBOARD_URL?.replace('/dashboard', '') || 'http://localhost:3000'
+const WEBSITE_URL = process.env.PLASMO_PUBLIC_DASHBOARD_URL?.replace('/dashboard', '') || 'http://localhost:60091'
 const INSTALLATION_ID_KEY = "kaizen_installation_id"
 const DEVICE_TOKEN_KEY = "kaizen_device_token"
 const USER_DATA_KEY = "kaizen_user_data"
@@ -167,7 +167,7 @@ function IndexOptions() {
 
             <button
               onClick={() => {
-                const dashboardUrl = process.env.PLASMO_PUBLIC_DASHBOARD_URL || 'http://localhost:3000/dashboard'
+                const dashboardUrl = process.env.PLASMO_PUBLIC_DASHBOARD_URL || 'http://localhost:60091/dashboard'
                 chrome.tabs.create({ url: dashboardUrl })
               }}
               className="w-full py-4 bg-white text-black font-bold uppercase tracking-widest hover:bg-gray-200 transition-all flex items-center justify-center gap-2 group"

@@ -1,4 +1,3 @@
-import "dotenv/config";
 import express, { Request, Response } from "express";
 import cors from "cors";
 import { GoogleGenAI } from "@google/genai";
@@ -9,14 +8,15 @@ import { startFocusScheduler, stopFocusScheduler } from "./lib/scheduler";
 import { opikClient, flushTraces } from "./lib/opik";
 
 const app = express();
-const port = process.env.PORT || 3001;
+const port = process.env.PORT || 60092;
 
 // CORS configuration
+const corsOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(",").map(origin => origin.trim())
+  : ["http://localhost:60091"];
+
 app.use(cors({
-  origin: [
-    "http://localhost:3000",
-    "https://kaizen.apps.sandipan.dev"
-  ],
+  origin: corsOrigins,
   credentials: true
 }));
 

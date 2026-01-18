@@ -9,8 +9,8 @@ Uses the official [`opik-gemini`](https://www.comet.com/docs/opik/integrations/g
 Create a `.env` file with:
 
 ```
-PORT=3000
-DATABASE_URL="postgresql://kaizen:kaizen_password@localhost:5432/kaizen?schema=public"
+PORT=60092
+DATABASE_URL="postgresql://kaizen:kaizen_password@localhost:60093/kaizen?schema=public"
 GEMINI_API_KEY=your_gemini_api_key_here
 OPIK_API_KEY=your_opik_api_key_here
 OPIK_WORKSPACE=your_workspace_name
@@ -55,7 +55,7 @@ pnpm db:studio    # Open Prisma Studio GUI
 docker build -t kaizen-server .
 
 # Run
-docker run -p 3000:3000 \
+docker run -p 60092:60092 \
   -e DATABASE_URL=your_database_url \
   -e GEMINI_API_KEY=your_key \
   -e OPIK_API_KEY=your_key \
@@ -70,7 +70,7 @@ docker run -p 3000:3000 \
 Send a message to Gemini.
 
 ```bash
-curl -X POST http://localhost:3000/message \
+curl -X POST http://localhost:60092/message \
   -H "Content-Type: application/json" \
   -d '{"message": "Hello, Gemini!"}'
 ```
@@ -80,7 +80,7 @@ curl -X POST http://localhost:3000/message \
 Health check endpoint.
 
 ```bash
-curl http://localhost:3000/health
+curl http://localhost:60092/health
 ```
 
 ---
@@ -108,7 +108,7 @@ Text-based attention activities (reading articles, documents, etc.)
 
 **Example:**
 ```bash
-curl -X POST http://localhost:3000/api/activities/text \
+curl -X POST http://localhost:60092/api/activities/text \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://example.com/article",
@@ -140,7 +140,7 @@ Image-based attention activities (viewing images, photos, infographics)
 
 **Example:**
 ```bash
-curl -X POST http://localhost:3000/api/activities/image \
+curl -X POST http://localhost:60092/api/activities/image \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://example.com/infographic.jpg",
@@ -171,7 +171,7 @@ YouTube video watching activities
 
 **Example:**
 ```bash
-curl -X POST http://localhost:3000/api/activities/youtube \
+curl -X POST http://localhost:60092/api/activities/youtube \
   -H "Content-Type: application/json" \
   -d '{
     "id": "dQw4w9WgXcQ",
@@ -202,7 +202,7 @@ Audio listening activities (podcasts, music, audiobooks)
 
 **Example:**
 ```bash
-curl -X POST http://localhost:3000/api/activities/audio \
+curl -X POST http://localhost:60092/api/activities/audio \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://example.com/podcast.mp3",

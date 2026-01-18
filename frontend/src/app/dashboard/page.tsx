@@ -151,7 +151,7 @@ export default function DashboardPage() {
       
       try {
         const token = await getToken();
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://api.kaizen.apps.sandipan.dev";
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:60092";
         const response = await fetch(`${apiUrl}/api/focus/latest`, {
           headers: {
             Authorization: `Bearer ${token}`,
