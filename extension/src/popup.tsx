@@ -108,6 +108,27 @@ function IndexPopup() {
   }
 
   const handleUnlink = async () => {
+    try {
+      // Get the current device token to authenticate the unlink request
+      const cached = await chrome.storage.local.get(DEVICE_TOKEN_KEY)
+      const token = cached[DEVICE_TOKEN_KEY]
+      
+      if (token && installationId) {
+        // Call server to delete the device token
+        await fetch(`${SERVER_URL}/device-tokens/unlink`, {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify({ installationId }),
+        })
+      }
+    } catch (error) {
+      console.error("Error unlinking from server:", error)
+    }
+    
+    // Always clear local storage regardless of server response
     await chrome.storage.local.remove([DEVICE_TOKEN_KEY, USER_DATA_KEY])
     chrome.runtime.sendMessage({ type: "CLEAR_AUTH_TOKEN" })
     setIsLinked(false)
