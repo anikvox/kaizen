@@ -8,5 +8,6 @@
     "build:extension": "pnpm --filter kaizen-extension build",
     "build:frontend": "pnpm --filter kaizen-frontend build",
     "build:server": "pnpm --filter kaizen-server build"
-  }
+  },
+  "license": "MIT"
 }
