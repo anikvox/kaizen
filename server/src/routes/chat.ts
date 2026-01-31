@@ -155,7 +155,7 @@ router.post('/sessions/:sessionId/messages', verifyDeviceToken, async (req: Requ
     });
 
     // Prepare Gemini prompt with context
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     // Build conversation history
     const history = previousMessages.slice(0, -1).map(msg => ({
@@ -170,7 +170,7 @@ router.post('/sessions/:sessionId/messages', verifyDeviceToken, async (req: Requ
       metadata: {
         userId,
         sessionId,
-        model: 'gemini-pro'
+        model: 'gemini-2.5-flash'
       }
     });
 
@@ -196,7 +196,7 @@ router.post('/sessions/:sessionId/messages', verifyDeviceToken, async (req: Requ
           content: fullResponse,
           metadata: {
             userId,
-            model: 'gemini-pro'
+            model: 'gemini-2.5-flash'
           }
         }
       });

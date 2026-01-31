@@ -21,7 +21,7 @@ async function getOrCreateInstallationId(): Promise<string> {
   if (result[INSTALLATION_ID_KEY]) {
     return result[INSTALLATION_ID_KEY]
   }
-  
+
   // Generate a new unique ID
   const id = crypto.randomUUID()
   await chrome.storage.local.set({ [INSTALLATION_ID_KEY]: id })
@@ -52,6 +52,39 @@ function IndexPopup() {
   const [user, setUser] = useState<UserData | null>(null)
   const [installationId, setInstallationId] = useState<string | null>(null)
 
+  // Helper to send message and wait for async response
+  const sendMessageAsync = (message: object): Promise<{ success: boolean; opened?: boolean }> => {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(message, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error("Message error:", chrome.runtime.lastError)
+          resolve({ success: false })
+        } else {
+          resolve(response || { success: false })
+        }
+      })
+    })
+  }
+
+  const openSidepanelAndClose = async () => {
+    try {
+      const response = await sendMessageAsync({ type: "OPEN_SIDEPANEL" })
+      if (response?.opened) {
+        // Sidepanel successfully opened, now we can close the popup
+        window.close()
+      } else {
+        // Sidepanel failed to open, stay on popup and show fallback UI
+        console.warn("Sidepanel did not open, showing fallback UI")
+        setIsLoading(false)
+        setIsLinked(true)
+      }
+    } catch (error) {
+      console.error("Error opening sidepanel:", error)
+      setIsLoading(false)
+      setIsLinked(true)
+    }
+  }
+
   const checkStatus = useCallback(async () => {
     const id = await getOrCreateInstallationId()
     setInstallationId(id)
@@ -59,8 +92,7 @@ function IndexPopup() {
     // First check local storage for cached data
     const cached = await chrome.storage.local.get([DEVICE_TOKEN_KEY, USER_DATA_KEY])
     if (cached[DEVICE_TOKEN_KEY] && cached[USER_DATA_KEY]) {
-      // User is already authenticated - open sidepanel instead
-      // Verify with server first
+      // User is already authenticated - verify with server first
       const status = await checkDeviceStatus(id)
       if (!status.linked) {
         // Token was revoked, clear local data
@@ -69,9 +101,8 @@ function IndexPopup() {
         setIsLoading(false)
       } else {
         // Token is valid - switch to sidepanel
-        chrome.runtime.sendMessage({ type: "OPEN_SIDEPANEL" })
-        window.close()
-        return
+        setUser(status.user)
+        await openSidepanelAndClose()
       }
       return
     }
@@ -89,19 +120,18 @@ function IndexPopup() {
       chrome.runtime.sendMessage({ type: "AUTH_STATE_CHANGED", isAuthenticated: true })
       setIsLinked(true)
       setUser(status.user)
-      
-      // Close popup and open sidepanel
-      chrome.runtime.sendMessage({ type: "OPEN_SIDEPANEL" })
-      window.close()
+
+      // Wait for sidepanel to open before closing popup
+      await openSidepanelAndClose()
       return
     }
-    
+
     setIsLoading(false)
   }, [])
 
   useEffect(() => {
     checkStatus()
-    
+
     // Poll for status changes (in case user links from website)
     const interval = setInterval(checkStatus, 3000)
     return () => clearInterval(interval)
@@ -118,7 +148,7 @@ function IndexPopup() {
       // Get the current device token to authenticate the unlink request
       const cached = await chrome.storage.local.get(DEVICE_TOKEN_KEY)
       const token = cached[DEVICE_TOKEN_KEY]
-      
+
       if (token && installationId) {
         // Call server to delete the device token
         await fetch(`${SERVER_URL}/device-tokens/unlink`, {
@@ -133,7 +163,7 @@ function IndexPopup() {
     } catch (error) {
       console.error("Error unlinking from server:", error)
     }
-    
+
     // Always clear local storage regardless of server response
     await chrome.storage.local.remove([DEVICE_TOKEN_KEY, USER_DATA_KEY])
     chrome.runtime.sendMessage({ type: "CLEAR_AUTH_TOKEN" })
@@ -178,7 +208,7 @@ function IndexPopup() {
               )}
             </div>
           </div>
-          
+
           <div className="bg-[#0A0A0A] border border-white/10 p-4">
             <p className="text-[10px] font-mono text-green-500 uppercase font-bold">Active</p>
             <p className="text-xs text-gray-400 mt-1">
@@ -214,7 +244,7 @@ function IndexPopup() {
           <p className="text-gray-400 text-sm text-center">
             Link your account to start tracking focus
           </p>
-          <button 
+          <button
             onClick={handleLinkAccount}
             className="w-full py-3 bg-white text-black font-bold uppercase text-xs tracking-widest hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 group"
           >

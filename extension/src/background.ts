@@ -22,11 +22,11 @@ const SIDE_PANEL_PATH = "sidepanel.html"
 // Update action behavior based on auth state
 async function updateActionBehavior() {
   const authenticated = await isAuthenticated()
-  
+
   if (authenticated) {
     // Disable popup so clicking opens sidepanel
     await chrome.action.setPopup({ popup: "" })
-    
+
     // Enable side panel globally with explicit path
     if (chrome.sidePanel) {
       try {
@@ -47,7 +47,7 @@ async function updateActionBehavior() {
   } else {
     // Enable popup for unauthenticated users
     await chrome.action.setPopup({ popup: "popup.html" })
-    
+
     // Disable side panel auto-open when not authenticated
     if (chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
       try {
@@ -154,33 +154,40 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   if (message.type === "OPEN_SIDEPANEL") {
     // Request to open sidepanel from popup after successful auth
-    // First update behavior, then open
-    updateActionBehavior().then(() => {
-      chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+    // First update behavior, then open - wait for completion before responding
+    (async () => {
+      try {
+        await updateActionBehavior()
+
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
         if (tabs[0]?.id && chrome.sidePanel) {
-          try {
-            // Enable side panel for this tab first with explicit path
-            await chrome.sidePanel.setOptions({
-              tabId: tabs[0].id,
-              path: SIDE_PANEL_PATH,
-              enabled: true
-            })
-            // Try opening by windowId first (more reliable), fall back to tabId
-            const windowId = tabs[0].windowId
-            if (windowId) {
-              await chrome.sidePanel.open({ windowId })
-            } else {
-              await chrome.sidePanel.open({ tabId: tabs[0].id })
-            }
-            console.log("Side panel opened via OPEN_SIDEPANEL message")
-          } catch (error) {
-            console.error("Error opening side panel:", error)
+          // Enable side panel for this tab first with explicit path
+          await chrome.sidePanel.setOptions({
+            tabId: tabs[0].id,
+            path: SIDE_PANEL_PATH,
+            enabled: true
+          })
+          // Try opening by windowId first (more reliable), fall back to tabId
+          const windowId = tabs[0].windowId
+          if (windowId) {
+            await chrome.sidePanel.open({ windowId })
+          } else {
+            await chrome.sidePanel.open({ tabId: tabs[0].id })
           }
+          console.log("Side panel opened via OPEN_SIDEPANEL message")
+          // Small delay to ensure sidepanel is fully rendered before popup closes
+          await new Promise(resolve => setTimeout(resolve, 150))
+          sendResponse({ success: true, opened: true })
+        } else {
+          console.warn("No active tab or sidePanel API not available")
+          sendResponse({ success: false, opened: false })
         }
-      })
-    })
-    sendResponse({ success: true })
-    return true
+      } catch (error) {
+        console.error("Error opening side panel:", error)
+        sendResponse({ success: false, opened: false, error: String(error) })
+      }
+    })()
+    return true // Keep message channel open for async response
   }
 
   // Handle attention messages from content scripts
@@ -403,4 +410,4 @@ async function handleWebsiteVisit(payload: WebsiteVisitPayload) {
   }
 }
 
-export {}
+export { }

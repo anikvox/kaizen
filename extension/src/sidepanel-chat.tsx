@@ -83,13 +83,12 @@ export const Chat: React.FC<ChatProps> = ({
   // Fetch the latest unprocessed intent
   const latestIntent = useLiveQuery(async () => {
     const intents = await db
-      .table<Intent>("intentQueue")
+      .table<any>("intentQueue")
       .orderBy("timestamp")
       .reverse()
-      .filter((intent) => !intent.processed)
-      .limit(1)
       .toArray()
-    return intents[0]
+    // Manual filter and limit for mock table
+    return intents.find((intent) => !intent.processed)
   }, [])
 
   // Watch for new chat intents and add them to the message text
@@ -116,13 +115,16 @@ export const Chat: React.FC<ChatProps> = ({
         setSelectedAudios([base64ToFile(latestIntent.payload, "audio.mp3")])
       }
 
-      // Consume the intent by deleting it from the queue
-      db.table<Intent>("intentQueue")
-        .where("timestamp")
-        .equals(latestIntent.timestamp)
-        .modify({
-          processed: true
-        })
+      // Consume the intent by updating it in the mock table
+      const consumeIntent = async () => {
+        const table = db.table<any>("intentQueue")
+        const intents = await table.where("timestamp").equals(latestIntent.timestamp).toArray()
+        if (intents.length > 0) {
+          const updatedIntent = { ...intents[0], processed: true }
+          await table.put(updatedIntent)
+        }
+      }
+      consumeIntent()
     }
   }, [latestIntent])
 
@@ -138,20 +140,23 @@ export const Chat: React.FC<ChatProps> = ({
   }, [messages?.length, streamingMessage])
 
   useEffect(() => {
-    const session = chatService.getSession()
-    if (session && 'inputUsage' in session && 'inputQuota' in session) {
-      const usage = { inputUsage: session.inputUsage as number, inputQuota: session.inputQuota as number }
-      setUsageInfo(usage)
-      onUsageUpdate?.(usage)
+    const fetchSessionUsage = async () => {
+      const session = await chatService.getSession()
+      if (session && 'inputUsage' in session && 'inputQuota' in session) {
+        const usage = {
+          inputUsage: session.inputUsage as number,
+          inputQuota: session.inputQuota as number
+        }
+        setUsageInfo(usage)
+        onUsageUpdate?.(usage)
+      }
     }
+    fetchSessionUsage()
   }, [messages, onUsageUpdate, chatService])
 
   useEffect(() => {
-    return () => {
-      if (chatService.getSession()) {
-        chatService.destroy()
-      }
-    }
+    // Component mount/unmount logic - Currently nothing to cleanup
+    return () => { }
   }, [chatService])
 
   // Handle dragging for resizable divider
@@ -321,10 +326,10 @@ export const Chat: React.FC<ChatProps> = ({
     setWriting(true)
 
     try {
-      const rewriter = await getRewriter("as-is", "as-is")
+      const rewriter = await getRewriter()
       const rewritten = await rewriter.rewrite(messageText)
       setMessageText(rewritten)
-      rewriter.destroy()
+      if ((rewriter as any).destroy) (rewriter as any).destroy()
     } finally {
       setWriting(false)
     }
@@ -335,7 +340,7 @@ export const Chat: React.FC<ChatProps> = ({
     setWriting(true)
 
     try {
-      const writer = await getWriter("neutral")
+      const writer = await getWriter()
       const attention = attentionContent(
         await allUserActivityForLastMs(CONTEXT_WINDOW_MS)
       )
@@ -347,13 +352,10 @@ export const Chat: React.FC<ChatProps> = ({
       const context = `${attention}${messages.length > 0 ? previousMessages : ""}`
 
       const written = await writer.write(
-        `Help me write a random interesting prompt based on what I was reading about as given in the context. Just return the prompt, nothing else. Don't start with Prompt.`,
-        {
-          context
-        }
+        `Help me write a random interesting prompt based on what I was reading about as given in the context. Just return the prompt, nothing else. Don't start with Prompt. Context: ${context}`
       )
       setMessageText(written)
-      writer.destroy()
+      if ((writer as any).destroy) (writer as any).destroy()
     } finally {
       setWriting(false)
     }
@@ -367,11 +369,10 @@ export const Chat: React.FC<ChatProps> = ({
         key={message.id}
         className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4 animate-fadeIn`}>
         <div
-          className={`max-w-xs lg:max-w-md xl:max-w-lg px-4 py-3 backdrop-blur-sm rounded-2xl shadow-sm ${
-            isUser
-              ? "bg-blue-600 text-white rounded-br-sm"
-              : " text-slate-900 dark:text-slate-100 rounded-bl-sm"
-          }`}>
+          className={`max-w-xs lg:max-w-md xl:max-w-lg px-4 py-3 backdrop-blur-sm rounded-2xl shadow-sm ${isUser
+            ? "bg-blue-600 text-white rounded-br-sm"
+            : " text-slate-900 dark:text-slate-100 rounded-bl-sm"
+            }`}>
           {message.type === "text" && (
             <div
               className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-headings:my-2 break-words overflow-wrap-anywhere"
@@ -475,11 +476,10 @@ export const Chat: React.FC<ChatProps> = ({
             </button>
             {usageInfo && (
               <div
-                className={`flex items-center justify-center mt-1 w-8 h-8 rounded-full shadow-sm ${
-                  usageInfo.inputUsage / (usageInfo.inputQuota / 1.2) < 0.75
-                    ? "bg-white"
-                    : "bg-white"
-                }`}
+                className={`flex items-center justify-center mt-1 w-8 h-8 rounded-full shadow-sm ${usageInfo.inputUsage / (usageInfo.inputQuota / 1.2) < 0.75
+                  ? "bg-white"
+                  : "bg-white"
+                  }`}
                 title={`${usageInfo.inputUsage} / ${usageInfo.inputQuota / 1.2}`}>
                 <svg className="w-5 h-5 -rotate-90" viewBox="0 0 20 20">
                   <circle
@@ -516,9 +516,8 @@ export const Chat: React.FC<ChatProps> = ({
       {/* Draggable Divider */}
       <div
         onMouseDown={() => setIsDragging(true)}
-        className={`h-1 bg-slate-200 dark:bg-slate-700 hover:bg-blue-400 dark:hover:bg-blue-600 cursor-ns-resize transition-colors flex-shrink-0 ${
-          isDragging ? "bg-blue-500 dark:bg-blue-500" : ""
-        }`}
+        className={`h-1 bg-slate-200 dark:bg-slate-700 hover:bg-blue-400 dark:hover:bg-blue-600 cursor-ns-resize transition-colors flex-shrink-0 ${isDragging ? "bg-blue-500 dark:bg-blue-500" : ""
+          }`}
         title="Drag to resize"
       />
 

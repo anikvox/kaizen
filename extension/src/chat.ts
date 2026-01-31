@@ -7,7 +7,8 @@ export type ChatResponse = {
   done: boolean
 }
 
-const storage = new Storage()
+const storage = new Storage({ area: "local" })
+const DEVICE_TOKEN_KEY = "kaizen_device_token"
 const SERVER_URL = process.env.PLASMO_PUBLIC_SERVER_URL || "http://localhost:60092"
 
 export class ChatService {
@@ -17,7 +18,7 @@ export class ChatService {
 
   constructor(chatId?: string, apiUrl?: string) {
     this.chatId = chatId || "default"
-    this.apiUrl = apiUrl || `${SERVER_URL}/api`
+    this.apiUrl = apiUrl || `${SERVER_URL}`
   }
 
   setContextWindowMs(ms: number) {
@@ -27,7 +28,12 @@ export class ChatService {
   // Get authorization token from storage
   private async getAuthToken(): Promise<string | null> {
     try {
-      const deviceToken = await storage.get("deviceToken")
+      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+        const result = await chrome.storage.local.get(DEVICE_TOKEN_KEY)
+        return result[DEVICE_TOKEN_KEY] || null
+      }
+      // Fallback for Plasmo storage if chrome API is not available (unlikely in extension context)
+      const deviceToken = await storage.get(DEVICE_TOKEN_KEY)
       return deviceToken
     } catch (error) {
       console.error("Failed to get device token:", error)
@@ -40,7 +46,6 @@ export class ChatService {
     try {
       const token = await this.getAuthToken()
       if (!token) {
-        console.error("No device token found")
         return null
       }
 
