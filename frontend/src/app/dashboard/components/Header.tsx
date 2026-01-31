@@ -1,8 +1,9 @@
 "use client";
 
-import { Moon, Settings, Sun } from "lucide-react"
+import { Moon, Settings, Sun, LogOut } from "lucide-react"
 import { useEffect, useState } from "react"
 import { formatTime } from "../lib"
+import { UserButton } from "@clerk/nextjs"
 
 interface HeaderProps {
     userName: string | null
@@ -91,6 +92,16 @@ export function Header({
                                 <Moon className="w-4 h-4 text-indigo-600" />
                             )}
                         </button>
+
+                        <div className="pl-1 border-l border-gray-200 dark:border-gray-800 ml-1">
+                            <UserButton
+                                appearance={{
+                                    elements: {
+                                        avatarBox: "w-8 h-8 rounded-lg"
+                                    }
+                                }}
+                            />
+                        </div>
                     </div>
                 </div>
             </div>

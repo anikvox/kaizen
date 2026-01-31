@@ -7,6 +7,20 @@ export type ChatResponse = {
   done: boolean
 }
 
+export type ChatMessage = {
+  id: string
+  role: "user" | "assistant"
+  content: string
+  createdAt: string
+}
+
+export type ChatSession = {
+  id: string
+  title: string
+  updatedAt: string
+  messages?: ChatMessage[]
+}
+
 const storage = new Storage({ area: "local" })
 const DEVICE_TOKEN_KEY = "kaizen_device_token"
 const SERVER_URL = process.env.PLASMO_PUBLIC_SERVER_URL || "http://localhost:60092"
@@ -18,7 +32,7 @@ export class ChatService {
 
   constructor(chatId?: string, apiUrl?: string) {
     this.chatId = chatId || "default"
-    this.apiUrl = apiUrl || `${SERVER_URL}`
+    this.apiUrl = apiUrl || `${SERVER_URL}/api`
   }
 
   setContextWindowMs(ms: number) {
@@ -32,7 +46,7 @@ export class ChatService {
         const result = await chrome.storage.local.get(DEVICE_TOKEN_KEY)
         return result[DEVICE_TOKEN_KEY] || null
       }
-      // Fallback for Plasmo storage if chrome API is not available (unlikely in extension context)
+      // Fallback for Plasmo storage
       const deviceToken = await storage.get(DEVICE_TOKEN_KEY)
       return deviceToken
     } catch (error) {
@@ -41,100 +55,133 @@ export class ChatService {
     }
   }
 
-  // Get or create chat session
+  // Get current session info (for compatibility with sidepanel usage tracking)
   async getSession() {
     try {
-      const token = await this.getAuthToken()
-      if (!token) {
-        return null
+      const sessions = await this.getSessions()
+      if (sessions.length > 0) {
+        // Mock usage info for now as backend doesn't provide it yet
+        return {
+          ...sessions[0],
+          inputUsage: 0,
+          inputQuota: 100
+        }
       }
+      return null
+    } catch (error) {
+      return null
+    }
+  }
 
-      // Try to get existing session
+  // Get all chat sessions for user
+  async getSessions(): Promise<ChatSession[]> {
+    try {
+      const token = await this.getAuthToken()
+      if (!token) return []
+
       const response = await fetch(`${this.apiUrl}/chat/sessions`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       })
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch sessions")
-      }
+      if (!response.ok) throw new Error("Failed to fetch sessions")
+      return response.json()
+    } catch (error) {
+      console.error("Get sessions error:", error)
+      return []
+    }
+  }
 
-      const sessions = await response.json()
+  // Create a new session
+  async createSession(title?: string): Promise<ChatSession | null> {
+    try {
+      const token = await this.getAuthToken()
+      if (!token) return null
 
-      // Return the most recent session or create new one
-      if (sessions.length > 0) {
-        return sessions[0]
-      }
-
-      // Create new session
-      const createResponse = await fetch(`${this.apiUrl}/chat/sessions`, {
+      const response = await fetch(`${this.apiUrl}/chat/sessions`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ title: 'New Chat' })
+        body: JSON.stringify({ title: title || "New Extension Chat" })
       })
 
-      if (!createResponse.ok) {
-        throw new Error("Failed to create session")
-      }
-
-      return await createResponse.json()
+      if (!response.ok) throw new Error("Failed to create session")
+      return response.json()
     } catch (error) {
-      console.error("Failed to get session:", error)
+      console.error("Create session error:", error)
       return null
     }
   }
 
-  // Stream chat responses from the backend
-  async *streamResponse(
-    prompt: string,
-    context?: string
-  ): AsyncGenerator<ChatResponse, void, unknown> {
+  // Get messages for a session
+  async getMessages(sessionId?: string): Promise<ChatMessage[]> {
     try {
+      const id = sessionId || this.chatId
+      if (id === "default") return []
+
       const token = await this.getAuthToken()
-      if (!token) {
-        yield {
-          text: "Error: Not authenticated. Please link your device first.",
-          done: true
-        }
-        return
-      }
+      if (!token) return []
 
-      // Get or create session
-      const session = await this.getSession()
-      if (!session) {
-        yield {
-          text: "Error: Failed to create chat session.",
-          done: true
-        }
-        return
-      }
-
-      // Send message to backend with SSE
-      const response = await fetch(`${this.apiUrl}/chat/sessions/${session.id}/messages`, {
-        method: 'POST',
+      const response = await fetch(`${this.apiUrl}/chat/sessions/${id}/messages`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok) throw new Error("Failed to fetch messages")
+      return response.json()
+    } catch (error) {
+      console.error("Get messages error:", error)
+      return []
+    }
+  }
+
+  // Stream AI response
+  async *streamResponse(prompt: string, context?: string): AsyncGenerator<ChatResponse, void, unknown> {
+    const token = await this.getAuthToken()
+    if (!token) {
+      yield {
+        text: "Error: Not authenticated. Please link your device first.",
+        done: true
+      }
+      return
+    }
+
+    try {
+      const response = await fetch(`${this.apiUrl}/chat/sessions/${this.chatId}/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ content: prompt, context })
+        body: JSON.stringify({
+          content: prompt,
+          context: context
+        })
       })
 
       if (!response.ok) {
-        throw new Error("Failed to send message")
+        const errorData = await response.json()
+        yield {
+          text: `Error: ${errorData.error || "Failed to get response"}`,
+          done: true
+        }
+        return
       }
 
-      // Read SSE stream
       const reader = response.body?.getReader()
-      const decoder = new TextDecoder()
-
       if (!reader) {
-        throw new Error("No response stream")
+        yield {
+          text: "Error: No response body",
+          done: true
+        }
+        return
       }
 
+      const decoder = new TextDecoder()
       let fullText = ""
 
       while (true) {
@@ -142,11 +189,19 @@ export class ChatService {
         if (done) break
 
         const chunk = decoder.decode(value, { stream: true })
-        const lines = chunk.split('\n')
+        const lines = chunk.split("\n")
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.substring(6))
+          if (line.startsWith("data: ")) {
+            const dataStr = line.substring(6).trim()
+            if (!dataStr) continue
+
+            let data
+            try {
+              data = JSON.parse(dataStr)
+            } catch (e) {
+              continue
+            }
 
             if (data.error) {
               yield {

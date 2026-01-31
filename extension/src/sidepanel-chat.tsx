@@ -128,15 +128,56 @@ export const Chat: React.FC<ChatProps> = ({
     }
   }, [latestIntent])
 
-  // Auto-scroll to bottom when messages change or during streaming
+  // Fetch messages from backend on mount
   useEffect(() => {
-    if (messages && messages.length > 0) {
-      messagesEndRef.current?.scrollIntoView({
+    const fetchHistory = async () => {
+      if (!chatId || chatId === "default") return
+
+      try {
+        const backendMessages = await chatService.getMessages(chatId)
+        if (backendMessages && backendMessages.length > 0) {
+          // Update local DB with backend messages to keep them in sync
+          const table = db.table<ChatMessage>("chatMessages")
+          for (const msg of backendMessages) {
+            const existing = await table
+              .where("chatId")
+              .equals(chatId)
+              .toArray()
+
+            const isDuplicate = existing.some(e => e.content === msg.content && e.by === (msg.role === 'user' ? 'user' : 'bot'))
+
+            if (!isDuplicate) {
+              await table.add({
+                chatId,
+                by: msg.role === 'user' ? 'user' : 'bot',
+                type: 'text' as const, // Assuming all backend messages are text for now
+                content: msg.content,
+                timestamp: new Date(msg.createdAt).getTime()
+              })
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch chat history from backend:", error)
+      }
+    }
+
+    fetchHistory()
+  }, [chatId, chatService])
+
+  const scrollToBottom = () => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({
         behavior: "smooth",
         block: "end",
         inline: "nearest"
       })
     }
+  }
+
+  // Auto-scroll to bottom when messages change or during streaming
+  useEffect(() => {
+    scrollToBottom()
   }, [messages?.length, streamingMessage])
 
   useEffect(() => {

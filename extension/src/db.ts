@@ -64,6 +64,7 @@ export type ChatMessage = {
   by: "user" | "bot"
   type: "text" | "image" | "audio"
   content: string
+  timestamp?: number
 }
 
 export type ProcessedIntent = {

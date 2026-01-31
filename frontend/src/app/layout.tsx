@@ -1,6 +1,20 @@
 import type { Metadata } from "next";
+import { Manrope, Poppins } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
+import { ThemeProvider } from "@/components/theme-provider";
+import { cn } from "@/lib/utils";
+
+const fontSans = Manrope({
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
+
+const fontHeading = Poppins({
+  subsets: ["latin"],
+  weight: ["400", "600", "700", "800"],
+  variable: "--font-heading",
+});
 
 export const metadata: Metadata = {
   title: "Kaizen",
@@ -13,10 +27,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
-      <html lang="en">
-        <body className="antialiased">{children}</body>
-      </html>
-    </ClerkProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body className={cn(
+        "min-h-screen bg-background font-sans antialiased",
+        fontSans.variable,
+        fontHeading.variable
+      )}>
+        <ClerkProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="dark"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {children}
+          </ThemeProvider>
+        </ClerkProvider>
+      </body>
+    </html>
   );
 }

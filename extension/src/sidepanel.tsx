@@ -33,6 +33,7 @@ import "./sidepanel.css"
 import type { Intent } from "~background/messages/intent"
 
 import { Chat } from "./sidepanel-chat"
+import { chatService } from "~chat"
 
 type TabType = "focus" | "insights" | "explore" | "intents"
 
@@ -109,26 +110,28 @@ const Popup = () => {
   // Watch for intent queue changes and switch to Learning tab
   useEffect(() => {
     storage.watch({
-      [INTENT_QUEUE_NOTIFY]: async () => {
+      [INTENT_QUEUE_NOTIFY.key]: async () => {
         // check if latest intent is a chat
-        const _iq = await db
+        const iq = await db
           .table<Intent>("intentQueue")
           .orderBy("timestamp")
           .reverse()
-          .limit(1)
           .toArray()
-        const iq = _iq?.filter((i) => i.processed === false)
+
+        const unprocessed = (iq as any[])?.filter((i) => i.processed === false)
 
         if (
-          iq &&
-          iq[0].type !== "CHAT" &&
-          iq[0].name !== "chat-with-this-page"
+          unprocessed &&
+          unprocessed.length > 0 &&
+          unprocessed[0].type !== "chat" &&
+          unprocessed[0].name !== "chat-with-this-page"
         ) {
           setActiveTab("intents")
         } else if (
-          iq &&
-          iq[0].type === "CHAT" &&
-          iq[0].name === "chat-with-this-page"
+          unprocessed &&
+          unprocessed.length > 0 &&
+          unprocessed[0].type === "chat" &&
+          unprocessed[0].name === "chat-with-this-page"
         ) {
           setActiveTab("focus")
         }
@@ -167,6 +170,20 @@ const Popup = () => {
           }
         } catch (pomodoroError) {
           console.error("Error fetching pomodoro state:", pomodoroError)
+        }
+        // Initialize chat session
+        try {
+          const sessions = await chatService.getSessions()
+          if (sessions.length > 0) {
+            setCurrentChatId(sessions[0].id)
+          } else {
+            const newSession = await chatService.createSession("Default Extension Chat")
+            if (newSession) {
+              setCurrentChatId(newSession.id)
+            }
+          }
+        } catch (chatError) {
+          console.error("Error initializing chat session:", chatError)
         }
       } catch (error) {
         console.error("Error fetching data:", error)
@@ -245,195 +262,195 @@ const Popup = () => {
     )
   }
 
-  const activitySummaries = useLiveQuery(() => {
-    return db
-      .table("activitySummary")
+  const activitySummaries = useLiveQuery(async () => {
+    const summaries = await db
+      .table<any>("activitySummary")
       .orderBy("timestamp")
       .reverse()
-      .limit(5)
       .toArray()
+    return summaries.slice(0, 5)
   }, [])
 
   const renderInsightsTab = () => {
     return (
-    <div className="flex-1 overflow-y-auto p-2 space-y-4">
-      {/* Refresher Quiz Section */}
-      <div className="bg-white/40 dark:bg-slate-700/40 backdrop-blur-sm rounded-xl border border-gray-300/50 dark:border-slate-600/50 p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-purple-100/80 dark:bg-purple-900/40 backdrop-blur-sm rounded-lg border border-purple-200/50 dark:border-purple-800/50">
-            <Award className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+      <div className="flex-1 overflow-y-auto p-2 space-y-4">
+        {/* Refresher Quiz Section */}
+        <div className="bg-white/40 dark:bg-slate-700/40 backdrop-blur-sm rounded-xl border border-gray-300/50 dark:border-slate-600/50 p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-purple-100/80 dark:bg-purple-900/40 backdrop-blur-sm rounded-lg border border-purple-200/50 dark:border-purple-800/50">
+              <Award className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              Refresher Quiz
+            </h3>
           </div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-            Refresher Quiz
-          </h3>
+          {focusDataDex && focusDataDex.length > 0 ? (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
+                You've learnt a lot recently... let's take a refresher! 🧠
+              </p>
+              <button
+                onClick={() => {
+                  chrome.tabs.create({ url: "/tabs/dashboard.html" })
+                }}
+                className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-medium py-3 px-4 rounded-lg transition-all shadow-md hover:shadow-lg">
+                Start Refresher Quiz
+              </button>
+            </div>
+          ) : (
+            <div className="text-sm text-gray-600 dark:text-gray-400 text-center py-2">
+              <p className="mb-2">
+                It will get active once you've enough focus 😔
+              </p>
+              <p className="text-xs italic">
+                Complete some focus sessions to unlock the quiz
+              </p>
+            </div>
+          )}
         </div>
-        {focusDataDex && focusDataDex.length > 0 ? (
-          <div className="space-y-3">
-            <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-              You've learnt a lot recently... let's take a refresher! 🧠
-            </p>
-            <button
-              onClick={() => {
-                chrome.tabs.create({ url: "/tabs/dashboard.html" })
-              }}
-              className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-medium py-3 px-4 rounded-lg transition-all shadow-md hover:shadow-lg">
-              Start Refresher Quiz
-            </button>
-          </div>
-        ) : (
-          <div className="text-sm text-gray-600 dark:text-gray-400 text-center py-2">
-            <p className="mb-2">
-              It will get active once you've enough focus 😔
-            </p>
-            <p className="text-xs italic">
-              Complete some focus sessions to unlock the quiz
-            </p>
-          </div>
-        )}
-      </div>
 
-      {/* Activity Summaries Section */}
-      <div className="bg-white/40 dark:bg-slate-700/40 backdrop-blur-sm rounded-xl border border-gray-300/50 dark:border-slate-600/50 p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-blue-100/80 dark:bg-blue-900/40 backdrop-blur-sm rounded-lg border border-blue-200/50 dark:border-blue-800/50">
-            <BarChart3 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+        {/* Activity Summaries Section */}
+        <div className="bg-white/40 dark:bg-slate-700/40 backdrop-blur-sm rounded-xl border border-gray-300/50 dark:border-slate-600/50 p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-blue-100/80 dark:bg-blue-900/40 backdrop-blur-sm rounded-lg border border-blue-200/50 dark:border-blue-800/50">
+              <BarChart3 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              Activity Summaries
+            </h3>
           </div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-            Activity Summaries
-          </h3>
-        </div>
-        {activitySummaries && activitySummaries.length > 0 ? (
-          <div className="space-y-3">
-            {activitySummaries.map((summary, index) => (
-              <div
-                key={index}
-                className="bg-white/50 dark:bg-slate-600/40 backdrop-blur-sm p-4 rounded-lg border border-gray-300/50 dark:border-slate-500/50 shadow-md">
-                <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
-                  {summary.summary}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {new Date(summary.timestamp).toLocaleString()}
-                </p>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            <p className="mb-2">No activity summaries yet</p>
-            <p className="text-xs italic">
-              Start browsing to see AI-powered insights
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Focus History Section */}
-      <div className="bg-white/40 dark:bg-slate-700/40 backdrop-blur-sm rounded-xl border border-gray-300/50 dark:border-slate-600/50 p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-green-100/80 dark:bg-green-900/40 backdrop-blur-sm rounded-lg border border-green-200/50 dark:border-green-800/50">
-            <Target className="w-5 h-5 text-green-600 dark:text-green-400" />
-          </div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-            Recent Focus Sessions
-          </h3>
-        </div>
-        {focusDataDex && focusDataDex.length > 0 ? (
-          <div className="space-y-2">
-            {focusDataDex.slice(0, 5).map((focus) => {
-              const parsed = parseFocus(focus)
-              return (
+          {activitySummaries && activitySummaries.length > 0 ? (
+            <div className="space-y-3">
+              {activitySummaries.map((summary, index) => (
                 <div
-                  key={focus.id}
-                  className="bg-white/50 dark:bg-slate-600/40 backdrop-blur-sm p-3 rounded-lg border border-gray-300/50 dark:border-slate-500/50 shadow-md">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {focus.item}
-                    </p>
-                    <span className="text-xs font-mono text-gray-500 dark:text-gray-400">
-                      {Math.floor(parsed.total_time / 3600000)}h{" "}
-                      {Math.floor((parsed.total_time % 3600000) / 60000)}m
-                    </span>
-                  </div>
+                  key={index}
+                  className="bg-white/50 dark:bg-slate-600/40 backdrop-blur-sm p-4 rounded-lg border border-gray-300/50 dark:border-slate-500/50 shadow-md">
+                  <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
+                    {summary.summary}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {new Date(summary.timestamp).toLocaleString()}
+                  </p>
                 </div>
-              )
-            })}
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="mb-2">No activity summaries yet</p>
+              <p className="text-xs italic">
+                Start browsing to see AI-powered insights
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Focus History Section */}
+        <div className="bg-white/40 dark:bg-slate-700/40 backdrop-blur-sm rounded-xl border border-gray-300/50 dark:border-slate-600/50 p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-green-100/80 dark:bg-green-900/40 backdrop-blur-sm rounded-lg border border-green-200/50 dark:border-green-800/50">
+              <Target className="w-5 h-5 text-green-600 dark:text-green-400" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              Recent Focus Sessions
+            </h3>
           </div>
-        ) : (
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            <p className="mb-2">No focus sessions yet</p>
-            <p className="text-xs italic">
-              Start focusing to track your learning journey
-            </p>
-          </div>
-        )}
+          {focusDataDex && focusDataDex.length > 0 ? (
+            <div className="space-y-2">
+              {focusDataDex.slice(0, 5).map((focus) => {
+                const parsed = parseFocus(focus)
+                return (
+                  <div
+                    key={focus.id}
+                    className="bg-white/50 dark:bg-slate-600/40 backdrop-blur-sm p-3 rounded-lg border border-gray-300/50 dark:border-slate-500/50 shadow-md">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {focus.item}
+                      </p>
+                      <span className="text-xs font-mono text-gray-500 dark:text-gray-400">
+                        {Math.floor(parsed.total_time / 3600000)}h{" "}
+                        {Math.floor((parsed.total_time % 3600000) / 60000)}m
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="mb-2">No focus sessions yet</p>
+              <p className="text-xs italic">
+                Start focusing to track your learning journey
+              </p>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
     )
   }
 
   const renderExploreTab = () => {
     return (
-    <div className="flex-1 overflow-y-auto p-2 space-y-4">
-      {/* Wins Section */}
-      <div className="bg-white/40 dark:bg-slate-700/40 backdrop-blur-xs rounded-xl border border-gray-300/50 dark:border-slate-600/50 p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-yellow-100/80 dark:bg-yellow-900/40 backdrop-blur-sm rounded-lg border border-yellow-200/50 dark:border-yellow-800/50">
-            <Trophy className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+      <div className="flex-1 overflow-y-auto p-2 space-y-4">
+        {/* Wins Section */}
+        <div className="bg-white/40 dark:bg-slate-700/40 backdrop-blur-xs rounded-xl border border-gray-300/50 dark:border-slate-600/50 p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-yellow-100/80 dark:bg-yellow-900/40 backdrop-blur-sm rounded-lg border border-yellow-200/50 dark:border-yellow-800/50">
+              <Trophy className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              Wins
+            </h3>
           </div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-            Wins
-          </h3>
-        </div>
-        {wins.length === 0 ? (
-          <div className="text-sm text-gray-500 dark:text-gray-400 italic py-2">
-            No wins yet. Keep focusing to unlock achievements!
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {wins.map((win, index) => (
-              <div
-                key={win.id}
-                className="flex items-center gap-3 bg-white/50 dark:bg-slate-600/40 backdrop-blur-sm px-4 py-3 rounded-lg border border-gray-300/50 dark:border-slate-500/50 hover:shadow-lg hover:border-gray-400/60 dark:hover:border-slate-400/60 transition-all"
-                style={{ animationDelay: `${index * 100}ms` }}>
-                {getWinIcon(win.type)}
-                <div className="flex-1">
-                  <p className="font-bold text-gray-900 dark:text-white text-sm">
-                    {win.focusItem}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {win.text}
-                  </p>
+          {wins.length === 0 ? (
+            <div className="text-sm text-gray-500 dark:text-gray-400 italic py-2">
+              No wins yet. Keep focusing to unlock achievements!
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {wins.map((win, index) => (
+                <div
+                  key={win.id}
+                  className="flex items-center gap-3 bg-white/50 dark:bg-slate-600/40 backdrop-blur-sm px-4 py-3 rounded-lg border border-gray-300/50 dark:border-slate-500/50 hover:shadow-lg hover:border-gray-400/60 dark:hover:border-slate-400/60 transition-all"
+                  style={{ animationDelay: `${index * 100}ms` }}>
+                  {getWinIcon(win.type)}
+                  <div className="flex-1">
+                    <p className="font-bold text-gray-900 dark:text-white text-sm">
+                      {win.focusItem}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {win.text}
+                    </p>
+                  </div>
+                  <span className="text-gray-500 dark:text-gray-400 font-mono text-xs">
+                    {Math.floor(win.totalTimeSpent / 60000)}:
+                    {((win.totalTimeSpent % 60000) / 1000)
+                      .toString()
+                      .padStart(2, "0")}
+                  </span>
                 </div>
-                <span className="text-gray-500 dark:text-gray-400 font-mono text-xs">
-                  {Math.floor(win.totalTimeSpent / 60000)}:
-                  {((win.totalTimeSpent % 60000) / 1000)
-                    .toString()
-                    .padStart(2, "0")}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
 
-      {/* Milestones Section */}
-      <div className="bg-white/40 dark:bg-slate-700/40 backdrop-blur-xs rounded-xl border border-gray-300/50 dark:border-slate-600/50 p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-purple-100/80 dark:bg-purple-900/40 backdrop-blur-sm rounded-lg border border-purple-200/50 dark:border-purple-800/50">
-            <Award className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+        {/* Milestones Section */}
+        <div className="bg-white/40 dark:bg-slate-700/40 backdrop-blur-xs rounded-xl border border-gray-300/50 dark:border-slate-600/50 p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-purple-100/80 dark:bg-purple-900/40 backdrop-blur-sm rounded-lg border border-purple-200/50 dark:border-purple-800/50">
+              <Award className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              Milestones
+            </h3>
           </div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-            Milestones
-          </h3>
-        </div>
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          <p className="mb-2">Coming soon: Track your learning milestones</p>
-          <p className="text-xs italic">
-            Celebrate your progress and achievements
-          </p>
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="mb-2">Coming soon: Track your learning milestones</p>
+            <p className="text-xs italic">
+              Celebrate your progress and achievements
+            </p>
+          </div>
         </div>
       </div>
-    </div>
     )
   }
 
@@ -492,7 +509,7 @@ const Popup = () => {
                   title="Take a tour">
                   <HelpCircle className="w-4 h-4 text-gray-600" />
                 </button> */}
-                
+
                 {/* Dashboard Button */}
                 <button
                   id="tour-dashboard"
@@ -512,20 +529,18 @@ const Popup = () => {
                   <div className="flex items-center gap-2 bg-gradient-to-r from-emerald-100/70 via-emerald-50/40 to-white/20 dark:from-emerald-900/50 dark:via-emerald-950/30 dark:to-slate-900/30 backdrop-blur-md px-4 py-2 rounded-xl border border-white/30 dark:border-slate-600/40 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
                     {/* Progress indicator background - Subtle fill */}
                     <div
-                      className={`absolute inset-0 rounded-xl transition-all duration-1000 ease-in-out ${
-                        pomodoroState.isActive
-                          ? pomodoroState.state === "focus"
-                            ? "bg-gradient-to-r from-red-500/5 via-orange-500/5 to-transparent dark:from-red-600/10 dark:via-orange-600/10 dark:to-transparent"
-                            : "bg-gradient-to-r from-green-500/5 via-teal-500/5 to-transparent dark:from-green-600/10 dark:via-teal-600/10 dark:to-transparent"
-                          : "bg-transparent"
-                      }`}
+                      className={`absolute inset-0 rounded-xl transition-all duration-1000 ease-in-out ${pomodoroState.isActive
+                        ? pomodoroState.state === "focus"
+                          ? "bg-gradient-to-r from-red-500/5 via-orange-500/5 to-transparent dark:from-red-600/10 dark:via-orange-600/10 dark:to-transparent"
+                          : "bg-gradient-to-r from-green-500/5 via-teal-500/5 to-transparent dark:from-green-600/10 dark:via-teal-600/10 dark:to-transparent"
+                        : "bg-transparent"
+                        }`}
                       style={{
-                        width: `${
-                          pomodoroState.state === "focus"
-                            ? ((1500 - pomodoroState.remainingTime) / 1500) *
-                              100
-                            : ((300 - pomodoroState.remainingTime) / 300) * 100
-                        }%`,
+                        width: `${pomodoroState.state === "focus"
+                          ? ((1500 - pomodoroState.remainingTime) / 1500) *
+                          100
+                          : ((300 - pomodoroState.remainingTime) / 300) * 100
+                          }%`,
                         mixBlendMode: "multiply",
                         backdropFilter: "blur(4px)"
                       }}
@@ -535,9 +550,8 @@ const Popup = () => {
                       {/* Timer display with state icon */}
                       <div className="flex items-center gap-1.5">
                         <div
-                          className={`transition-transform duration-300 ${
-                            pomodoroState.isActive ? "animate-pulse" : ""
-                          }`}>
+                          className={`transition-transform duration-300 ${pomodoroState.isActive ? "animate-pulse" : ""
+                            }`}>
                           {pomodoroState.state === "focus" ? (
                             <Timer className="w-4 h-4 text-red-600 dark:text-red-400" />
                           ) : (
@@ -555,11 +569,10 @@ const Popup = () => {
                       {/* Play/Pause button - Enhanced */}
                       <button
                         onClick={handlePomodoroToggle}
-                        className={`group relative flex items-center justify-center w-7 h-7 rounded-lg transition-all duration-300 ${
-                          pomodoroState.isActive
-                            ? "bg-gradient-to-br from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 shadow-md"
-                            : "bg-gradient-to-br from-green-400 to-emerald-500 hover:from-green-500 hover:to-emerald-600 shadow-md"
-                        } hover:scale-110 active:scale-95 hover:shadow-lg`}
+                        className={`group relative flex items-center justify-center w-7 h-7 rounded-lg transition-all duration-300 ${pomodoroState.isActive
+                          ? "bg-gradient-to-br from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 shadow-md"
+                          : "bg-gradient-to-br from-green-400 to-emerald-500 hover:from-green-500 hover:to-emerald-600 shadow-md"
+                          } hover:scale-110 active:scale-95 hover:shadow-lg`}
                         aria-label={
                           pomodoroState.isActive
                             ? `Pause ${pomodoroState.state}`
@@ -693,11 +706,10 @@ const Popup = () => {
             <div className="flex gap-2">
               <button
                 onClick={() => setActiveTab("focus")}
-                className={`relative flex-1 py-2.5 rounded-[16px] text-xs font-semibold transition-all duration-300 ${
-                  activeTab === "focus"
-                    ? "bg-white/80 dark:bg-slate-700/80 backdrop-blur-xl text-gray-900 dark:text-white shadow-lg border border-white/40 dark:border-slate-600/40"
-                    : "bg-white/40 dark:bg-slate-700/40 backdrop-blur-md text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border border-white/20 dark:border-slate-600/20"
-                }`}>
+                className={`relative flex-1 py-2.5 rounded-[16px] text-xs font-semibold transition-all duration-300 ${activeTab === "focus"
+                  ? "bg-white/80 dark:bg-slate-700/80 backdrop-blur-xl text-gray-900 dark:text-white shadow-lg border border-white/40 dark:border-slate-600/40"
+                  : "bg-white/40 dark:bg-slate-700/40 backdrop-blur-md text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border border-white/20 dark:border-slate-600/20"
+                  }`}>
                 <div className="flex flex-col items-center gap-1">
                   <Target className="w-5 h-5" />
                   <span className="text-[11px]">Focus</span>
@@ -705,11 +717,10 @@ const Popup = () => {
               </button>
               <button
                 onClick={() => setActiveTab("insights")}
-                className={`relative flex-1 py-2.5 rounded-[16px] text-xs font-semibold transition-all duration-300 ${
-                  activeTab === "insights"
-                    ? "bg-white/80 dark:bg-slate-700/80 backdrop-blur-xl text-gray-900 dark:text-white shadow-lg border border-white/40 dark:border-slate-600/40"
-                    : "bg-white/40 dark:bg-slate-700/40 backdrop-blur-md text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border border-white/20 dark:border-slate-600/20"
-                }`}>
+                className={`relative flex-1 py-2.5 rounded-[16px] text-xs font-semibold transition-all duration-300 ${activeTab === "insights"
+                  ? "bg-white/80 dark:bg-slate-700/80 backdrop-blur-xl text-gray-900 dark:text-white shadow-lg border border-white/40 dark:border-slate-600/40"
+                  : "bg-white/40 dark:bg-slate-700/40 backdrop-blur-md text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border border-white/20 dark:border-slate-600/20"
+                  }`}>
                 <div className="flex flex-col items-center gap-1">
                   <BarChart3 className="w-5 h-5" />
                   <span className="text-[11px]">Insights</span>
@@ -717,11 +728,10 @@ const Popup = () => {
               </button>
               <button
                 onClick={() => setActiveTab("intents")}
-                className={`relative flex-1 py-2.5 rounded-[16px] text-xs font-semibold transition-all duration-300 ${
-                  activeTab === "intents"
-                    ? "bg-white/80 dark:bg-slate-700/80 backdrop-blur-xl text-gray-900 dark:text-white shadow-lg border border-white/40 dark:border-slate-600/40"
-                    : "bg-white/40 dark:bg-slate-700/40 backdrop-blur-md text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border border-white/20 dark:border-slate-600/20"
-                }`}>
+                className={`relative flex-1 py-2.5 rounded-[16px] text-xs font-semibold transition-all duration-300 ${activeTab === "intents"
+                  ? "bg-white/80 dark:bg-slate-700/80 backdrop-blur-xl text-gray-900 dark:text-white shadow-lg border border-white/40 dark:border-slate-600/40"
+                  : "bg-white/40 dark:bg-slate-700/40 backdrop-blur-md text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border border-white/20 dark:border-slate-600/20"
+                  }`}>
                 <div className="flex flex-col items-center gap-1">
                   <Lightbulb className="w-5 h-5" />
                   <span className="text-[11px]">Learning</span>
@@ -729,11 +739,10 @@ const Popup = () => {
               </button>
               <button
                 onClick={() => setActiveTab("explore")}
-                className={`relative flex-1 py-2.5 rounded-[16px] text-xs font-semibold transition-all duration-300 ${
-                  activeTab === "explore"
-                    ? "bg-white/80 dark:bg-slate-700/80 backdrop-blur-xl text-gray-900 dark:text-white shadow-lg border border-white/40 dark:border-slate-600/40"
-                    : "bg-white/40 dark:bg-slate-700/40 backdrop-blur-md text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border border-white/20 dark:border-slate-600/20"
-                }`}>
+                className={`relative flex-1 py-2.5 rounded-[16px] text-xs font-semibold transition-all duration-300 ${activeTab === "explore"
+                  ? "bg-white/80 dark:bg-slate-700/80 backdrop-blur-xl text-gray-900 dark:text-white shadow-lg border border-white/40 dark:border-slate-600/40"
+                  : "bg-white/40 dark:bg-slate-700/40 backdrop-blur-md text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border border-white/20 dark:border-slate-600/20"
+                  }`}>
                 <div className="flex flex-col items-center gap-1">
                   <Compass className="w-5 h-5" />
                   <span className="text-[11px]">Explore</span>
