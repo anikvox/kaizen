@@ -21,3 +21,9 @@ export const COGNITIVE_ATTENTION_SHOW_OVERLAY = {
 
 // Server configuration
 export const SERVER_URL = process.env.PLASMO_PUBLIC_SERVER_URL || "http://localhost:60092/api"
+
+// Intent queue notification setting
+export const INTENT_QUEUE_NOTIFY = {
+  key: "setting-intent-queue-notify",
+  defaultValue: true
+}
