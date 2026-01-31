@@ -254,19 +254,23 @@ export const Chat: React.FC<ChatProps> = ({
     setStreamingMessage("")
 
     try {
-      await chatService.streamResponse(
-        userMessage,
-        images,
-        audios,
-        (chunk: string, done: boolean) => {
-          if (done) {
-            setIsStreaming(false)
-            setStreamingMessage("")
-          } else {
-            setStreamingMessage((prev) => prev + chunk)
-          }
+      // Stream response from backend
+      for await (const response of chatService.streamResponse(userMessage)) {
+        setStreamingMessage(response.text)
+
+        if (response.done) {
+          // Save bot response to DB
+          await db.table<ChatMessage>("chatMessages").add({
+            chatId,
+            by: "bot",
+            type: "text",
+            content: response.text
+          })
+          setIsStreaming(false)
+          setStreamingMessage("")
+          break
         }
-      )
+      }
     } catch (error) {
       console.error("Error getting response:", error)
       setIsStreaming(false)

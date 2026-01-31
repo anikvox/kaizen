@@ -9,16 +9,16 @@ datasource db {
 
 // Website visit tracking
 model WebsiteVisit {
-  id        Int      @id @default(autoincrement())
-  url       String   @unique // URL is unique per user visit
-  title     String
-  metadata  Json     @default("{}")
-  openedAt  DateTime @default(now())
-  closedAt  DateTime?
-  activeTime Int     @default(0) // Active time in milliseconds
-  referrer  String?
-  updatedAt DateTime @updatedAt
-  userId    String   // Link to user
+  id         Int       @id @default(autoincrement())
+  url        String    @unique // URL is unique per user visit
+  title      String
+  metadata   Json      @default("{}")
+  openedAt   DateTime  @default(now())
+  closedAt   DateTime?
+  activeTime Int       @default(0) // Active time in milliseconds
+  referrer   String?
+  updatedAt  DateTime  @updatedAt
+  userId     String // Link to user
 
   user User @relation(fields: [userId], references: [id])
 
@@ -33,7 +33,7 @@ model TextAttention {
   url       String
   text      String   @db.Text
   timestamp DateTime @default(now())
-  userId    String   // Link to user
+  userId    String // Link to user
 
   user User @relation(fields: [userId], references: [id])
 
@@ -45,14 +45,14 @@ model TextAttention {
 // Image-based attention activities (viewing images, photos, infographics)
 model ImageAttention {
   id        Int      @id @default(autoincrement())
-  url       String   // URL of the page
-  src       String   // URL to the image
+  url       String // URL of the page
+  src       String // URL to the image
   alt       String
   title     String
   width     Int
   caption   String   @db.Text
   timestamp DateTime @default(now())
-  userId    String   // Link to user
+  userId    String // Link to user
 
   user User @relation(fields: [userId], references: [id])
 
@@ -64,13 +64,13 @@ model ImageAttention {
 // YouTube video watching activities
 model YoutubeAttention {
   id              String   @id @default(cuid()) // Internal ID
-  videoId         String   // YouTube video ID
+  videoId         String // YouTube video ID
   title           String
   channelName     String
   caption         String?  @db.Text
-  activeWatchTime Int?     // Active watch time in seconds
+  activeWatchTime Int? // Active watch time in seconds
   timestamp       DateTime @default(now())
-  userId          String   // Link to user
+  userId          String // Link to user
 
   user User @relation(fields: [userId], references: [id])
 
@@ -82,13 +82,13 @@ model YoutubeAttention {
 // Audio listening activities (podcasts, music, audiobooks)
 model AudioAttention {
   id        Int      @id @default(autoincrement())
-  url       String   // URL of the page
-  src       String   // URL to the audio source
+  url       String // URL of the page
+  src       String // URL to the audio source
   title     String
-  duration  Int      // Duration in seconds
+  duration  Int // Duration in seconds
   summary   String   @db.Text
   timestamp DateTime @default(now())
-  userId    String   // Link to user
+  userId    String // Link to user
 
   user User @relation(fields: [userId], references: [id])
 
@@ -99,31 +99,31 @@ model AudioAttention {
 
 // Focus scores calculated from attention data
 model Focus {
-  id              Int      @id @default(autoincrement())
-  score           Float    // Focus score 0-100
-  category        String   // e.g., "deep_work", "shallow_work", "distraction", "rest"
-  summary         String   @db.Text // AI-generated summary of focus analysis
-  insights        String?  @db.Text // Additional AI insights and recommendations
-  
-  // Time window for this focus calculation
-  windowStart     DateTime
-  windowEnd       DateTime
-  
-  // Stats from the analysis
-  textCount       Int      @default(0)
-  imageCount      Int      @default(0)
-  youtubeCount    Int      @default(0)
-  audioCount      Int      @default(0)
-  
-  // Metadata
-  modelUsed       String   // Which AI model was used
-  traceId         String?  // Opik trace ID for debugging
-  
-  timestamp       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  userId          String   // Link to user
+  id       Int     @id @default(autoincrement())
+  score    Float // Focus score 0-100
+  category String // e.g., "deep_work", "shallow_work", "distraction", "rest"
+  summary  String  @db.Text // AI-generated summary of focus analysis
+  insights String? @db.Text // Additional AI insights and recommendations
 
-  user            User     @relation(fields: [userId], references: [id])
+  // Time window for this focus calculation
+  windowStart DateTime
+  windowEnd   DateTime
+
+  // Stats from the analysis
+  textCount    Int @default(0)
+  imageCount   Int @default(0)
+  youtubeCount Int @default(0)
+  audioCount   Int @default(0)
+
+  // Metadata
+  modelUsed String // Which AI model was used
+  traceId   String? // Opik trace ID for debugging
+
+  timestamp DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String // Link to user
+
+  user User @relation(fields: [userId], references: [id])
 
   @@index([timestamp])
   @@index([windowStart, windowEnd])
@@ -132,13 +132,13 @@ model Focus {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String?
-  image         String?
-  password      String?   // Hashed password for email/password login
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  image     String?
+  password  String? // Hashed password for email/password login
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   websiteVisits     WebsiteVisit[]
   textAttentions    TextAttention[]
@@ -147,22 +147,57 @@ model User {
   audioAttentions   AudioAttention[]
   focusScores       Focus[]
   deviceTokens      DeviceToken[]
+  chatSessions      ChatSession[]
 }
 
 // Device tokens for browser extension authentication
 // Each extension installation gets a unique token linked to a user
 model DeviceToken {
-  id              String    @id @default(cuid())
-  installationId  String    @unique  // Unique ID per extension installation
-  token           String    @unique  // The actual token used for API auth
-  deviceName      String?   // Optional friendly name for the device
-  lastUsedAt      DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  userId          String
-  
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String    @id @default(cuid())
+  installationId String    @unique // Unique ID per extension installation
+  token          String    @unique // The actual token used for API auth
+  deviceName     String? // Optional friendly name for the device
+  lastUsedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  userId         String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([token])
   @@index([userId])
+}
+
+// Chat sessions for AI conversations
+model ChatSession {
+  id        String   @id @default(cuid())
+  title     String? // Optional title for the chat
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// Individual messages within a chat session
+model ChatMessage {
+  id            String @id @default(cuid())
+  chatSessionId String
+  role          String // "user" or "assistant"
+  content       String @db.Text
+
+  // Optional metadata
+  metadata Json    @default("{}") // Can store context, model info, etc.
+  traceId  String? // Opik trace ID for debugging
+
+  createdAt DateTime @default(now())
+
+  chatSession ChatSession @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+
+  @@index([chatSessionId])
+  @@index([createdAt])
 }

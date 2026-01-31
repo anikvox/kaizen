@@ -173,7 +173,7 @@ router.get("/average", async (req: AuthRequest, res: Response) => {
  */
 router.get("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const userId = req.auth!.userId;
 
     if (isNaN(id)) {
@@ -202,7 +202,7 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
  */
 router.delete("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const userId = req.auth!.userId;
 
     if (isNaN(id)) {

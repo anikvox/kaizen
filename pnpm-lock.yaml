@@ -196,12 +196,18 @@ importers:
       '@google/genai':
         specifier: ^1.0.0
         version: 1.37.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
+      '@google/generative-ai':
+        specifier: ^0.24.1
+        version: 0.24.1
       '@prisma/client':
         specifier: ^6.2.1
         version: 6.19.2(prisma@6.19.2(typescript@5.9.3))(typescript@5.9.3)
       '@types/cors':
         specifier: ^2.8.19
         version: 2.8.19
+      '@types/express-serve-static-core':
+        specifier: ^5.1.1
+        version: 5.1.1
       cors:
         specifier: ^2.8.5
         version: 2.8.5
@@ -726,6 +732,10 @@ packages:
     peerDependenciesMeta:
       '@modelcontextprotocol/sdk':
         optional: true
+
+  '@google/generative-ai@0.24.1':
+    resolution: {integrity: sha512-MqO+MLfM6kjxcKoy0p1wRzG3b4ZZXtPI+z2IE26UogS2Cm/XHO+7gGRBh6gcJsOiIVoH93UwKvW4HdgiOZCy9Q==}
+    engines: {node: '>=18.0.0'}
 
   '@ianvs/prettier-plugin-sort-imports@4.7.0':
     resolution: {integrity: sha512-soa2bPUJAFruLL4z/CnMfSEKGznm5ebz29fIa9PxYtu8HHyLKNE1NXAs6dylfw1jn/ilEIfO2oLLN6uAafb7DA==}
@@ -5393,6 +5403,8 @@ snapshots:
       - bufferutil
       - supports-color
       - utf-8-validate
+
+  '@google/generative-ai@0.24.1': {}
 
   '@ianvs/prettier-plugin-sort-imports@4.7.0(@vue/compiler-sfc@3.3.4)(prettier@3.7.4)':
     dependencies:
