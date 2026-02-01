@@ -60,6 +60,8 @@ router.post("/sessions", requireAuth, async (req: AuthRequest, res: Response) =>
     const userId = req.auth!.userId;
     const { title } = req.body;
 
+    console.log("Creating session for user:", userId, "with title:", title);
+
     const session = await prisma.chatSession.create({
       data: {
         userId,
@@ -67,10 +69,14 @@ router.post("/sessions", requireAuth, async (req: AuthRequest, res: Response) =>
       },
     });
 
+    console.log("Session created successfully:", session.id);
     res.json(session);
   } catch (error) {
     console.error("Create session error:", error);
-    res.status(500).json({ error: "Failed to create chat session" });
+    if (error instanceof Error) {
+      console.error("Error details:", error.message, error.stack);
+    }
+    res.status(500).json({ error: "Failed to create chat session", details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 
@@ -221,26 +227,78 @@ router.post(
         
         if (files?.image?.[0]) {
           const imageFile = files.image[0];
-          const uploadedImage = await genAIFiles.files.upload({
-            file: imageFile.path,
-            config: { mimeType: imageFile.mimetype },
+          console.log("Processing image file:", {
+            name: imageFile.originalname,
+            mimetype: imageFile.mimetype,
+            size: imageFile.size
           });
-          uploadedFiles.push({
-            fileData: { fileUri: uploadedImage.uri, mimeType: imageFile.mimetype }
-          });
-          fs.unlinkSync(imageFile.path);
+          
+          try {
+            const uploadedImage = await genAIFiles.files.upload({
+              file: imageFile.path,
+              config: { mimeType: imageFile.mimetype },
+            });
+            console.log("Image uploaded successfully:", uploadedImage.uri);
+            
+            if (uploadedImage.name) {
+              let file = await genAIFiles.files.get({ name: uploadedImage.name });
+              while (file.state === "PROCESSING") {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                file = await genAIFiles.files.get({ name: uploadedImage.name });
+              }
+              
+              if (file.state === "FAILED") {
+                throw new Error("Image processing failed");
+              }
+            }
+            
+            uploadedFiles.push({
+              fileData: { fileUri: uploadedImage.uri, mimeType: imageFile.mimetype }
+            });
+            fs.unlinkSync(imageFile.path);
+          } catch (imageError) {
+            console.error("Image upload failed:", imageError);
+            fs.unlinkSync(imageFile.path);
+            throw new Error(`Image upload failed: ${imageError instanceof Error ? imageError.message : 'Unknown error'}`);
+          }
         }
 
         if (files?.audio?.[0]) {
           const audioFile = files.audio[0];
-          const uploadedAudio = await genAIFiles.files.upload({
-            file: audioFile.path,
-            config: { mimeType: audioFile.mimetype },
+          console.log("Processing audio file:", {
+            name: audioFile.originalname,
+            mimetype: audioFile.mimetype,
+            size: audioFile.size
           });
-          uploadedFiles.push({
-            fileData: { fileUri: uploadedAudio.uri, mimeType: audioFile.mimetype }
-          });
-          fs.unlinkSync(audioFile.path);
+          
+          try {
+            const uploadedAudio = await genAIFiles.files.upload({
+              file: audioFile.path,
+              config: { mimeType: audioFile.mimetype },
+            });
+            console.log("Audio uploaded successfully:", uploadedAudio.uri);
+            
+            if (uploadedAudio.name) {
+              let file = await genAIFiles.files.get({ name: uploadedAudio.name });
+              while (file.state === "PROCESSING") {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                file = await genAIFiles.files.get({ name: uploadedAudio.name });
+              }
+              
+              if (file.state === "FAILED") {
+                throw new Error("Audio processing failed");
+              }
+            }
+            
+            uploadedFiles.push({
+              fileData: { fileUri: uploadedAudio.uri, mimeType: audioFile.mimetype }
+            });
+            fs.unlinkSync(audioFile.path);
+          } catch (audioError) {
+            console.error("Audio upload failed:", audioError);
+            fs.unlinkSync(audioFile.path);
+            throw new Error(`Audio upload failed: ${audioError instanceof Error ? audioError.message : 'Unknown error'}`);
+          }
         }
 
         const chat = model.startChat({ history });
@@ -279,9 +337,18 @@ router.post(
           const newTitle = await generateChatTitle(content, fullResponse);
           await prisma.chatSession.update({
             where: { id: sessionId },
-            data: { title: newTitle }
+            data: { 
+              title: newTitle,
+              updatedAt: new Date()
+            }
           });
           res.write(`data: ${JSON.stringify({ type: 'title_update', title: newTitle })}\n\n`);
+        } else {
+          // Update session to refresh updatedAt timestamp
+          await prisma.chatSession.update({
+            where: { id: sessionId },
+            data: { updatedAt: new Date() }
+          });
         }
 
         trace.end();

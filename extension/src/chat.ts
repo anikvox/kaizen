@@ -150,6 +150,14 @@ export class ChatService {
       return
     }
 
+    if (!this.chatId || this.chatId === "default" || this.chatId === "") {
+      yield {
+        text: "Error: No chat session initialized.",
+        done: true
+      }
+      return
+    }
+
     try {
       const response = await fetch(`${this.apiUrl}/chat/sessions/${this.chatId}/messages`, {
         method: "POST",

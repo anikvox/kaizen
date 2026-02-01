@@ -66,7 +66,7 @@ export function Chat() {
         scrollToBottom();
     }, [messages, streamingMessage, scrollToBottom]);
 
-    // Initialize chat
+    // Initialize chat and poll for session updates
     useEffect(() => {
         const initChat = async () => {
             if (!isSignedIn) return;
@@ -89,12 +89,26 @@ export function Chat() {
             }
         };
 
+        const refreshSessions = async () => {
+            if (!chatServiceRef.current) return;
+            try {
+                const sessions = await chatServiceRef.current.getSessions();
+                setChats(sessions);
+            } catch (error) {
+                console.error("Failed to refresh sessions:", error);
+            }
+        };
+
         if (isLoaded && isSignedIn) {
             initChat();
+            
+            const interval = setInterval(refreshSessions, 5000);
+            
+            return () => clearInterval(interval);
         }
-    }, [isLoaded, isSignedIn, getToken]);
+    }, [isLoaded, isSignedIn, getToken, selectedChatId]);
 
-    // Fetch messages for selected chat
+    // Fetch messages for selected chat with polling
     useEffect(() => {
         const fetchMessages = async () => {
             if (!selectedChatId || !chatServiceRef.current) return;
@@ -107,6 +121,21 @@ export function Chat() {
         };
 
         fetchMessages();
+        
+        const interval = setInterval(fetchMessages, 3000);
+        
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                fetchMessages();
+            }
+        };
+        
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [selectedChatId]);
 
     // Handle dragging for resizable layout

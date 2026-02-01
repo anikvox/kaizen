@@ -79,6 +79,10 @@ export const Chat: React.FC<ChatProps> = ({
       .equals(chatId)
       .toArray()
   }, [chatId])
+  
+  useEffect(() => {
+    console.log(`[Sidepanel Chat] Displaying ${messages?.length || 0} messages for chatId: ${chatId}`, messages)
+  }, [messages, chatId])
 
   // Fetch the latest unprocessed intent
   const latestIntent = useLiveQuery(async () => {
@@ -128,34 +132,33 @@ export const Chat: React.FC<ChatProps> = ({
     }
   }, [latestIntent])
 
-  // Fetch messages from backend on mount
   useEffect(() => {
     const fetchHistory = async () => {
-      if (!chatId || chatId === "default") return
+      if (!chatId || chatId === "default" || chatId === "") return
 
       try {
+        console.log(`[Sidepanel Chat] Fetching messages for chatId: ${chatId}`)
         const backendMessages = await chatService.getMessages(chatId)
+        console.log(`[Sidepanel Chat] Received ${backendMessages.length} messages from backend:`, backendMessages)
+        
         if (backendMessages && backendMessages.length > 0) {
-          // Update local DB with backend messages to keep them in sync
           const table = db.table<ChatMessage>("chatMessages")
+          
+          await table.where("chatId").equals(chatId).delete()
+          console.log(`[Sidepanel Chat] Cleared local messages for chatId: ${chatId}`)
+          
           for (const msg of backendMessages) {
-            const existing = await table
-              .where("chatId")
-              .equals(chatId)
-              .toArray()
-
-            const isDuplicate = existing.some(e => e.content === msg.content && e.by === (msg.role === 'user' ? 'user' : 'bot'))
-
-            if (!isDuplicate) {
-              await table.add({
-                chatId,
-                by: msg.role === 'user' ? 'user' : 'bot',
-                type: 'text' as const, // Assuming all backend messages are text for now
-                content: msg.content,
-                timestamp: new Date(msg.createdAt).getTime()
-              })
-            }
+            await table.add({
+              chatId,
+              by: msg.role === 'user' ? 'user' : 'bot',
+              type: 'text' as const,
+              content: msg.content,
+              timestamp: new Date(msg.createdAt).getTime()
+            })
           }
+          console.log(`[Sidepanel Chat] Added ${backendMessages.length} messages to IndexedDB`)
+        } else {
+          console.log(`[Sidepanel Chat] No messages received from backend`)
         }
       } catch (error) {
         console.error("Failed to fetch chat history from backend:", error)
@@ -163,6 +166,21 @@ export const Chat: React.FC<ChatProps> = ({
     }
 
     fetchHistory()
+    
+    const interval = setInterval(fetchHistory, 3000)
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchHistory()
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [chatId, chatService])
 
   const scrollToBottom = () => {
@@ -238,11 +256,12 @@ export const Chat: React.FC<ChatProps> = ({
       (!messageText.trim() &&
         selectedImages.length === 0 &&
         selectedAudios.length === 0) ||
-      isStreaming
+      isStreaming ||
+      !chatId ||
+      chatId === ""
     )
       return
 
-    // Save user text message to DB if there is text
     if (messageText.trim()) {
       await db.table<ChatMessage>("chatMessages").add({
         chatId,
@@ -252,7 +271,6 @@ export const Chat: React.FC<ChatProps> = ({
       })
     }
 
-    // Save images to DB
     for (const image of selectedImages) {
       const reader = new FileReader()
       const base64 = await new Promise<string>((resolve) => {
@@ -267,7 +285,6 @@ export const Chat: React.FC<ChatProps> = ({
       })
     }
 
-    // Save audios to DB
     for (const audio of selectedAudios) {
       const reader = new FileReader()
       const base64 = await new Promise<string>((resolve) => {
@@ -290,22 +307,18 @@ export const Chat: React.FC<ChatProps> = ({
     setSelectedImages([])
     setSelectedAudios([])
 
-    // Notify parent that chat has been created (if new)
     if (isNewChat) {
       onChatCreated?.(chatId)
     }
 
-    // Get bot response using ChatService with streaming
     setIsStreaming(true)
     setStreamingMessage("")
 
     try {
-      // Stream response from backend
       for await (const response of chatService.streamResponse(userMessage)) {
         setStreamingMessage(response.text)
 
         if (response.done) {
-          // Save bot response to DB
           await db.table<ChatMessage>("chatMessages").add({
             chatId,
             by: "bot",
@@ -314,6 +327,22 @@ export const Chat: React.FC<ChatProps> = ({
           })
           setIsStreaming(false)
           setStreamingMessage("")
+          
+          const backendMessages = await chatService.getMessages(chatId)
+          if (backendMessages && backendMessages.length > 0) {
+            const table = db.table<ChatMessage>("chatMessages")
+            await table.where("chatId").equals(chatId).delete()
+            
+            for (const msg of backendMessages) {
+              await table.add({
+                chatId,
+                by: msg.role === 'user' ? 'user' : 'bot',
+                type: 'text' as const,
+                content: msg.content,
+                timestamp: new Date(msg.createdAt).getTime()
+              })
+            }
+          }
           break
         }
       }
@@ -693,7 +722,9 @@ export const Chat: React.FC<ChatProps> = ({
                   (!messageText.trim() &&
                     selectedImages.length === 0 &&
                     selectedAudios.length === 0) ||
-                  isStreaming
+                  isStreaming ||
+                  !chatId ||
+                  chatId === ""
                 }
                 className="p-2 self-center bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 disabled:from-slate-300 disabled:to-slate-400 dark:disabled:from-slate-600 dark:disabled:to-slate-700 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg disabled:shadow-none"
                 title="Send Message">

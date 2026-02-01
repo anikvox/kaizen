@@ -57,7 +57,9 @@ export class DashboardChatService {
         });
 
         if (!response.ok) {
-            throw new Error("Failed to create chat session");
+            const errorText = await response.text();
+            console.error("Create session error:", response.status, errorText);
+            throw new Error(`Failed to create chat session: ${response.status} ${errorText}`);
         }
 
         return response.json();
@@ -112,7 +114,9 @@ export class DashboardChatService {
         });
 
         if (!response.ok) {
-            throw new Error("Failed to send message");
+            const errorText = await response.text();
+            console.error("Server error:", response.status, errorText);
+            throw new Error(`Failed to send message: ${response.status} ${errorText}`);
         }
 
         const reader = response.body?.getReader();

@@ -51,7 +51,7 @@ const Popup = () => {
 
   const [activeTab, setActiveTab] = useState<TabType>("focus")
   const [focusData, setFocusData] = useState<FocusWithParsedData | null>(null)
-  const [currentChatId, setCurrentChatId] = useState<string>(generateChatId())
+  const [currentChatId, setCurrentChatId] = useState<string>("")
   const [isDeviceLinked, setIsDeviceLinked] = useState<boolean | null>(null)
 
   const focusDataDex = useLiveQuery(() => {
@@ -164,7 +164,6 @@ const Popup = () => {
     checkDeviceLink()
   }, [])
 
-  console.log(`Yoo`)
   // Fetch data on mount
   useEffect(() => {
     const fetchData = async () => {
@@ -185,19 +184,23 @@ const Popup = () => {
         } catch (pomodoroError) {
           console.error("Error fetching pomodoro state:", pomodoroError)
         }
-        // Initialize chat session
+        // Initialize chat session - always use most recent session
         try {
           const sessions = await chatService.getSessions()
           if (sessions.length > 0) {
+            // Always use the most recent session (first in the list)
             setCurrentChatId(sessions[0].id)
           } else {
-            const newSession = await chatService.createSession("Default Extension Chat")
+            const newSession = await chatService.createSession("New Chat")
             if (newSession) {
               setCurrentChatId(newSession.id)
+            } else {
+              setCurrentChatId(generateChatId())
             }
           }
         } catch (chatError) {
           console.error("Error initializing chat session:", chatError)
+          setCurrentChatId(generateChatId())
         }
       } catch (error) {
         console.error("Error fetching data:", error)
@@ -209,6 +212,27 @@ const Popup = () => {
 
     fetchData()
   }, [])
+  
+  // Poll for session updates to stay in sync with dashboard
+  useEffect(() => {
+    const sessionPollInterval = setInterval(async () => {
+      try {
+        const sessions = await chatService.getSessions()
+        console.log(`[Sidepanel] Polled sessions. Current: ${currentChatId}, Most recent: ${sessions[0]?.id}`)
+        if (sessions.length > 0 && sessions[0].id !== currentChatId) {
+          console.log(`[Sidepanel] Switching to most recent session: ${sessions[0].id} (was: ${currentChatId})`)
+          // If the most recent session changed, switch to it
+          setCurrentChatId(sessions[0].id)
+        }
+      } catch (error) {
+        console.error("Error polling sessions:", error)
+      }
+    }, 3000)
+    
+    return () => {
+      clearInterval(sessionPollInterval)
+    }
+  }, [currentChatId])
 
   // Poll pomodoro state every second
   useEffect(() => {
@@ -259,8 +283,18 @@ const Popup = () => {
     return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
   }, [pomodoroState])
 
-  const handleNewChatRequest = useCallback(() => {
-    setCurrentChatId(generateChatId())
+  const handleNewChatRequest = useCallback(async () => {
+    try {
+      const newSession = await chatService.createSession("New Chat")
+      if (newSession) {
+        setCurrentChatId(newSession.id)
+      } else {
+        setCurrentChatId(generateChatId())
+      }
+    } catch (error) {
+      console.error("Error creating new chat:", error)
+      setCurrentChatId(generateChatId())
+    }
   }, [])
 
   const handleRevokeToken = useCallback(async () => {
