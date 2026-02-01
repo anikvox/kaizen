@@ -95,6 +95,7 @@ export function Header({
 
                         <div className="pl-1 border-l border-gray-200 dark:border-gray-800 ml-1">
                             <UserButton
+                                afterSignOutUrl="/signed-out"
                                 appearance={{
                                     elements: {
                                         avatarBox: "w-8 h-8 rounded-lg"

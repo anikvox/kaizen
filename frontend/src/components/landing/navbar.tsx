@@ -39,7 +39,10 @@ export default function Navbar() {
                     </SignInButton>
                 </SignedOut>
                 <SignedIn>
-                    <UserButton appearance={{ elements: { userButtonAvatarBox: "w-9 h-9 rounded-lg" } }} />
+                    <UserButton
+                        afterSignOutUrl="/signed-out"
+                        appearance={{ elements: { userButtonAvatarBox: "w-9 h-9 rounded-lg" } }}
+                    />
                 </SignedIn>
             </div>
         </nav>

@@ -3,7 +3,7 @@
   "displayName": "Kaizen",
   "version": "0.0.1",
   "description": "Focus that follows you",
-  "author": "sandipndev <hey@sandipan.dev>, neilblaze <putubanerjee23@gmail.com>",
+  "author": "anikvox <anikvox@proton.me>, neilblaze <putubanerjee23@gmail.com>",
   "scripts": {
     "dev": "plasmo dev",
     "build": "plasmo build",

@@ -8,6 +8,7 @@ import {
   // HelpCircle,
   LayoutDashboard,
   Lightbulb,
+  LogOut,
   Pause,
   Play,
   Target,
@@ -19,7 +20,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { Storage } from "@plasmohq/storage"
 
 import db, { type Focus, type PomodoroState } from "~db"
-import { INTENT_QUEUE_NOTIFY } from "~default-settings"
+import { INTENT_QUEUE_NOTIFY, SERVER_URL } from "~default-settings"
 
 import { parseFocus, type FocusWithParsedData } from "./sidepanel-api/focus"
 import { getPomodoroState, togglePomodoro } from "./sidepanel-api/pomodoro"
@@ -41,6 +42,9 @@ const generateChatId = () =>
   `chat-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
 
 const storage = new Storage()
+const DEVICE_TOKEN_KEY = "kaizen_device_token"
+const USER_DATA_KEY = "kaizen_user_data"
+const INSTALLATION_ID_KEY = "kaizen_installation_id"
 
 const Popup = () => {
   console.log("Popup component rendering")
@@ -48,6 +52,7 @@ const Popup = () => {
   const [activeTab, setActiveTab] = useState<TabType>("focus")
   const [focusData, setFocusData] = useState<FocusWithParsedData | null>(null)
   const [currentChatId, setCurrentChatId] = useState<string>(generateChatId())
+  const [isDeviceLinked, setIsDeviceLinked] = useState<boolean | null>(null)
 
   const focusDataDex = useLiveQuery(() => {
     return db.table<Focus>("focus").toArray()
@@ -150,6 +155,15 @@ const Popup = () => {
     setFormattedFocusTime(strxx)
   }
 
+  // Check device link status on mount
+  useEffect(() => {
+    const checkDeviceLink = async () => {
+      const cached = await chrome.storage.local.get([DEVICE_TOKEN_KEY])
+      setIsDeviceLinked(!!cached[DEVICE_TOKEN_KEY])
+    }
+    checkDeviceLink()
+  }, [])
+
   console.log(`Yoo`)
   // Fetch data on mount
   useEffect(() => {
@@ -247,6 +261,40 @@ const Popup = () => {
 
   const handleNewChatRequest = useCallback(() => {
     setCurrentChatId(generateChatId())
+  }, [])
+
+  const handleRevokeToken = useCallback(async () => {
+    if (!confirm("Are you sure you want to revoke this device? You'll need to link your account again.")) {
+      return
+    }
+
+    try {
+      // Get the current device token and installation ID
+      const cached = await chrome.storage.local.get([DEVICE_TOKEN_KEY, INSTALLATION_ID_KEY])
+      const token = cached[DEVICE_TOKEN_KEY]
+      const installationId = cached[INSTALLATION_ID_KEY]
+
+      if (token && installationId) {
+        // Call server to delete the device token
+        await fetch(`${SERVER_URL}/device-tokens/unlink`, {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify({ installationId }),
+        })
+      }
+    } catch (error) {
+      console.error("Error revoking device token:", error)
+    }
+
+    // Always clear local storage regardless of server response
+    await chrome.storage.local.remove([DEVICE_TOKEN_KEY, USER_DATA_KEY])
+    chrome.runtime.sendMessage({ type: "CLEAR_AUTH_TOKEN" })
+
+    // Update state to show device not linked page
+    setIsDeviceLinked(false)
   }, [])
 
   const renderFocusTab = () => {
@@ -454,12 +502,69 @@ const Popup = () => {
     )
   }
 
-  if (isLoading) {
+  if (isLoading || isDeviceLinked === null) {
     return (
       <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-white mx-auto mb-4"></div>
           <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show device not linked page if user is not authenticated
+  if (isDeviceLinked === false) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 p-8">
+        <div className="max-w-md w-full">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 p-8 text-center">
+            {/* Logo */}
+            <div className="flex justify-center mb-6">
+              <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center">
+                <LogOut className="w-8 h-8 text-white" />
+              </div>
+            </div>
+
+            {/* Title */}
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+              Device Not Linked
+            </h1>
+
+            {/* Description */}
+            <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
+              This device has been unlinked from your Kaizen account. Please close this sidepanel and link your device again from the extension popup.
+            </p>
+
+            {/* Divider */}
+            <div className="border-t border-gray-200 dark:border-slate-700 my-6"></div>
+
+            {/* Instructions */}
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+              <p className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-2">
+                To relink your device:
+              </p>
+              <ol className="text-sm text-blue-800 dark:text-blue-300 text-left space-y-2">
+                <li className="flex items-start gap-2">
+                  <span className="font-bold min-w-[20px]">1.</span>
+                  <span>Close this sidepanel</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="font-bold min-w-[20px]">2.</span>
+                  <span>Click the Kaizen extension icon in your browser toolbar</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="font-bold min-w-[20px]">3.</span>
+                  <span>Follow the instructions to link your account</span>
+                </li>
+              </ol>
+            </div>
+
+            {/* Close button hint */}
+            <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+              You can now safely close this sidepanel
+            </p>
+          </div>
         </div>
       </div>
     )
@@ -522,6 +627,15 @@ const Popup = () => {
                     <LayoutDashboard className="w-4 h-4 text-white" />
                   </div>
                   <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-400 to-purple-500 opacity-0 group-hover:opacity-20 blur-md transition-opacity duration-300 -z-10" />
+                </button>
+
+                {/* Revoke Device Button */}
+                <button
+                  onClick={handleRevokeToken}
+                  className="cursor-pointer h-10 relative bg-white/60 hover:bg-red-500/80 backdrop-blur-md px-3 py-2 rounded-xl border border-gray-200/50 hover:border-red-300/50 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 active:scale-95 group"
+                  aria-label="Revoke Device"
+                  title="Revoke this device">
+                  <LogOut className="w-4 h-4 text-gray-600 group-hover:text-white transition-colors" />
                 </button>
 
                 {/* Pomodoro Timer */}
