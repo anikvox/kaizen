@@ -3,6 +3,8 @@ export type ChatMessage = {
     role: "user" | "assistant";
     content: string;
     createdAt: string;
+    imagePreview?: string;
+    audioName?: string;
 };
 
 export type ChatSession = {
@@ -19,7 +21,9 @@ export type StreamResponse = {
     error?: string;
 };
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_SERVER_URL || "http://localhost:60092/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL 
+    ? `${process.env.NEXT_PUBLIC_API_URL}/api`
+    : "http://localhost:60092/api";
 
 export class DashboardChatService {
     private token: string;
@@ -89,15 +93,22 @@ export class DashboardChatService {
     async *sendMessageStreaming(
         sessionId: string,
         content: string,
-        context?: string
+        context?: string,
+        image?: File,
+        audio?: File
     ): AsyncGenerator<StreamResponse, void, unknown> {
+        const formData = new FormData();
+        formData.append('content', content);
+        if (context) formData.append('context', context);
+        if (image) formData.append('image', image);
+        if (audio) formData.append('audio', audio);
+
         const response = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}/messages`, {
             method: "POST",
             headers: {
-                "Content-Type": "application/json",
                 Authorization: `Bearer ${this.token}`,
             },
-            body: JSON.stringify({ content, context }),
+            body: formData,
         });
 
         if (!response.ok) {

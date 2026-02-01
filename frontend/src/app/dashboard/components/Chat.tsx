@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import { MessageSquare, Plus, Send, Sparkles, Trash2, Loader2, Image as ImageIcon, Mic, MoreVertical } from "lucide-react";
+import { MessageSquare, Plus, Send, Sparkles, Trash2, Loader2, Image as ImageIcon, Mic, MoreVertical, X } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { DashboardChatService, ChatSession, ChatMessage } from "../lib/chat";
 import { marked } from "marked";
@@ -45,13 +45,18 @@ export function Chat() {
     const [isSending, setIsSending] = useState(false);
     const [streamingMessage, setStreamingMessage] = useState("");
     const [reflectionRange, setReflectionRange] = useState(30 * 60 * 1000);
-    const [messagesHeight, setMessagesHeight] = useState(70); // percentage for resizable layout
+    const [messagesHeight, setMessagesHeight] = useState(70);
     const [isDragging, setIsDragging] = useState(false);
-    const focusScore = 82; // Mock focus score for the gauge
+    const [selectedImage, setSelectedImage] = useState<File | null>(null);
+    const [selectedAudio, setSelectedAudio] = useState<File | null>(null);
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const focusScore = 82;
 
     const chatServiceRef = useRef<DashboardChatService | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const imageInputRef = useRef<HTMLInputElement>(null);
+    const audioInputRef = useRef<HTMLInputElement>(null);
 
     const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
         messagesEndRef.current?.scrollIntoView({ behavior });
@@ -161,12 +166,20 @@ export function Chat() {
             id: Date.now().toString(),
             role: "user",
             content: message,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            imagePreview: imagePreview || undefined,
+            audioName: selectedAudio?.name
         };
 
         setMessages(prev => [...prev, userMsg]);
         const currentMsg = message;
+        const currentImage = selectedImage;
+        const currentAudio = selectedAudio;
+        
         setMessage("");
+        setSelectedImage(null);
+        setSelectedAudio(null);
+        setImagePreview(null);
         setIsSending(true);
         setStreamingMessage("");
 
@@ -175,7 +188,9 @@ export function Chat() {
             const stream = chatServiceRef.current.sendMessageStreaming(
                 selectedChatId,
                 currentMsg,
-                `Reflection Range: ${REFLECTION_RANGES.find(r => r.value === reflectionRange)?.label}`
+                `Reflection Range: ${REFLECTION_RANGES.find(r => r.value === reflectionRange)?.label}`,
+                currentImage || undefined,
+                currentAudio || undefined
             );
 
             for await (const response of stream) {
@@ -199,9 +214,42 @@ export function Chat() {
             setStreamingMessage("");
         } catch (error) {
             console.error("Failed to send message:", error);
+            if (error instanceof Error) {
+                alert(`Failed to send message: ${error.message}`);
+            }
         } finally {
             setIsSending(false);
         }
+    };
+
+    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file && file.type.startsWith('image/')) {
+            setSelectedImage(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setImagePreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleAudioSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file && file.type.startsWith('audio/')) {
+            setSelectedAudio(file);
+        }
+    };
+
+    const removeImage = () => {
+        setSelectedImage(null);
+        setImagePreview(null);
+        if (imageInputRef.current) imageInputRef.current.value = '';
+    };
+
+    const removeAudio = () => {
+        setSelectedAudio(null);
+        if (audioInputRef.current) audioInputRef.current.value = '';
     };
 
     if (!isLoaded || !isSignedIn) return null;
@@ -319,6 +367,19 @@ export function Chat() {
                                             ? "bg-blue-600 text-white rounded-br-md ml-auto"
                                             : "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 rounded-bl-md"
                                             }`}>
+                                            {m.imagePreview && (
+                                                <img 
+                                                    src={m.imagePreview} 
+                                                    alt="Attached" 
+                                                    className="rounded-lg mb-2 max-w-xs max-h-64 object-cover"
+                                                />
+                                            )}
+                                            {m.audioName && (
+                                                <div className={`flex items-center gap-2 mb-2 px-3 py-2 rounded-lg ${m.role === "user" ? "bg-blue-700" : "bg-gray-100 dark:bg-gray-700"}`}>
+                                                    <Mic size={16} />
+                                                    <span className="text-sm">{m.audioName}</span>
+                                                </div>
+                                            )}
                                             <div
                                                 className={`prose prose-sm max-w-none break-words ${m.role === 'user' ? 'prose-invert text-white' : 'dark:prose-invert text-gray-800 dark:text-gray-200'}`}
                                                 dangerouslySetInnerHTML={{ __html: marked.parse(m.content) as string }}
@@ -389,9 +450,35 @@ export function Chat() {
                             className={`h-1.5 w-full cursor-ns-resize transition-all border-y border-gray-100 dark:border-gray-800 ${isDragging ? 'bg-blue-500' : 'bg-transparent hover:bg-blue-400/30'}`}
                         />
 
-                        {/* Input Controls Container */}
                         <div className="p-4 bg-white/60 dark:bg-gray-900/60 border-t border-gray-200 dark:border-gray-800 backdrop-blur-xl">
                             <div className="max-w-4xl mx-auto">
+                                {(imagePreview || selectedAudio) && (
+                                    <div className="mb-3 flex gap-2">
+                                        {imagePreview && (
+                                            <div className="relative inline-block">
+                                                <img src={imagePreview} alt="Preview" className="h-20 w-20 object-cover rounded-lg border-2 border-blue-500" />
+                                                <button
+                                                    onClick={removeImage}
+                                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        )}
+                                        {selectedAudio && (
+                                            <div className="relative inline-flex items-center gap-2 px-3 py-2 bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-500 rounded-lg">
+                                                <Mic size={16} className="text-purple-600 dark:text-purple-400" />
+                                                <span className="text-sm text-purple-700 dark:text-purple-300">{selectedAudio.name}</span>
+                                                <button
+                                                    onClick={removeAudio}
+                                                    className="ml-2 text-red-500 hover:text-red-600"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                                 <div className="relative bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg focus-within:border-blue-500 dark:focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
                                     <textarea
                                         value={message}
@@ -407,15 +494,31 @@ export function Chat() {
                                         className="w-full resize-none bg-transparent px-4 py-3 pr-32 focus:outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 max-h-[200px] overflow-y-auto"
                                         style={{ minHeight: '44px' }}
                                     />
+                                    <input
+                                        ref={imageInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleImageSelect}
+                                        className="hidden"
+                                    />
+                                    <input
+                                        ref={audioInputRef}
+                                        type="file"
+                                        accept="audio/*"
+                                        onChange={handleAudioSelect}
+                                        className="hidden"
+                                    />
                                     <div className="absolute right-2 bottom-2 flex items-center gap-1">
                                         <button 
+                                            onClick={() => imageInputRef.current?.click()}
                                             title="Attach Image" 
                                             className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all"
                                         >
                                             <ImageIcon size={18} />
                                         </button>
                                         <button 
-                                            title="Voice Input" 
+                                            onClick={() => audioInputRef.current?.click()}
+                                            title="Attach Audio" 
                                             className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all"
                                         >
                                             <Mic size={18} />

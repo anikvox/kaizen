@@ -1,17 +1,25 @@
 import express, { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { Opik } from "opik";
+import multer from "multer";
+import fs from "fs";
+import path from "path";
 
 import { requireAuth, AuthRequest } from "../middleware/auth";
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const genAIFiles = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
-// Initialize Opik for tracing
+const upload = multer({ 
+  dest: "uploads/",
+  limits: { fileSize: 20 * 1024 * 1024 }
+});
+
 const opik = new Opik();
 
 // Helper to generate a chat title
@@ -124,13 +132,31 @@ router.get(
 router.post(
   "/sessions/:sessionId/messages",
   requireAuth,
+  (req, res, next) => {
+    upload.fields([{ name: 'image', maxCount: 1 }, { name: 'audio', maxCount: 1 }])(req, res, (err) => {
+      if (err) {
+        console.error("Multer error:", err);
+        return res.status(400).json({ error: "File upload failed" });
+      }
+      next();
+    });
+  },
   async (req: AuthRequest, res: Response) => {
     try {
       const userId = req.auth!.userId;
       const sessionId = req.params.sessionId as string;
       const { content, context } = req.body;
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
-      // Verify session belongs to user
+      console.log("Received message request:", { 
+        userId, 
+        sessionId, 
+        hasContent: !!content,
+        hasContext: !!context,
+        hasFiles: !!files,
+        fileKeys: files ? Object.keys(files) : []
+      });
+
       const session = await prisma.chatSession.findFirst({
         where: { id: sessionId, userId },
       });
@@ -139,7 +165,6 @@ router.post(
         return res.status(404).json({ error: "Chat session not found" });
       }
 
-      // Save user message
       const userMessage = await prisma.chatMessage.create({
         data: {
           chatSessionId: sessionId,
@@ -148,22 +173,17 @@ router.post(
         },
       });
 
-      // Set up SSE for streaming response
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
 
-      // Get conversation history for context
       const previousMessages = await prisma.chatMessage.findMany({
         where: { chatSessionId: sessionId as string },
         orderBy: { createdAt: "asc" },
-        take: 10, // Last 10 messages for context
+        take: 10,
       });
 
-      // Prepare Gemini prompt with context
-      const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
-        systemInstruction: `You are Kaizen AI, an advanced productivity assistant.
+      const systemInstruction = `You are Kaizen AI, an advanced productivity assistant.
         You have access to the user's activity and focus data.
         
         PRINCIPLES:
@@ -172,17 +192,18 @@ router.post(
         3. Citations: If referring to specific websites, include their URLs.
         4. Focus: Help the user stay in the flow and improve their productivity.
         
-        User Context: ${context || "No specific activity context provided yet."}
-        `
+        User Context: ${context || "No specific activity context provided yet."}`;
+
+      const model = genAI.getGenerativeModel({
+        model: "gemini-2.5-flash",
+        systemInstruction
       });
 
-      // Build conversation history
       const history = previousMessages.slice(0, -1).map((msg) => ({
         role: msg.role === "user" ? "user" : "model",
         parts: [{ text: msg.content }],
       }));
 
-      // Start Opik trace
       const trace = opik.trace({
         name: "chat_completion",
         input: { prompt: content, context },
@@ -190,24 +211,58 @@ router.post(
           userId,
           sessionId,
           model: "gemini-2.5-flash",
+          hasImage: !!files?.image,
+          hasAudio: !!files?.audio,
         },
       });
 
       try {
+        let uploadedFiles: any[] = [];
+        
+        if (files?.image?.[0]) {
+          const imageFile = files.image[0];
+          const uploadedImage = await genAIFiles.files.upload({
+            file: imageFile.path,
+            config: { mimeType: imageFile.mimetype },
+          });
+          uploadedFiles.push({
+            fileData: { fileUri: uploadedImage.uri, mimeType: imageFile.mimetype }
+          });
+          fs.unlinkSync(imageFile.path);
+        }
+
+        if (files?.audio?.[0]) {
+          const audioFile = files.audio[0];
+          const uploadedAudio = await genAIFiles.files.upload({
+            file: audioFile.path,
+            config: { mimeType: audioFile.mimetype },
+          });
+          uploadedFiles.push({
+            fileData: { fileUri: uploadedAudio.uri, mimeType: audioFile.mimetype }
+          });
+          fs.unlinkSync(audioFile.path);
+        }
+
         const chat = model.startChat({ history });
-        const result = await chat.sendMessageStream(content);
+        
+        const messageParts: any[] = [];
+        if (uploadedFiles.length > 0) {
+          messageParts.push(...uploadedFiles);
+        }
+        if (content) {
+          messageParts.push({ text: content });
+        }
+        
+        const result = await chat.sendMessageStream(messageParts.length > 0 ? messageParts : content);
 
         let fullResponse = "";
 
         for await (const chunk of result.stream) {
           const chunkText = chunk.text();
           fullResponse += chunkText;
-
-          // Send chunk to client
           res.write(`data: ${JSON.stringify({ chunk: chunkText })}\n\n`);
         }
 
-        // Save assistant message
         const assistantMessage = await prisma.chatMessage.create({
           data: {
             chatSessionId: sessionId as string,
@@ -220,21 +275,17 @@ router.post(
           },
         });
 
-        // Trigger title update if it's still 'New Chat'
         if (session.title === "New Chat") {
           const newTitle = await generateChatTitle(content, fullResponse);
           await prisma.chatSession.update({
             where: { id: sessionId },
             data: { title: newTitle }
           });
-          // Notify client about title update
           res.write(`data: ${JSON.stringify({ type: 'title_update', title: newTitle })}\n\n`);
         }
 
-        // End trace
         trace.end();
 
-        // Send completion signal
         res.write(
           `data: ${JSON.stringify({
             done: true,
@@ -244,6 +295,9 @@ router.post(
         res.end();
       } catch (aiError) {
         console.error("AI generation error:", aiError);
+        if (aiError instanceof Error) {
+          console.error("Error details:", aiError.message, aiError.stack);
+        }
         trace.end();
         res.write(
           `data: ${JSON.stringify({ error: "AI generation failed" })}\n\n`
@@ -252,6 +306,9 @@ router.post(
       }
     } catch (error) {
       console.error("Send message error:", error);
+      if (error instanceof Error) {
+        console.error("Error details:", error.message, error.stack);
+      }
       if (!res.headersSent) {
         res.status(500).json({ error: "Failed to send message" });
       }
