@@ -32,7 +32,7 @@ export class ChatService {
 
   constructor(chatId?: string, apiUrl?: string) {
     this.chatId = chatId || "default"
-    this.apiUrl = apiUrl || `${SERVER_URL}/api`
+    this.apiUrl = apiUrl || `${SERVER_URL}`
   }
 
   setContextWindowMs(ms: number) {

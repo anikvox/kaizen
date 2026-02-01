@@ -17,7 +17,7 @@ const opik = new Opik();
 // Helper to generate a chat title
 async function generateChatTitle(userMessage: string, assistantResponse: string): Promise<string> {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const prompt = `Based on this conversation, generate a 3-4 word title that captures the main topic.
     
     User: ${userMessage}

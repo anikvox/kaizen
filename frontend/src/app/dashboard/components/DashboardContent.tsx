@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { useTheme } from "next-themes";
 import { Header } from "./Header";
 import { CompactFocusCard } from "./CompactFocusCard";
 import { AttentionProgressGraph } from "./AttentionProgressGraph";
@@ -20,11 +21,11 @@ type TabType = "dashboard" | "journey" | "settings" | "chat";
 export function DashboardContent() {
     const { user } = useUser();
     const userName = user?.firstName || "Explorer";
+    const { theme, setTheme } = useTheme();
+    const [mounted, setMounted] = useState(false);
 
     const [activeTab, setActiveTab] = useState<TabType>("dashboard");
-    const [isDarkMode, setIsDarkMode] = useState(false);
 
-    // Fetch data using our mock/replicated hooks
     const { currentFocus, focusHistory, isLoading: focusLoading } = useFocusData();
     const { wins, isLoading: winsLoading } = useWinsData();
     const {
@@ -35,27 +36,12 @@ export function DashboardContent() {
     } = useQuizQuestions();
     const { pulses, isLoading: pulseLoading } = usePulseData();
 
-    // Theme management
     useEffect(() => {
-        const savedTheme = localStorage.getItem("kaizen:theme");
-        const prefersDark = savedTheme === "dark" || (!savedTheme && window.matchMedia("(prefers-color-scheme: dark)").matches);
-        setIsDarkMode(prefersDark);
-        if (prefersDark) {
-            document.documentElement.classList.add("dark");
-        } else {
-            document.documentElement.classList.remove("dark");
-        }
+        setMounted(true);
     }, []);
 
     const handleThemeToggle = () => {
-        const newTheme = !isDarkMode;
-        setIsDarkMode(newTheme);
-        localStorage.setItem("kaizen:theme", newTheme ? "dark" : "light");
-        if (newTheme) {
-            document.documentElement.classList.add("dark");
-        } else {
-            document.documentElement.classList.remove("dark");
-        }
+        setTheme(theme === "dark" ? "light" : "dark");
     };
 
     const renderDashboard = () => (
@@ -96,11 +82,15 @@ export function DashboardContent() {
         </div>
     );
 
+    if (!mounted) {
+        return null;
+    }
+
     return (
         <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-950 font-sans text-gray-900 dark:text-gray-100 transition-colors duration-300 overflow-hidden">
             <Header
                 userName={userName}
-                isDarkMode={isDarkMode}
+                isDarkMode={theme === "dark"}
                 onThemeToggle={handleThemeToggle}
                 onSettingsClick={() => setActiveTab("settings")}
             />
