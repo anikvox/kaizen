@@ -226,7 +226,7 @@ export function Chat() {
                         className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-3 rounded-xl transition-all font-semibold shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
                     >
                         <Plus size={20} />
-                        <span>New Conversation</span>
+                        <span>New Chat</span>
                     </button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-800">
@@ -247,7 +247,7 @@ export function Chat() {
                                             className={selectedChatId === chat.id ? "text-blue-600 dark:text-blue-400" : "text-gray-400"}
                                         />
                                     </div>
-                                    <h3 className={`font-bold truncate text-sm ${selectedChatId === chat.id ? 'text-blue-900 dark:text-blue-100' : 'text-gray-700 dark:text-gray-300'}`}>
+                                    <h3 className={`font-semibold truncate text-sm ${selectedChatId === chat.id ? 'text-blue-900 dark:text-blue-100' : 'text-gray-700 dark:text-gray-300'}`}>
                                         {chat.title}
                                     </h3>
                                 </div>
@@ -280,56 +280,13 @@ export function Chat() {
                         {/* Header */}
                         <div className="bg-white/40 dark:bg-gray-800/40 border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between backdrop-blur-md z-10">
                             <div className="flex items-center gap-4">
-                                <div className="p-3 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/40 dark:to-indigo-900/40 rounded-2xl shadow-inner border border-blue-200/20 dark:border-blue-800/20">
+                                <div className="p-2.5 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-xl border border-blue-200/50 dark:border-blue-800/50 shadow-sm">
                                     <MessageSquare className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                                 </div>
                                 <div>
-                                    <h2 className="text-lg font-black text-gray-900 dark:text-gray-100 leading-tight">
-                                        {selectedChat?.title === "New Chat" ? "Exploration Session" : selectedChat?.title}
+                                    <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 leading-tight">
+                                        {selectedChat?.title || "Chat"}
                                     </h2>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                                        <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-widest font-black opacity-80">
-                                            Live Interaction Mode
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-6">
-                                {/* Focus Depth Gauge (Inspired by alphazero's usage indicator) */}
-                                <div className="flex items-center gap-3 px-3 py-1.5 bg-blue-50/50 dark:bg-blue-900/10 rounded-2xl border border-blue-100/50 dark:border-blue-800/50 shadow-sm">
-                                    <div className="relative w-8 h-8 flex items-center justify-center">
-                                        <svg className="w-full h-full -rotate-90">
-                                            <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="3" className="text-blue-100 dark:text-blue-900/40" />
-                                            <circle
-                                                cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="3"
-                                                strokeDasharray={88} strokeDashoffset={88 - (88 * focusScore) / 100}
-                                                className="text-blue-600 dark:text-blue-400 transition-all duration-1000"
-                                                strokeLinecap="round"
-                                            />
-                                        </svg>
-                                        <span className="absolute text-[9px] font-black text-blue-700 dark:text-blue-300">{focusScore}%</span>
-                                    </div>
-                                    <div className="hidden sm:block">
-                                        <p className="text-[8px] font-black text-blue-400 uppercase tracking-tighter leading-none">Focus Depth</p>
-                                        <p className="text-[10px] font-black text-blue-700 dark:text-blue-300">High State</p>
-                                    </div>
-                                </div>
-
-                                {/* Reflection Range */}
-                                <div className="flex flex-col items-end">
-                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter mb-0.5">Reflection Range</span>
-                                    <div className="flex p-0.5 bg-gray-100/50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
-                                        {REFLECTION_RANGES.map(r => (
-                                            <button
-                                                key={r.value}
-                                                onClick={() => setReflectionRange(r.value)}
-                                                className={`px-2 py-1 text-[9px] font-black rounded-md transition-all ${reflectionRange === r.value ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200'}`}
-                                            >
-                                                {r.label}
-                                            </button>
-                                        ))}
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -349,8 +306,12 @@ export function Chat() {
                                     >
                                         {m.role !== "user" && (
                                             <div className="flex-shrink-0 mr-3 mt-1">
-                                                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white text-xs font-black shadow-lg shadow-blue-500/20">
-                                                    KA
+                                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md">
+                                                    <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
+                                                        <circle cx="9" cy="16" r="1"/>
+                                                        <circle cx="15" cy="16" r="1"/>
+                                                    </svg>
                                                 </div>
                                             </div>
                                         )}
@@ -380,8 +341,12 @@ export function Chat() {
                                         className="flex justify-start"
                                     >
                                         <div className="flex-shrink-0 mr-3 mt-1">
-                                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white text-xs font-black shadow-lg animate-pulse">
-                                                KA
+                                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md animate-pulse">
+                                                <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
+                                                    <circle cx="9" cy="16" r="1"/>
+                                                    <circle cx="15" cy="16" r="1"/>
+                                                </svg>
                                             </div>
                                         </div>
                                         <div className="max-w-[85%] px-5 py-3.5 rounded-3xl shadow-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 rounded-bl-md">
@@ -405,12 +370,12 @@ export function Chat() {
                                         exit={{ opacity: 0, scale: 0.9 }}
                                         className="h-full flex flex-col items-center justify-center text-center p-10"
                                     >
-                                        <div className="p-8 bg-blue-50 dark:bg-blue-900/10 rounded-[40px] mb-6 shadow-inner border border-blue-100 dark:border-blue-900/30">
+                                        <div className="p-8 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/10 dark:to-indigo-900/10 rounded-3xl mb-6 shadow-inner border border-blue-100 dark:border-blue-900/30">
                                             <Sparkles className="w-16 h-16 text-blue-600 dark:text-blue-500" />
                                         </div>
-                                        <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2 italic tracking-tighter">Ready when you are.</h3>
-                                        <p className="text-gray-500 dark:text-gray-400 max-w-xs text-sm font-medium leading-relaxed">
-                                            Ask me anything about your current work or set a reflection range to analyze your activity.
+                                        <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Start a Conversation</h3>
+                                        <p className="text-gray-500 dark:text-gray-400 max-w-md text-sm leading-relaxed">
+                                            Ask me anything about your productivity, get insights on your focus patterns, or discuss your recent activities.
                                         </p>
                                     </motion.div>
                                 )}
@@ -425,20 +390,9 @@ export function Chat() {
                         />
 
                         {/* Input Controls Container */}
-                        <div className="p-6 bg-white/60 dark:bg-gray-900/60 border-t border-gray-200 dark:border-gray-800 backdrop-blur-xl">
-                            <div className="relative group/input flex flex-col gap-4">
-                                <div className="flex items-center gap-2 px-1">
-                                    <button title="Attach Image" className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all border border-transparent hover:border-blue-200 dark:hover:border-blue-800">
-                                        <ImageIcon size={18} />
-                                    </button>
-                                    <button title="Voice Input" className="p-2 text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-xl transition-all border border-transparent hover:border-purple-200 dark:hover:border-purple-800">
-                                        <Mic size={18} />
-                                    </button>
-                                    <div className="h-4 w-px bg-gray-200 dark:bg-gray-800 mx-1" />
-                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Advanced Input</span>
-                                </div>
-
-                                <div className="relative flex items-end gap-3">
+                        <div className="p-4 bg-white/60 dark:bg-gray-900/60 border-t border-gray-200 dark:border-gray-800 backdrop-blur-xl">
+                            <div className="max-w-4xl mx-auto">
+                                <div className="relative bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg focus-within:border-blue-500 dark:focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
                                     <textarea
                                         value={message}
                                         onChange={(e) => setMessage(e.target.value)}
@@ -448,43 +402,75 @@ export function Chat() {
                                                 handleSendMessage();
                                             }
                                         }}
-                                        placeholder="Speak your mind..."
-                                        className="flex-1 resize-none bg-white dark:bg-gray-900/50 border-2 border-gray-200/60 dark:border-gray-800/60 rounded-3xl px-6 py-4 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500/50 min-h-[120px] text-gray-900 dark:text-gray-100 shadow-inner font-medium text-base transition-all placeholder:text-gray-300 dark:placeholder:text-gray-600"
+                                        placeholder="Message Kaizen AI..."
+                                        rows={1}
+                                        className="w-full resize-none bg-transparent px-4 py-3 pr-32 focus:outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 max-h-[200px] overflow-y-auto"
+                                        style={{ minHeight: '44px' }}
                                     />
-                                    <div className="absolute right-4 bottom-4 flex items-center gap-3">
-                                        <button title="Rewrite Prompt" className="p-3 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-2xl transition-all border border-purple-100 dark:border-purple-900/30">
-                                            <Sparkles size={22} />
+                                    <div className="absolute right-2 bottom-2 flex items-center gap-1">
+                                        <button 
+                                            title="Attach Image" 
+                                            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all"
+                                        >
+                                            <ImageIcon size={18} />
+                                        </button>
+                                        <button 
+                                            title="Voice Input" 
+                                            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all"
+                                        >
+                                            <Mic size={18} />
                                         </button>
                                         <button
                                             onClick={handleSendMessage}
                                             disabled={!message.trim() || isSending || !selectedChatId}
-                                            className={`p-4 rounded-2xl shadow-2xl transition-all flex items-center justify-center ${!message.trim() || isSending || !selectedChatId
-                                                ? "bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed"
-                                                : "bg-gradient-to-br from-blue-600 to-indigo-700 text-white hover:shadow-blue-500/40 hover:scale-[1.05] active:scale-[0.95]"
+                                            className={`p-2 rounded-lg transition-all ${!message.trim() || isSending || !selectedChatId
+                                                ? "text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                                                : "text-white bg-blue-600 hover:bg-blue-700 shadow-sm"
                                                 }`}
                                         >
-                                            {isSending ? <Loader2 size={24} className="animate-spin" /> : <Send size={24} />}
+                                            {isSending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
                                         </button>
                                     </div>
+                                </div>
+                                <div className="flex items-center justify-between mt-2 px-2">
+                                    <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                                        <span className="flex items-center gap-1.5">
+                                            <span className="font-medium">Reflection Range:</span>
+                                            <div className="flex gap-1">
+                                                {REFLECTION_RANGES.map(r => (
+                                                    <button
+                                                        key={r.value}
+                                                        onClick={() => setReflectionRange(r.value)}
+                                                        className={`px-2 py-0.5 text-xs rounded transition-all ${reflectionRange === r.value ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                                                    >
+                                                        {r.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </span>
+                                    </div>
+                                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                                        Press Enter to send, Shift+Enter for new line
+                                    </span>
                                 </div>
                             </div>
                         </div>
                     </>
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-center p-20">
-                        <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/20 dark:to-purple-900/20 rounded-[48px] flex items-center justify-center mb-8 border border-white dark:border-gray-800 shadow-2xl">
-                            <MessageSquare className="w-12 h-12 text-blue-600 dark:text-blue-500" />
+                        <div className="w-20 h-20 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-3xl flex items-center justify-center mb-6 border border-blue-100 dark:border-blue-800/50 shadow-lg">
+                            <MessageSquare className="w-10 h-10 text-blue-600 dark:text-blue-500" />
                         </div>
-                        <h3 className="text-4xl font-black text-gray-900 dark:text-white mb-4 italic tracking-tighter">Your Intelligence Hub.</h3>
-                        <p className="text-gray-500 dark:text-gray-400 max-w-sm text-lg font-medium leading-relaxed mb-8">
-                            Select a thread to continue or start a fresh exploration session to gain new insights.
+                        <h3 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">Select a Chat</h3>
+                        <p className="text-gray-500 dark:text-gray-400 max-w-md text-base leading-relaxed mb-8">
+                            Choose a conversation from the sidebar or create a new chat to get started
                         </p>
                         <button
                             onClick={handleCreateChat}
-                            className="flex items-center gap-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-8 py-4 rounded-2xl font-black transition-all hover:scale-105 active:scale-95 shadow-2xl shadow-gray-900/20 dark:shadow-white/10"
+                            className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-xl font-semibold transition-all hover:scale-105 active:scale-95 shadow-lg"
                         >
                             <Plus size={20} />
-                            Start New Session
+                            New Chat
                         </button>
                     </div>
                 )}

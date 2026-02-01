@@ -18,18 +18,31 @@ const opik = new Opik();
 async function generateChatTitle(userMessage: string, assistantResponse: string): Promise<string> {
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-    const prompt = `Based on this conversation, generate a 3-4 word title that captures the main topic.
-    
-    User: ${userMessage}
-    Assistant: ${assistantResponse}
-    
-    Respond with ONLY the title string, no quotes, no extra words.`;
+    const prompt = `Generate a concise, descriptive title (2-5 words) for this conversation that captures the main topic or question.
+
+User: ${userMessage}
+Assistant: ${assistantResponse}
+
+Requirements:
+- Be specific and descriptive
+- Use title case
+- No quotes or punctuation
+- Focus on the key topic or action
+
+Examples:
+- "Focus Tracking Setup"
+- "Productivity Tips"
+- "Weekly Report Analysis"
+- "API Integration Help"
+
+Title:`;
 
     const result = await model.generateContent(prompt);
-    return result.response.text().trim().replace(/^["']|["']$/g, "").slice(0, 50);
+    const title = result.response.text().trim().replace(/^["']|["']$/g, "").slice(0, 60);
+    return title || "New Chat";
   } catch (error) {
     console.error("Title generation error:", error);
-    return "New Conversation";
+    return "New Chat";
   }
 }
 
