@@ -8,6 +8,7 @@ import { ChatService } from "~chat"
 import db, { type ChatMessage } from "~db"
 import { getRewriter, getWriter } from "~model"
 import { allUserActivityForLastMs, attentionContent } from "~utils"
+import { messageCache } from "~message-cache"
 
 interface ChatProps {
   chatId: string
@@ -88,7 +89,26 @@ export const Chat: React.FC<ChatProps> = ({
       try {
         const serverMessages = await chatService.getMessages(chatId)
         console.log(`[Sidepanel Chat] Fetched ${serverMessages.length} messages from server for session: ${chatId}`)
-        setMessages(serverMessages)
+        
+        // Merge with cached metadata (image previews)
+        const mergedMessages = serverMessages.map(msg => {
+          const cached = messageCache.get(msg.id)
+          if (cached) {
+            return { 
+              ...msg, 
+              metadata: { 
+                ...msg.metadata, 
+                imagePreview: cached.imagePreview,
+                audioName: cached.audioName,
+                imageFileName: cached.imageFileName,
+                audioFileName: cached.audioFileName
+              } 
+            }
+          }
+          return msg
+        })
+        
+        setMessages(mergedMessages)
       } catch (error) {
         console.error("[Sidepanel Chat] Error fetching messages:", error)
         setMessages([])
@@ -292,12 +312,29 @@ export const Chat: React.FC<ChatProps> = ({
     const images = selectedImages.length > 0 ? selectedImages : null
     const audios = selectedAudios.length > 0 ? selectedAudios : null
 
+    // Convert image to base64 for preview
+    let imagePreview: string | undefined
+    if (images && images.length > 0) {
+      const reader = new FileReader()
+      imagePreview = await new Promise<string>((resolve) => {
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.readAsDataURL(images[0])
+      })
+    }
+
     // Add user message to local state immediately for UI feedback
     const tempUserMsg: ChatMessage = {
       id: `temp-${Date.now()}`,
       role: "user",
       content: userMessage,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      metadata: {
+        hasImage: !!images,
+        hasAudio: !!audios,
+        imageFileName: images?.[0]?.name,
+        audioFileName: audios?.[0]?.name,
+        imagePreview: imagePreview
+      }
     }
     setMessages(prev => [...prev, tempUserMsg])
 
@@ -319,7 +356,11 @@ export const Chat: React.FC<ChatProps> = ({
 
       console.log(`[Sidepanel Chat] Streaming response for session: ${chatId}`)
       
-      for await (const response of chatService.streamResponse(userMessage, context)) {
+      // Get the first image and audio file (server supports one of each)
+      const imageFile = images && images.length > 0 ? images[0] : undefined
+      const audioFile = audios && audios.length > 0 ? audios[0] : undefined
+      
+      for await (const response of chatService.streamResponse(userMessage, context, imageFile, audioFile)) {
         fullResponse = response.text
         setStreamingMessage(fullResponse)
 
@@ -337,11 +378,47 @@ export const Chat: React.FC<ChatProps> = ({
           
           console.log("[Sidepanel Chat] Message sent successfully to session:", chatId)
           
-          // Refresh messages from server after a short delay
+          // Refresh messages from server after a short delay and cache the preview
           setTimeout(async () => {
             try {
               const serverMessages = await chatService.getMessages(chatId)
-              setMessages(serverMessages)
+              
+              // Cache the image preview for this message
+              if (imagePreview) {
+                const userMsgFromServer = serverMessages.find(m => 
+                  m.role === 'user' && 
+                  m.content === userMessage &&
+                  Math.abs(new Date(m.createdAt).getTime() - new Date(tempUserMsg.createdAt).getTime()) < 10000
+                )
+                if (userMsgFromServer) {
+                  messageCache.set(userMsgFromServer.id, {
+                    imagePreview,
+                    imageFileName: images?.[0]?.name,
+                    audioName: audios?.[0]?.name,
+                    audioFileName: audios?.[0]?.name
+                  })
+                }
+              }
+              
+              // Merge server messages with cached data
+              const mergedMessages = serverMessages.map(msg => {
+                const cached = messageCache.get(msg.id)
+                if (cached) {
+                  return { 
+                    ...msg, 
+                    metadata: { 
+                      ...msg.metadata, 
+                      imagePreview: cached.imagePreview,
+                      audioName: cached.audioName,
+                      imageFileName: cached.imageFileName,
+                      audioFileName: cached.audioFileName
+                    } 
+                  }
+                }
+                return msg
+              })
+              
+              setMessages(mergedMessages)
             } catch (error) {
               console.error("[Sidepanel Chat] Error refreshing messages:", error)
             }
@@ -460,6 +537,11 @@ export const Chat: React.FC<ChatProps> = ({
   const renderMessage = (message: ChatMessage) => {
     // Handle both server format (role) and local format (by)
     const isUser = (message as any).role === "user" || (message as any).by === "user"
+    const metadata = (message as any).metadata
+    
+    // Get image source - prefer cached preview, fallback to server URL
+    const imageSource = metadata?.imagePreview || 
+      (metadata?.imagePath ? `${process.env.PLASMO_PUBLIC_SERVER_URL || 'http://localhost:60092'}/api/chat/uploads/${metadata.imagePath.split('/').pop()}` : null)
 
     return (
       <div
@@ -471,6 +553,22 @@ export const Chat: React.FC<ChatProps> = ({
               ? "bg-blue-600 text-white rounded-br-sm"
               : " text-slate-900 dark:text-slate-100 rounded-bl-sm"
               }`}>
+            {/* Image preview */}
+            {imageSource && (
+              <img
+                src={imageSource}
+                alt="Uploaded"
+                className="max-w-full rounded-lg mb-2 max-h-64 object-cover"
+              />
+            )}
+            {/* Audio indicator */}
+            {(metadata?.hasAudio || metadata?.audioFileName) && (
+              <div className={`flex items-center gap-2 mb-2 px-3 py-2 rounded-lg ${isUser ? "bg-blue-700" : "bg-slate-100 dark:bg-slate-700"}`}>
+                <Mic size={16} />
+                <span className="text-sm">{metadata.audioFileName || metadata.audioName || 'Audio file'}</span>
+              </div>
+            )}
+            {/* Message content */}
             <div
               className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-headings:my-2 break-words overflow-wrap-anywhere"
               dangerouslySetInnerHTML={{

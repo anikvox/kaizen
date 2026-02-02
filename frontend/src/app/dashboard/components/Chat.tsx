@@ -6,6 +6,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { DashboardChatService, ChatSession, ChatMessage } from "../lib/chat";
 import { marked } from "marked";
 import { motion, AnimatePresence } from "framer-motion";
+import { messageCache } from "../lib/message-cache";
 
 // Configure marked for safe link rendering
 marked.use({
@@ -48,6 +49,7 @@ export function Chat() {
     const [selectedImage, setSelectedImage] = useState<File | null>(null);
     const [selectedAudio, setSelectedAudio] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [imageBlobUrls, setImageBlobUrls] = useState<Map<string, string>>(new Map());
     const focusScore = 82;
 
     const chatServiceRef = useRef<DashboardChatService | null>(null);
@@ -77,6 +79,40 @@ export function Chat() {
         return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
     };
 
+    const fetchImageWithAuth = useCallback(async (filename: string): Promise<string | null> => {
+        // Check if we already have a blob URL for this image
+        if (imageBlobUrls.has(filename)) {
+            return imageBlobUrls.get(filename)!;
+        }
+
+        try {
+            const token = await getToken();
+            if (!token) return null;
+
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:60092'}/api/chat/uploads/${filename}`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            if (!response.ok) {
+                console.error("[Chat] Failed to fetch image:", response.status);
+                return null;
+            }
+
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            
+            // Cache the blob URL
+            setImageBlobUrls(prev => new Map(prev).set(filename, blobUrl));
+            
+            return blobUrl;
+        } catch (error) {
+            console.error("[Chat] Error fetching image:", error);
+            return null;
+        }
+    }, [getToken, imageBlobUrls]);
+
     const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
         messagesEndRef.current?.scrollIntoView({ behavior });
     }, []);
@@ -84,6 +120,13 @@ export function Chat() {
     useEffect(() => {
         scrollToBottom();
     }, [messages, streamingMessage, scrollToBottom]);
+
+    // Cleanup blob URLs on unmount
+    useEffect(() => {
+        return () => {
+            imageBlobUrls.forEach(url => URL.revokeObjectURL(url));
+        };
+    }, [imageBlobUrls]);
 
     // Auto-resize textarea based on content
     useEffect(() => {
@@ -175,8 +218,24 @@ export function Chat() {
                 chatServiceRef.current = service;
 
                 const msgs = await service.getMessages(selectedChatId);
+                console.log("[Chat] Fetched messages:", msgs);
+                console.log("[Chat] First message full object:", msgs[0]);
+                console.log("[Chat] First message metadata type:", typeof msgs[0]?.metadata);
+                console.log("[Chat] First message metadata:", JSON.stringify(msgs[0]?.metadata, null, 2));
                 if (isActive) {
-                    setMessages(msgs);
+                    // Merge with cached metadata (imagePreview, audioName)
+                    setMessages(msgs.map(msg => {
+                        console.log("[Chat] Message metadata:", msg.id, msg.metadata);
+                        const cached = messageCache.get(msg.id);
+                        if (cached) {
+                            return {
+                                ...msg,
+                                imagePreview: cached.imagePreview || msg.imagePreview,
+                                audioName: cached.audioName || msg.audioName
+                            };
+                        }
+                        return msg;
+                    }));
                 }
             } catch (error) {
                 console.error("Failed to fetch messages:", error);
@@ -257,6 +316,8 @@ export function Chat() {
         const currentMsg = message;
         const currentImage = selectedImage;
         const currentAudio = selectedAudio;
+        const currentImagePreview = imagePreview;
+        const currentAudioName = selectedAudio?.name;
         
         setMessage("");
         setSelectedImage(null);
@@ -295,7 +356,46 @@ export function Chat() {
 
             setMessages(prev => [...prev, assistantMsg]);
             setStreamingMessage("");
-            console.log("[Chat] Message sent successfully to session:", selectedChatId);
+            
+            // Refresh messages from server and cache the image preview
+            setTimeout(async () => {
+                try {
+                    const msgs = await chatServiceRef.current!.getMessages(selectedChatId);
+                    
+                    // Find the user message we just sent and cache its preview
+                    if (currentImagePreview || currentAudioName) {
+                        const userMsgFromServer = msgs.find(m => 
+                            m.role === 'user' && 
+                            m.content === currentMsg &&
+                            Math.abs(new Date(m.createdAt).getTime() - new Date(userMsg.createdAt).getTime()) < 10000
+                        );
+                        
+                        if (userMsgFromServer) {
+                            messageCache.set(userMsgFromServer.id, {
+                                imagePreview: currentImagePreview || undefined,
+                                audioName: currentAudioName,
+                                imageFileName: currentImage?.name,
+                                audioFileName: currentAudio?.name
+                            });
+                        }
+                    }
+                    
+                    // Merge with cache
+                    setMessages(msgs.map(msg => {
+                        const cached = messageCache.get(msg.id);
+                        if (cached) {
+                            return {
+                                ...msg,
+                                imagePreview: cached.imagePreview || msg.imagePreview,
+                                audioName: cached.audioName || msg.audioName
+                            };
+                        }
+                        return msg;
+                    }));
+                } catch (error) {
+                    console.error("Failed to refresh messages:", error);
+                }
+            }, 1000);
         } catch (error) {
             console.error("Failed to send message:", error);
             if (error instanceof Error) {
@@ -334,6 +434,51 @@ export function Chat() {
     const removeAudio = () => {
         setSelectedAudio(null);
         if (audioInputRef.current) audioInputRef.current.value = '';
+    };
+
+    // Component to render authenticated images
+    const AuthenticatedImage = ({ filename, alt, className }: { filename: string; alt: string; className: string }) => {
+        const [imageUrl, setImageUrl] = useState<string | null>(null);
+        const [loading, setLoading] = useState(true);
+
+        useEffect(() => {
+            let mounted = true;
+            
+            fetchImageWithAuth(filename).then(url => {
+                if (mounted && url) {
+                    setImageUrl(url);
+                    setLoading(false);
+                }
+            });
+
+            return () => {
+                mounted = false;
+            };
+        }, [filename]);
+
+        if (loading) {
+            return (
+                <div className={`${className} flex items-center justify-center bg-gray-100 dark:bg-gray-800`}>
+                    <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                </div>
+            );
+        }
+
+        if (!imageUrl) {
+            return null;
+        }
+
+        return (
+            <img 
+                src={imageUrl}
+                alt={alt} 
+                className={className}
+                onError={(e) => {
+                    console.error("[Chat] Image load error:", imageUrl);
+                    e.currentTarget.style.display = 'none';
+                }}
+            />
+        );
     };
 
     if (!isLoaded || !isSignedIn) return null;
@@ -451,19 +596,55 @@ export function Chat() {
                                                 ? "bg-blue-600 text-white rounded-br-md"
                                                 : "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 rounded-bl-md"
                                                 }`}>
-                                                {m.imagePreview && (
-                                                    <img 
-                                                        src={m.imagePreview} 
-                                                        alt="Attached" 
-                                                        className="rounded-lg mb-2 max-w-xs max-h-64 object-cover"
-                                                    />
-                                                )}
-                                                {m.audioName && (
-                                                    <div className={`flex items-center gap-2 mb-2 px-3 py-2 rounded-lg ${m.role === "user" ? "bg-blue-700" : "bg-gray-100 dark:bg-gray-700"}`}>
-                                                        <Mic size={16} />
-                                                        <span className="text-sm">{m.audioName}</span>
-                                                    </div>
-                                                )}
+                                                {(() => {
+                                                    const hasImagePreview = !!m.imagePreview;
+                                                    const metadata = m.metadata || {};
+                                                    const hasImagePath = !!metadata.imagePath;
+                                                    const imagePath = metadata.imagePath;
+                                                    // Handle both old format (full path) and new format (just filename)
+                                                    const imageFileName = imagePath ? (imagePath.includes('/') ? imagePath.split('/').pop() : imagePath) : null;
+                                                    
+                                                    console.log("[Chat] Image rendering:", {
+                                                        messageId: m.id,
+                                                        hasImagePreview,
+                                                        hasImagePath,
+                                                        imagePath,
+                                                        imageFileName,
+                                                        metadata: m.metadata,
+                                                        metadataType: typeof m.metadata
+                                                    });
+                                                    
+                                                    if (hasImagePreview && m.imagePreview) {
+                                                        // Use local preview (base64)
+                                                        return (
+                                                            <img 
+                                                                src={m.imagePreview}
+                                                                alt="Attached" 
+                                                                className="rounded-lg mb-2 max-w-xs max-h-64 object-cover"
+                                                            />
+                                                        );
+                                                    } else if (hasImagePath && imageFileName) {
+                                                        // Fetch from server with auth
+                                                        return (
+                                                            <AuthenticatedImage 
+                                                                filename={imageFileName}
+                                                                alt="Attached"
+                                                                className="rounded-lg mb-2 max-w-xs max-h-64 object-cover"
+                                                            />
+                                                        );
+                                                    }
+                                                    return null;
+                                                })()}
+                                                {(() => {
+                                                    const metadata = m.metadata || {};
+                                                    const audioName = m.audioName || metadata.audioFileName;
+                                                    return audioName ? (
+                                                        <div className={`flex items-center gap-2 mb-2 px-3 py-2 rounded-lg ${m.role === "user" ? "bg-blue-700" : "bg-gray-100 dark:bg-gray-700"}`}>
+                                                            <Mic size={16} />
+                                                            <span className="text-sm">{audioName}</span>
+                                                        </div>
+                                                    ) : null;
+                                                })()}
                                                 <div
                                                     className={`prose prose-sm max-w-none break-words ${m.role === 'user' ? 'prose-invert text-white' : 'dark:prose-invert text-gray-800 dark:text-gray-200'}`}
                                                     dangerouslySetInnerHTML={{ __html: marked.parse(m.content) as string }}

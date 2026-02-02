@@ -5,6 +5,7 @@ export type ChatMessage = {
     createdAt: string;
     imagePreview?: string;
     audioName?: string;
+    metadata?: any; // Allow any metadata structure from server
 };
 
 export type ChatSession = {

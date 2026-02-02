@@ -22,6 +22,43 @@ const upload = multer({
 
 const opik = new Opik();
 
+// Serve uploaded files
+router.get("/uploads/:filename", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const filename = Array.isArray(req.params.filename) ? req.params.filename[0] : req.params.filename;
+    const filePath = path.join(process.cwd(), "uploads", filename);
+    
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      console.error("[File serve] File not found:", filePath);
+      return res.status(404).json({ error: "File not found" });
+    }
+    
+    console.log("[File serve] Serving file:", filePath);
+    
+    // Try to determine content type from file signature
+    const buffer = fs.readFileSync(filePath);
+    let contentType = 'application/octet-stream';
+    
+    // Check file signature (magic numbers)
+    if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+      contentType = 'image/jpeg';
+    } else if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
+      contentType = 'image/png';
+    } else if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) {
+      contentType = 'image/gif';
+    } else if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46) {
+      contentType = 'image/webp';
+    }
+    
+    res.setHeader('Content-Type', contentType);
+    res.sendFile(filePath);
+  } catch (error) {
+    console.error("Error serving file:", error);
+    res.status(500).json({ error: "Failed to serve file" });
+  }
+});
+
 // Helper to generate a chat title
 async function generateChatTitle(userMessage: string, assistantResponse: string): Promise<string> {
   try {
@@ -126,6 +163,10 @@ router.get(
         orderBy: { createdAt: "asc" },
       });
 
+      console.log("[GET messages] Fetched messages for session:", sessionId);
+      console.log("[GET messages] First message:", messages[0]);
+      console.log("[GET messages] First message metadata:", JSON.stringify(messages[0]?.metadata, null, 2));
+
       res.json(messages);
     } catch (error) {
       console.error("Get messages error:", error);
@@ -176,7 +217,24 @@ router.post(
           chatSessionId: sessionId,
           role: "user",
           content,
+          metadata: {
+            hasImage: !!files?.image?.[0],
+            hasAudio: !!files?.audio?.[0],
+            imageFileName: files?.image?.[0]?.originalname,
+            audioFileName: files?.audio?.[0]?.originalname,
+            imagePath: files?.image?.[0]?.filename, // Use filename instead of path
+            audioPath: files?.audio?.[0]?.filename,
+            imageMimeType: files?.image?.[0]?.mimetype,
+            audioMimeType: files?.audio?.[0]?.mimetype
+          }
         },
+      });
+      
+      console.log("Created user message with metadata:", {
+        id: userMessage.id,
+        metadata: userMessage.metadata,
+        hasImage: !!files?.image?.[0],
+        imagePath: files?.image?.[0]?.path
       });
 
       res.setHeader("Content-Type", "text/event-stream");
@@ -255,10 +313,12 @@ router.post(
             uploadedFiles.push({
               fileData: { fileUri: uploadedImage.uri, mimeType: imageFile.mimetype }
             });
-            fs.unlinkSync(imageFile.path);
+            // Keep the file for serving via /api/chat/uploads/:filename
+            // fs.unlinkSync(imageFile.path);
           } catch (imageError) {
             console.error("Image upload failed:", imageError);
-            fs.unlinkSync(imageFile.path);
+            // Keep the file even on error so it can be served
+            // fs.unlinkSync(imageFile.path);
             throw new Error(`Image upload failed: ${imageError instanceof Error ? imageError.message : 'Unknown error'}`);
           }
         }
@@ -293,10 +353,12 @@ router.post(
             uploadedFiles.push({
               fileData: { fileUri: uploadedAudio.uri, mimeType: audioFile.mimetype }
             });
-            fs.unlinkSync(audioFile.path);
+            // Keep the file for serving via /api/chat/uploads/:filename
+            // fs.unlinkSync(audioFile.path);
           } catch (audioError) {
             console.error("Audio upload failed:", audioError);
-            fs.unlinkSync(audioFile.path);
+            // Keep the file even on error so it can be served
+            // fs.unlinkSync(audioFile.path);
             throw new Error(`Audio upload failed: ${audioError instanceof Error ? audioError.message : 'Unknown error'}`);
           }
         }

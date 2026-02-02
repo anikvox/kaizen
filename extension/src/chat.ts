@@ -12,6 +12,13 @@ export type ChatMessage = {
   role: "user" | "assistant"
   content: string
   createdAt: string
+  metadata?: {
+    hasImage?: boolean
+    hasAudio?: boolean
+    imageFileName?: string
+    audioFileName?: string
+    imagePreview?: string
+  }
 }
 
 export type ChatSession = {
@@ -140,7 +147,12 @@ export class ChatService {
   }
 
   // Stream AI response
-  async *streamResponse(prompt: string, context?: string): AsyncGenerator<ChatResponse, void, unknown> {
+  async *streamResponse(
+    prompt: string, 
+    context?: string,
+    image?: File,
+    audio?: File
+  ): AsyncGenerator<ChatResponse, void, unknown> {
     const token = await this.getAuthToken()
     if (!token) {
       yield {
@@ -159,16 +171,32 @@ export class ChatService {
     }
 
     try {
-      const response = await fetch(`${this.apiUrl}/chat/sessions/${this.chatId}/messages`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
+      // Use FormData if files are present, otherwise JSON
+      let body: FormData | string
+      let headers: Record<string, string> = {
+        "Authorization": `Bearer ${token}`
+      }
+
+      if (image || audio) {
+        const formData = new FormData()
+        formData.append('content', prompt)
+        if (context) formData.append('context', context)
+        if (image) formData.append('image', image)
+        if (audio) formData.append('audio', audio)
+        body = formData
+        // Don't set Content-Type for FormData - browser will set it with boundary
+      } else {
+        headers["Content-Type"] = "application/json"
+        body = JSON.stringify({
           content: prompt,
           context: context
         })
+      }
+
+      const response = await fetch(`${this.apiUrl}/chat/sessions/${this.chatId}/messages`, {
+        method: "POST",
+        headers,
+        body
       })
 
       if (!response.ok) {
