@@ -77,6 +77,9 @@ export function Chat() {
 
     // Initialize chat and poll for session updates
     useEffect(() => {
+        let isActive = true;
+        let pollInterval: NodeJS.Timeout | null = null;
+
         const initChat = async () => {
             if (!isSignedIn) return;
             try {
@@ -87,22 +90,37 @@ export function Chat() {
                 chatServiceRef.current = service;
 
                 const sessions = await service.getSessions();
-                setChats(sessions);
-                if (sessions.length > 0 && !selectedChatId) {
-                    setSelectedChatId(sessions[0].id);
+                if (isActive) {
+                    setChats(sessions);
+                    if (sessions.length > 0 && !selectedChatId) {
+                        setSelectedChatId(sessions[0].id);
+                    }
                 }
             } catch (error) {
                 console.error("Failed to initialize chat:", error);
             } finally {
-                setIsLoading(false);
+                if (isActive) {
+                    setIsLoading(false);
+                }
             }
         };
 
         const refreshSessions = async () => {
-            if (!chatServiceRef.current) return;
+            if (!isActive || !isSignedIn) return;
             try {
-                const sessions = await chatServiceRef.current.getSessions();
-                setChats(sessions);
+                const token = await getToken();
+                if (!token) {
+                    console.warn("No token available, skipping session refresh");
+                    return;
+                }
+
+                const service = new DashboardChatService(token);
+                chatServiceRef.current = service;
+
+                const sessions = await service.getSessions();
+                if (isActive && sessions.length > 0) {
+                    setChats(sessions);
+                }
             } catch (error) {
                 console.error("Failed to refresh sessions:", error);
             }
@@ -111,41 +129,62 @@ export function Chat() {
         if (isLoaded && isSignedIn) {
             initChat();
             
-            const interval = setInterval(refreshSessions, 5000);
-            
-            return () => clearInterval(interval);
+            pollInterval = setInterval(refreshSessions, 5000);
         }
+        
+        return () => {
+            isActive = false;
+            if (pollInterval) {
+                clearInterval(pollInterval);
+            }
+        };
     }, [isLoaded, isSignedIn, getToken, selectedChatId]);
 
     // Fetch messages for selected chat with polling
     useEffect(() => {
+        let isActive = true;
+        let pollInterval: NodeJS.Timeout | null = null;
+
         const fetchMessages = async () => {
-            if (!selectedChatId || !chatServiceRef.current) return;
+            if (!selectedChatId || !isActive || !isSignedIn) return;
             try {
-                const msgs = await chatServiceRef.current.getMessages(selectedChatId);
-                setMessages(msgs);
+                const token = await getToken();
+                if (!token) return;
+
+                const service = new DashboardChatService(token);
+                chatServiceRef.current = service;
+
+                const msgs = await service.getMessages(selectedChatId);
+                if (isActive) {
+                    setMessages(msgs);
+                }
             } catch (error) {
                 console.error("Failed to fetch messages:", error);
             }
         };
 
-        fetchMessages();
-        
-        const interval = setInterval(fetchMessages, 3000);
-        
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible') {
-                fetchMessages();
-            }
-        };
-        
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        
-        return () => {
-            clearInterval(interval);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-    }, [selectedChatId]);
+        if (selectedChatId) {
+            fetchMessages();
+            
+            pollInterval = setInterval(fetchMessages, 3000);
+            
+            const handleVisibilityChange = () => {
+                if (document.visibilityState === 'visible') {
+                    fetchMessages();
+                }
+            };
+            
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+            
+            return () => {
+                isActive = false;
+                if (pollInterval) {
+                    clearInterval(pollInterval);
+                }
+                document.removeEventListener('visibilitychange', handleVisibilityChange);
+            };
+        }
+    }, [selectedChatId, isSignedIn, getToken]);
 
     const handleCreateChat = async () => {
         if (!chatServiceRef.current) return;

@@ -93,12 +93,12 @@ export function Header({
                             )}
                         </button>
 
-                        <div className="pl-1 border-l border-gray-200 dark:border-gray-800 ml-1">
+                        <div className="pl-1 border-l border-gray-200 dark:border-gray-800 mr-4">
                             <UserButton
                                 afterSignOutUrl="/signed-out"
                                 appearance={{
                                     elements: {
-                                        avatarBox: "w-8 h-8 rounded-lg"
+                                        avatarBox: "w-8 h-8 rounded-lg ml-3 mt-1"
                                     }
                                 }}
                             />

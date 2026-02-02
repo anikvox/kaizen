@@ -33,17 +33,24 @@ export class DashboardChatService {
     }
 
     async getSessions(): Promise<ChatSession[]> {
-        const response = await fetch(`${API_BASE_URL}/chat/sessions`, {
-            headers: {
-                Authorization: `Bearer ${this.token}`,
-            },
-        });
+        try {
+            const response = await fetch(`${API_BASE_URL}/chat/sessions`, {
+                headers: {
+                    Authorization: `Bearer ${this.token}`,
+                },
+            });
 
-        if (!response.ok) {
-            throw new Error("Failed to fetch chat sessions");
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`Failed to fetch chat sessions: ${response.status} ${response.statusText}`, errorText);
+                return [];
+            }
+
+            return response.json();
+        } catch (error) {
+            console.error("Error fetching chat sessions:", error);
+            return [];
         }
-
-        return response.json();
     }
 
     async createSession(title?: string): Promise<ChatSession> {
@@ -66,17 +73,24 @@ export class DashboardChatService {
     }
 
     async getMessages(sessionId: string): Promise<ChatMessage[]> {
-        const response = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}/messages`, {
-            headers: {
-                Authorization: `Bearer ${this.token}`,
-            },
-        });
+        try {
+            const response = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}/messages`, {
+                headers: {
+                    Authorization: `Bearer ${this.token}`,
+                },
+            });
 
-        if (!response.ok) {
-            throw new Error("Failed to fetch messages");
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`Failed to fetch messages: ${response.status} ${response.statusText}`, errorText);
+                return [];
+            }
+
+            return response.json();
+        } catch (error) {
+            console.error("Error fetching messages:", error);
+            return [];
         }
-
-        return response.json();
     }
 
     async deleteSession(sessionId: string): Promise<void> {
