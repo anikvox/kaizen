@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@kaizen/ui": "workspace:*",
+    "@plasmohq/messaging": "^0.7.2",
     "@plasmohq/storage": "^1.15.0",
     "@radix-ui/react-collapsible": "^1.1.12",
     "@radix-ui/react-label": "^2.1.8",
@@ -60,8 +61,12 @@
     },
     "web_accessible_resources": [
       {
-        "resources": ["assets/*"],
-        "matches": ["<all_urls>"]
+        "resources": [
+          "assets/*"
+        ],
+        "matches": [
+          "<all_urls>"
+        ]
       }
     ],
     "content_security_policy": {

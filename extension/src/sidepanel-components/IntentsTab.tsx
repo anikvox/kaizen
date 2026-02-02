@@ -4,7 +4,19 @@ import { useEffect, useMemo, useState } from "react"
 import type { Intent } from "~background/messages/intent"
 import { CODE_TO_LANGUAGE } from "~background/messages/intent"
 import db, { type ProcessedIntent } from "~db"
-import { getLanguageModel, getRewriter, getSummarizer, getWriter } from "~model"
+import { SERVER_URL } from "~default-settings"
+
+const DEVICE_TOKEN_KEY = "kaizen_device_token"
+
+const getAuthToken = async (): Promise<string | null> => {
+  try {
+    const result = await chrome.storage.local.get(DEVICE_TOKEN_KEY)
+    return result[DEVICE_TOKEN_KEY] || null
+  } catch (error) {
+    console.error("Error getting device token:", error)
+    return null
+  }
+}
 
 const getIntentIcon = (type: string) => {
   switch (type) {
@@ -23,41 +35,34 @@ const getIntentIcon = (type: string) => {
   }
 }
 
-// Helper methods to process different intent types using Chrome AI
 const processProofread = async (
   text: string,
   onChunk?: (chunk: string) => void
 ): Promise<string> => {
   try {
-    const writer = await getWriter("formal")
-
-    if (onChunk) {
-      // Use streaming
-      const stream = writer.writeStreaming(text)
-      let fullResponse = ""
-      let previousChunk = ""
-
-      for await (const chunk of stream) {
-        const newChunk = chunk.startsWith(previousChunk)
-          ? chunk.slice(previousChunk.length)
-          : chunk
-
-        if (newChunk) {
-          fullResponse += newChunk
-          onChunk(newChunk)
-        }
-
-        previousChunk = chunk
-      }
-
-      writer.destroy()
-      return fullResponse
-    } else {
-      // Fallback to non-streaming
-      const result = await writer.write(text)
-      writer.destroy()
-      return result
+    const token = await getAuthToken()
+    if (!token) {
+      throw new Error("Not authenticated")
     }
+
+    const response = await fetch(`${SERVER_URL}/ai/write`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ prompt: `Proofread and correct any errors in this text: ${text}` })
+    })
+
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    if (onChunk) {
+      onChunk(data.text)
+    }
+    return data.text
   } catch (error) {
     console.error("Error in processProofread:", error)
     throw new Error(
@@ -72,37 +77,32 @@ const processTranslate = async (
   onChunk?: (chunk: string) => void
 ): Promise<string> => {
   try {
+    const token = await getAuthToken()
+    if (!token) {
+      throw new Error("Not authenticated")
+    }
+
     const targetLanguage = CODE_TO_LANGUAGE[language]
-    const model = await getLanguageModel()
     const prompt = `Translate the following text to ${targetLanguage}. Only provide the translation, no explanations:\n\n${text}`
 
-    if (onChunk) {
-      // Use streaming
-      const stream = model.promptStreaming(prompt)
-      let fullResponse = ""
-      let previousChunk = ""
+    const response = await fetch(`${SERVER_URL}/ai/prompt`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ prompt })
+    })
 
-      for await (const chunk of stream) {
-        const newChunk = chunk.startsWith(previousChunk)
-          ? chunk.slice(previousChunk.length)
-          : chunk
-
-        if (newChunk) {
-          fullResponse += newChunk
-          onChunk(newChunk)
-        }
-
-        previousChunk = chunk
-      }
-
-      model.destroy()
-      return fullResponse
-    } else {
-      // Fallback to non-streaming
-      const result = await model.prompt(prompt)
-      model.destroy()
-      return result
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.statusText}`)
     }
+
+    const data = await response.json()
+    if (onChunk) {
+      onChunk(data.text)
+    }
+    return data.text
   } catch (error) {
     console.error("Error in processTranslate:", error)
     throw new Error(
@@ -116,35 +116,29 @@ const processRephrase = async (
   onChunk?: (chunk: string) => void
 ): Promise<string> => {
   try {
-    const rewriter = await getRewriter("as-is", "as-is")
-
-    if (onChunk) {
-      // Use streaming
-      const stream = rewriter.rewriteStreaming(text)
-      let fullResponse = ""
-      let previousChunk = ""
-
-      for await (const chunk of stream) {
-        const newChunk = chunk.startsWith(previousChunk)
-          ? chunk.slice(previousChunk.length)
-          : chunk
-
-        if (newChunk) {
-          fullResponse += newChunk
-          onChunk(newChunk)
-        }
-
-        previousChunk = chunk
-      }
-
-      rewriter.destroy()
-      return fullResponse
-    } else {
-      // Fallback to non-streaming
-      const result = await rewriter.rewrite(text)
-      rewriter.destroy()
-      return result
+    const token = await getAuthToken()
+    if (!token) {
+      throw new Error("Not authenticated")
     }
+
+    const response = await fetch(`${SERVER_URL}/ai/rewrite`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ text })
+    })
+
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    if (onChunk) {
+      onChunk(data.text)
+    }
+    return data.text
   } catch (error) {
     console.error("Error in processRephrase:", error)
     throw new Error(
@@ -158,35 +152,29 @@ const processSummarize = async (
   onChunk?: (chunk: string) => void
 ): Promise<string> => {
   try {
-    const summarizer = await getSummarizer("tldr")
-
-    if (onChunk) {
-      // Use streaming
-      const stream = summarizer.summarizeStreaming(text)
-      let fullResponse = ""
-      let previousChunk = ""
-
-      for await (const chunk of stream) {
-        const newChunk = chunk.startsWith(previousChunk)
-          ? chunk.slice(previousChunk.length)
-          : chunk
-
-        if (newChunk) {
-          fullResponse += newChunk
-          onChunk(newChunk)
-        }
-
-        previousChunk = chunk
-      }
-
-      summarizer.destroy()
-      return fullResponse
-    } else {
-      // Fallback to non-streaming
-      const result = await summarizer.summarize(text)
-      summarizer.destroy()
-      return result
+    const token = await getAuthToken()
+    if (!token) {
+      throw new Error("Not authenticated")
     }
+
+    const response = await fetch(`${SERVER_URL}/ai/summarize`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ text })
+    })
+
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    if (onChunk) {
+      onChunk(data.text)
+    }
+    return data.text
   } catch (error) {
     console.error("Error in processSummarize:", error)
     throw new Error(
@@ -197,11 +185,7 @@ const processSummarize = async (
 
 export const IntentsTab = () => {
   const [processingIds, setProcessingIds] = useState<Set<number>>(new Set())
-  const [streamingResults, setStreamingResults] = useState<Map<number, string>>(
-    new Map()
-  )
 
-  // Load intent queue
   const iq = useLiveQuery(() => {
     return db
       .table<Intent>("intentQueue")
@@ -212,12 +196,10 @@ export const IntentsTab = () => {
   }, [])
   const intentQueue = iq?.filter((intent) => intent.type !== "CHAT")
 
-  // Load processed results
   const processedIntents = useLiveQuery(() => {
     return db.table<ProcessedIntent>("processedIntents").toArray()
   }, [])
 
-  // Create a map of intentId -> processed result
   const resultsMap = useMemo(() => {
     const map = new Map<number, ProcessedIntent>()
     processedIntents?.forEach((pi) => {
@@ -226,7 +208,6 @@ export const IntentsTab = () => {
     return map
   }, [processedIntents])
 
-  // Auto-process unprocessed intents
   useEffect(() => {
     if (!intentQueue) return
 
@@ -235,7 +216,6 @@ export const IntentsTab = () => {
         return
       }
 
-      // Check if already processed in database
       if (resultsMap.has(intent.id)) {
         return
       }
@@ -246,28 +226,17 @@ export const IntentsTab = () => {
         let result: string
         let originalText: string = ""
 
-        // Create streaming callback for real-time updates
-        const onChunk = (chunk: string) => {
-          setStreamingResults((prev) => {
-            const newMap = new Map(prev)
-            const current = newMap.get(intent.id!) || ""
-            newMap.set(intent.id!, current + chunk)
-            return newMap
-          })
-        }
-
         switch (intent.type) {
           case "PROOFREAD":
             originalText = intent.text
-            result = await processProofread(intent.text, onChunk)
+            result = await processProofread(intent.text)
             break
           case "TRANSLATE":
             if ("language" in intent && "text" in intent) {
               originalText = intent.text
               result = await processTranslate(
                 intent.text,
-                intent.language as keyof typeof CODE_TO_LANGUAGE,
-                onChunk
+                intent.language as keyof typeof CODE_TO_LANGUAGE
               )
             } else {
               result = "Translation error: No language specified"
@@ -275,17 +244,16 @@ export const IntentsTab = () => {
             break
           case "REPHRASE":
             originalText = intent.text
-            result = await processRephrase(intent.text, onChunk)
+            result = await processRephrase(intent.text)
             break
           case "SUMMARIZE":
             originalText = intent.text
-            result = await processSummarize(intent.text, onChunk)
+            result = await processSummarize(intent.text)
             break
           default:
             result = "Unknown intent type"
         }
 
-        // Save result to database
         await db.table<ProcessedIntent>("processedIntents").add({
           intentId: intent.id,
           intentType: intent.type,
@@ -294,20 +262,11 @@ export const IntentsTab = () => {
           timestamp: Date.now()
         })
 
-        // Mark as processed in the intent queue
         await db.table("intentQueue").update(intent.id, {
           processed: true
         })
-
-        // Clear streaming result for this intent
-        setStreamingResults((prev) => {
-          const newMap = new Map(prev)
-          newMap.delete(intent.id!)
-          return newMap
-        })
       } catch (error) {
         console.error("Error processing intent:", error)
-        // Save error result to database
         const errorText = "text" in intent ? intent.text : ""
         await db.table<ProcessedIntent>("processedIntents").add({
           intentId: intent.id,
@@ -315,13 +274,6 @@ export const IntentsTab = () => {
           originalText: errorText,
           result: `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
           timestamp: Date.now()
-        })
-
-        // Clear streaming result for this intent
-        setStreamingResults((prev) => {
-          const newMap = new Map(prev)
-          newMap.delete(intent.id!)
-          return newMap
         })
       } finally {
         setProcessingIds((prev) => {
@@ -332,7 +284,6 @@ export const IntentsTab = () => {
       }
     }
 
-    // Process all unprocessed intents
     intentQueue.forEach((intent) => {
       processIntent(intent)
     })
@@ -340,10 +291,8 @@ export const IntentsTab = () => {
 
   const handleDelete = async (intent: Intent & { id?: number }) => {
     if (intent.id) {
-      // Delete from both tables
       await db.table("intentQueue").delete(intent.id)
 
-      // Delete associated processed result if exists
       const processedResult = await db
         .table<ProcessedIntent>("processedIntents")
         .where("intentId")
@@ -358,7 +307,6 @@ export const IntentsTab = () => {
 
   return (
     <div className="flex-1 overflow-y-auto p-2 space-y-4">
-      {/* Learning Queue Section */}
       <div className="bg-white/40 dark:bg-slate-700/40 backdrop-blur-sm rounded-xl border border-gray-300/50 dark:border-slate-600/50 p-5">
         {intentQueue && intentQueue.length > 0 ? (
           <div className="space-y-3">
@@ -368,9 +316,6 @@ export const IntentsTab = () => {
                 intentWithId.id && processingIds.has(intentWithId.id)
               const processedResult = intentWithId.id
                 ? resultsMap.get(intentWithId.id)
-                : null
-              const streamingResult = intentWithId.id
-                ? streamingResults.get(intentWithId.id)
                 : null
 
               return (
@@ -410,7 +355,6 @@ export const IntentsTab = () => {
                         {new Date(intent.timestamp).toLocaleString()}
                       </p>
 
-                      {/* Action Button */}
                       <div className="flex gap-2 mt-3">
                         <button
                           onClick={() => handleDelete(intentWithId)}
@@ -419,20 +363,6 @@ export const IntentsTab = () => {
                         </button>
                       </div>
 
-                      {/* Display Streaming Result (in progress) */}
-                      {isProcessing && streamingResult && (
-                        <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
-                          <p className="text-xs font-semibold text-blue-800 dark:text-blue-400 mb-1 flex items-center gap-2">
-                            <span className="animate-pulse">●</span>
-                            Streaming:
-                          </p>
-                          <p className="text-sm text-blue-700 dark:text-blue-300 whitespace-pre-wrap">
-                            {streamingResult}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Display Final Result from Database */}
                       {processedResult && !isProcessing && (
                         <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
                           <p className="text-xs font-semibold text-green-800 dark:text-green-400 mb-1">
