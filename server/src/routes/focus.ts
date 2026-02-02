@@ -1,10 +1,9 @@
 import { Router, Request, Response } from "express";
 import {
-  computeAndSaveFocus,
-  computeFocusForLastHours,
+  processFocusSession,
+  getActiveFocus,
   getFocusHistory,
-  getAverageFocus,
-} from "../lib/inference";
+} from "../lib/focus";
 import {
   startFocusScheduler,
   stopFocusScheduler,
@@ -30,70 +29,34 @@ async function ensureUser(clerkId: string) {
 }
 
 // =============================================================================
-// FOCUS INFERENCE ROUTES
+// FOCUS TRACKING ROUTES (Neuropilot approach)
 // =============================================================================
 
-interface ComputeFocusBody {
-  windowStart?: string; // ISO date string
-  windowEnd?: string; // ISO date string
-  hours?: number; // Alternative: compute for last N hours
-}
-
 /**
- * POST /focus/compute - Compute focus score from attention data
- *
- * Body options:
- * - { hours: number } - Compute focus for the last N hours
- * - { windowStart: string, windowEnd: string } - Compute for a specific time window
- * - {} - Defaults to last 1 hour
+ * POST /focus/detect - Manually trigger focus detection
+ * Useful for testing or on-demand focus calculation
  */
-router.post(
-  "/compute",
-  async (req: AuthRequest<{}, {}, ComputeFocusBody>, res: Response) => {
-    try {
-      const { windowStart, windowEnd, hours } = req.body;
-      const userId = req.auth!.userId;
+router.post("/detect", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.auth!.userId;
 
-      // Ensure user exists before computing focus
-      await ensureUser(userId);
+    // Ensure user exists
+    await ensureUser(userId);
 
-      let result;
+    const result = await processFocusSession(userId);
 
-      if (windowStart && windowEnd) {
-        // Use provided time window
-        const start = new Date(windowStart);
-        const end = new Date(windowEnd);
-
-        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-          res.status(400).json({ error: "Invalid date format" });
-          return;
-        }
-
-        if (start >= end) {
-          res.status(400).json({ error: "windowStart must be before windowEnd" });
-          return;
-        }
-
-        result = await computeAndSaveFocus(start, end, userId);
-      } else {
-        // Use hours (default to 1)
-        const hoursToCompute = hours && hours > 0 ? hours : 1;
-        result = await computeFocusForLastHours(hoursToCompute, userId);
-      }
-
-      res.status(201).json(result);
-    } catch (error) {
-      console.error("Error computing focus:", error);
-      res.status(500).json({ error: "Failed to compute focus" });
-    }
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error detecting focus:", error);
+    res.status(500).json({ error: "Failed to detect focus" });
   }
-);
+});
 
 /**
  * GET /focus - Get focus history
  *
  * Query params:
- * - limit: number (default 10)
+ * - limit: number (default 10, max 100)
  * - offset: number (default 0)
  */
 router.get("/", async (req: AuthRequest, res: Response) => {
@@ -102,7 +65,7 @@ router.get("/", async (req: AuthRequest, res: Response) => {
     const offset = parseInt(req.query.offset as string) || 0;
     const userId = req.auth!.userId;
 
-    const history = await getFocusHistory(limit, offset, userId);
+    const history = await getFocusHistory(userId, limit, offset);
     res.json(history);
   } catch (error) {
     console.error("Error fetching focus history:", error);
@@ -111,69 +74,31 @@ router.get("/", async (req: AuthRequest, res: Response) => {
 });
 
 /**
- * GET /focus/latest - Get the most recent focus calculation
+ * GET /focus/current - Get the current/most recent focus
  */
-router.get("/latest", async (req: AuthRequest, res: Response) => {
+router.get("/current", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.auth!.userId;
-    const latest = await prisma.focus.findFirst({
-      where: { userId },
-      orderBy: { timestamp: "desc" },
-    });
+    const current = await getActiveFocus(userId);
 
-    if (!latest) {
+    if (!current) {
       res.status(404).json({ error: "No focus data found" });
       return;
     }
 
-    res.json(latest);
+    res.json(current);
   } catch (error) {
-    console.error("Error fetching latest focus:", error);
-    res.status(500).json({ error: "Failed to fetch latest focus" });
+    console.error("Error fetching current focus:", error);
+    res.status(500).json({ error: "Failed to fetch current focus" });
   }
 });
 
 /**
- * GET /focus/average - Get average focus score for a time period
- *
- * Query params:
- * - windowStart: ISO date string (required)
- * - windowEnd: ISO date string (required)
- */
-router.get("/average", async (req: AuthRequest, res: Response) => {
-  try {
-    const { windowStart, windowEnd } = req.query;
-    const userId = req.auth!.userId;
-
-    if (!windowStart || !windowEnd) {
-      res
-        .status(400)
-        .json({ error: "windowStart and windowEnd are required" });
-      return;
-    }
-
-    const start = new Date(windowStart as string);
-    const end = new Date(windowEnd as string);
-
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      res.status(400).json({ error: "Invalid date format" });
-      return;
-    }
-
-    const result = await getAverageFocus(start, end, userId);
-    res.json(result);
-  } catch (error) {
-    console.error("Error calculating average focus:", error);
-    res.status(500).json({ error: "Failed to calculate average focus" });
-  }
-});
-
-/**
- * GET /focus/:id - Get a specific focus calculation by ID
+ * GET /focus/:id - Get a specific focus by ID
  */
 router.get("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const id = parseInt(req.params.id as string);
+    const id = parseInt(req.params.id);
     const userId = req.auth!.userId;
 
     if (isNaN(id)) {
@@ -186,7 +111,7 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
     });
 
     if (!focus) {
-      res.status(404).json({ error: "Focus record not found" });
+      res.status(404).json({ error: "Focus not found" });
       return;
     }
 
@@ -202,7 +127,7 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
  */
 router.delete("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const id = parseInt(req.params.id as string);
+    const id = parseInt(req.params.id);
     const userId = req.auth!.userId;
 
     if (isNaN(id)) {
@@ -212,7 +137,7 @@ router.delete("/:id", async (req: AuthRequest, res: Response) => {
 
     const existing = await prisma.focus.findUnique({ where: { id, userId } });
     if (!existing) {
-      res.status(404).json({ error: "Focus record not found" });
+      res.status(404).json({ error: "Focus not found" });
       return;
     }
 
@@ -233,40 +158,69 @@ router.get("/stats/today", async (req: AuthRequest, res: Response) => {
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    const [average, focusRecords] = await Promise.all([
-      getAverageFocus(startOfDay, now, userId),
-      prisma.focus.findMany({
-        where: {
-          userId,
-          timestamp: {
-            gte: startOfDay,
-            lte: now,
-          },
+    const focusRecords = await prisma.focus.findMany({
+      where: {
+        userId,
+        lastUpdated: {
+          gte: startOfDay,
+          lte: now,
         },
-        orderBy: { timestamp: "asc" },
-        select: {
-          id: true,
-          score: true,
-          category: true,
-          timestamp: true,
-        },
-      }),
-    ]);
+      },
+      orderBy: { lastUpdated: "asc" },
+    });
 
-    // Calculate category distribution
-    const categoryDistribution = focusRecords.reduce(
+    // Calculate total time per focus item
+    const itemStats = focusRecords.reduce(
       (acc, record) => {
-        acc[record.category] = (acc[record.category] || 0) + 1;
+        const timeSpent = record.timeSpent as Array<{ start: number; end: number | null }>;
+        let totalMs = 0;
+
+        for (const segment of timeSpent) {
+          if (segment.end) {
+            totalMs += segment.end - segment.start;
+          } else {
+            // Active segment
+            totalMs += Date.now() - segment.start;
+          }
+        }
+
+        if (!acc[record.item]) {
+          acc[record.item] = {
+            item: record.item,
+            keywords: record.keywords,
+            totalTimeMs: 0,
+            sessionCount: 0,
+          };
+        }
+
+        acc[record.item].totalTimeMs += totalMs;
+        acc[record.item].sessionCount += 1;
+
         return acc;
       },
-      {} as Record<string, number>
+      {} as Record<
+        string,
+        { item: string; keywords: string[]; totalTimeMs: number; sessionCount: number }
+      >
     );
 
+    const stats = Object.values(itemStats).map((stat) => ({
+      ...stat,
+      totalTimeMinutes: Math.round(stat.totalTimeMs / 60000),
+    }));
+
+    // Sort by total time descending
+    stats.sort((a, b) => b.totalTimeMs - a.totalTimeMs);
+
     res.json({
-      averageScore: average.average,
-      totalRecords: average.count,
-      categoryDistribution,
-      timeline: focusRecords,
+      totalRecords: focusRecords.length,
+      focusItems: stats,
+      timeline: focusRecords.map((r) => ({
+        id: r.id,
+        item: r.item,
+        keywords: r.keywords,
+        lastUpdated: r.lastUpdated,
+      })),
     });
   } catch (error) {
     console.error("Error fetching today's stats:", error);
@@ -278,22 +232,12 @@ router.get("/stats/today", async (req: AuthRequest, res: Response) => {
 // SCHEDULER CONTROL ROUTES
 // =============================================================================
 
-// For now, scheduler is global or needs further thought for multi-user
-// We'll keep it as is but it might need userId in the future
-
-// =============================================================================
-// SCHEDULER CONTROL ROUTES
-// =============================================================================
-
 /**
  * GET /focus/scheduler/status - Get scheduler status
  */
 router.get("/scheduler/status", (_req: Request, res: Response) => {
   const config = getSchedulerConfig();
-  res.json({
-    ...config,
-    intervalMinutes: config.intervalMs / 60000,
-  });
+  res.json(config);
 });
 
 /**

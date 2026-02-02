@@ -1,12 +1,12 @@
-import { computeFocusForLastHours } from "./inference";
+import { processFocusSession } from "./focus";
 import { createTrace } from "./opik";
 import { prisma } from "./prisma";
 
-const FOCUS_INTERVAL_MS = 5 * 60 * 1000; // Compute focus every 5 minutes
-const FOCUS_WINDOW_HOURS = 1; // Analyze the last 1 hour of attention data
+// Task intervals
+const FOCUS_INTERVAL_MS = 5 * 1000; // Process focus sessions every 5s
 
-let schedulerInterval: NodeJS.Timeout | null = null;
-let isRunning = false;
+let focusInterval: NodeJS.Timeout | null = null;
+let isFocusRunning = false;
 
 /**
  * Gets all users who have had activity in the specified time window
@@ -55,37 +55,40 @@ async function getUsersWithRecentActivity(windowHours: number): Promise<string[]
   return Array.from(allUserIds);
 }
 
+// Track last calculation timestamps for each user
+const lastFocusCalculation = new Map<string, number>();
+
 /**
- * Runs a single focus computation cycle for all active users
+ * Runs a focus detection cycle for all active users
  */
 async function runFocusCycle(): Promise<void> {
-  if (isRunning) {
-    console.log("[Scheduler] Previous focus computation still running, skipping...");
+  if (isFocusRunning) {
+    console.log("[Scheduler:Focus] Previous cycle still running, skipping...");
     return;
   }
 
-  isRunning = true;
+  isFocusRunning = true;
   const startTime = Date.now();
 
-  // Create a trace for the scheduled cycle
   const trace = createTrace({
     name: "scheduledFocusCycle",
-    tags: ["kaizen", "scheduler", "background"],
+    tags: ["kaizen", "scheduler", "focus"],
     metadata: {
       intervalMs: FOCUS_INTERVAL_MS,
-      windowHours: FOCUS_WINDOW_HOURS,
       scheduledAt: new Date().toISOString(),
     },
   });
 
   try {
-    console.log("[Scheduler] Starting focus computation...");
-    
-    // Get all users with recent activity
-    const userIds = await getUsersWithRecentActivity(FOCUS_WINDOW_HOURS);
-    
+    console.log("[Scheduler:Focus] Starting focus detection...");
+
+    // Get all users with recent activity (last 1 hour)
+    // Note: This is just to find active users - processFocusSession will fetch activity
+    // from each user's last focus update timestamp, not from this window
+    const userIds = await getUsersWithRecentActivity(1); // 1 hour
+
     if (userIds.length === 0) {
-      console.log("[Scheduler] No users with recent activity, skipping...");
+      console.log("[Scheduler:Focus] No users with recent activity, skipping...");
       trace.update({
         output: { skipped: true, reason: "No users with recent activity" },
       });
@@ -93,72 +96,93 @@ async function runFocusCycle(): Promise<void> {
       return;
     }
 
-    console.log(`[Scheduler] Computing focus for ${userIds.length} user(s)...`);
-    
-    // Compute focus for each user
+    console.log(
+      `[Scheduler:Focus] Processing focus for ${userIds.length} user(s)...`
+    );
+
+    // Process focus for each user with last calculation timestamp
     const results = await Promise.allSettled(
-      userIds.map((userId) => computeFocusForLastHours(FOCUS_WINDOW_HOURS, userId))
+      userIds.map((userId) => {
+        const lastCalc = lastFocusCalculation.get(userId);
+        return processFocusSession(userId, lastCalc).then((result) => {
+          // Update last calculation timestamp for this user
+          lastFocusCalculation.set(userId, Date.now());
+          return result;
+        });
+      })
     );
 
     const duration = Date.now() - startTime;
     const successCount = results.filter((r) => r.status === "fulfilled").length;
     const failureCount = results.filter((r) => r.status === "rejected").length;
 
+    // Count actions
+    const actions = results
+      .filter((r) => r.status === "fulfilled")
+      .map((r) => (r as PromiseFulfilledResult<any>).value.action);
+    const created = actions.filter((a) => a === "created").length;
+    const updated = actions.filter((a) => a === "updated").length;
+    const closed = actions.filter((a) => a === "closed").length;
+    const noActivity = actions.filter((a) => a === "no_activity").length;
+
     console.log(
-      `[Scheduler] Focus computed for ${successCount} users, ${failureCount} failures (took ${duration}ms)`
+      `[Scheduler:Focus] Completed: ${successCount} users (${created} created, ${updated} updated, ${closed} closed, ${noActivity} no activity), ${failureCount} failures (took ${duration}ms)`
     );
 
-    // Update trace with successful result
     trace.update({
       output: {
         userCount: userIds.length,
         successCount,
         failureCount,
+        created,
+        updated,
+        closed,
+        noActivity,
         durationMs: duration,
       },
     });
     trace.end();
   } catch (error) {
-    console.error("[Scheduler] Error computing focus:", error);
-
-    // Update trace with error
+    console.error("[Scheduler:Focus] Error:", error);
     trace.update({
       output: { error: error instanceof Error ? error.message : String(error) },
       metadata: { error: true },
     });
     trace.end();
   } finally {
-    isRunning = false;
+    isFocusRunning = false;
   }
 }
 
+
 /**
- * Starts the background focus computation scheduler
+ * Starts the background scheduler
  */
 export function startFocusScheduler(): void {
-  if (schedulerInterval) {
+  if (focusInterval) {
     console.log("[Scheduler] Already running");
     return;
   }
 
   console.log(
-    `[Scheduler] Starting focus scheduler (interval: ${FOCUS_INTERVAL_MS / 1000}s, window: ${FOCUS_WINDOW_HOURS}h)`
+    `[Scheduler] Starting scheduler:
+  - Focus detection: every ${FOCUS_INTERVAL_MS / 1000}s`
   );
 
   // Run immediately on start
   runFocusCycle();
 
   // Then run at regular intervals
-  schedulerInterval = setInterval(runFocusCycle, FOCUS_INTERVAL_MS);
+  focusInterval = setInterval(runFocusCycle, FOCUS_INTERVAL_MS);
 }
 
 /**
- * Stops the background focus computation scheduler
+ * Stops the background scheduler
  */
 export function stopFocusScheduler(): void {
-  if (schedulerInterval) {
-    clearInterval(schedulerInterval);
-    schedulerInterval = null;
+  if (focusInterval) {
+    clearInterval(focusInterval);
+    focusInterval = null;
     console.log("[Scheduler] Focus scheduler stopped");
   }
 }
@@ -167,7 +191,7 @@ export function stopFocusScheduler(): void {
  * Returns whether the scheduler is currently active
  */
 export function isSchedulerRunning(): boolean {
-  return schedulerInterval !== null;
+  return focusInterval !== null;
 }
 
 /**
@@ -175,8 +199,9 @@ export function isSchedulerRunning(): boolean {
  */
 export function getSchedulerConfig() {
   return {
-    intervalMs: FOCUS_INTERVAL_MS,
-    windowHours: FOCUS_WINDOW_HOURS,
-    isRunning: isSchedulerRunning(),
+    focus: {
+      intervalMs: FOCUS_INTERVAL_MS,
+      isRunning: focusInterval !== null,
+    },
   };
 }

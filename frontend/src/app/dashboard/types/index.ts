@@ -1,3 +1,23 @@
+// Backend Focus model from the server
+export interface BackendFocus {
+    id: number
+    score: number // 0-100
+    category: string // "deep_work", "shallow_work", "distraction", "rest"
+    summary: string
+    insights?: string
+    windowStart: string // ISO date string
+    windowEnd: string // ISO date string
+    textCount: number
+    imageCount: number
+    youtubeCount: number
+    audioCount: number
+    modelUsed: string
+    traceId?: string
+    timestamp: string // ISO date string
+    updatedAt: string // ISO date string
+}
+
+// Legacy Focus type - kept for backward compatibility with existing components
 export interface Focus {
     id?: number
     focus_item?: string // some versions use focus_item

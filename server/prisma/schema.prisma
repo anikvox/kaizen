@@ -20,6 +20,10 @@ model WebsiteVisit {
   updatedAt  DateTime  @updatedAt
   userId     String // Link to user
 
+  // AI-generated summary of website content
+  summary            String?   @db.Text
+  summaryGeneratedAt DateTime?
+
   user User @relation(fields: [userId], references: [id])
 
   @@index([openedAt])
@@ -97,37 +101,30 @@ model AudioAttention {
   @@index([userId])
 }
 
-// Focus scores calculated from attention data
+// Focus tracking - what the user is actively working on
+// Based on neuropilot's approach
 model Focus {
-  id       Int     @id @default(autoincrement())
-  score    Float // Focus score 0-100
-  category String // e.g., "deep_work", "shallow_work", "distraction", "rest"
-  summary  String  @db.Text // AI-generated summary of focus analysis
-  insights String? @db.Text // Additional AI insights and recommendations
+  id     Int    @id @default(autoincrement())
+  userId String
 
-  // Time window for this focus calculation
-  windowStart DateTime
-  windowEnd   DateTime
+  // Topic and keywords describing what user is focused on
+  item     String // e.g., "React Development", "Machine Learning Research"
+  keywords String[] // Array of keywords (e.g., ["react", "hooks", "useState", "components"])
 
-  // Stats from the analysis
-  textCount    Int @default(0)
-  imageCount   Int @default(0)
-  youtubeCount Int @default(0)
-  audioCount   Int @default(0)
+  // Time tracking - array of time segments
+  // Each segment has {start, end} where end is null for active segment
+  timeSpent Json @default("[]") // Array of {start: number, end: number | null}
+
+  // Timestamps
+  lastUpdated DateTime @default(now())
 
   // Metadata
   modelUsed String // Which AI model was used
   traceId   String? // Opik trace ID for debugging
 
-  timestamp DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  userId    String // Link to user
-
   user User @relation(fields: [userId], references: [id])
 
-  @@index([timestamp])
-  @@index([windowStart, windowEnd])
-  @@index([category])
+  @@index([userId, lastUpdated])
   @@index([userId])
 }
 
@@ -145,7 +142,7 @@ model User {
   imageAttentions   ImageAttention[]
   youtubeAttentions YoutubeAttention[]
   audioAttentions   AudioAttention[]
-  focusScores       Focus[]
+  focus             Focus[]
   deviceTokens      DeviceToken[]
   chatSessions      ChatSession[]
 }

@@ -8,13 +8,61 @@ import { motion } from "framer-motion"
 import { BarChart3, Clock } from "lucide-react"
 import { useMemo } from "react"
 
-import { calculateStats, formatDuration } from "../lib"
-import type { FocusWithParsedData, WinWithParsedData } from "../types"
+import { formatDuration } from "../lib"
+import type { BackendFocus, WinWithParsedData } from "../types"
 
 interface CompactStatsCardProps {
-    focusHistory: FocusWithParsedData[]
+    focusHistory: BackendFocus[]
     wins: WinWithParsedData[]
     isLoading?: boolean
+}
+
+// Helper to calculate stats from BackendFocus data
+function calculateStatsFromBackendFocus(focusHistory: BackendFocus[], wins: WinWithParsedData[]) {
+    const now = Date.now();
+    const oneDayAgo = now - 24 * 60 * 60 * 1000;
+    const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
+
+    // Filter today's focus records
+    const todayFocus = focusHistory.filter(f => new Date(f.timestamp).getTime() >= oneDayAgo);
+    const weekFocus = focusHistory.filter(f => new Date(f.timestamp).getTime() >= oneWeekAgo);
+
+    // Calculate daily and weekly totals based on time windows
+    const dailyTotal = todayFocus.reduce((sum, f) => {
+        const duration = new Date(f.windowEnd).getTime() - new Date(f.windowStart).getTime();
+        return sum + duration;
+    }, 0);
+
+    const weeklyTotal = weekFocus.reduce((sum, f) => {
+        const duration = new Date(f.windowEnd).getTime() - new Date(f.windowStart).getTime();
+        return sum + duration;
+    }, 0);
+
+    // Group by category for top activities
+    const categoryTotals = todayFocus.reduce((acc, f) => {
+        const duration = new Date(f.windowEnd).getTime() - new Date(f.windowStart).getTime();
+        acc[f.category] = (acc[f.category] || 0) + duration;
+        return acc;
+    }, {} as Record<string, number>);
+
+    const topActivities = Object.entries(categoryTotals)
+        .map(([name, time]) => ({ name, time }))
+        .sort((a, b) => b.time - a.time);
+
+    const primeActivity = topActivities[0] ? {
+        name: topActivities[0].name,
+        totalTime: topActivities[0].time,
+        percentage: (topActivities[0].time / dailyTotal) * 100
+    } : null;
+
+    return {
+        dailyTotal,
+        weeklyTotal,
+        topActivities,
+        primeActivity,
+        dailyWins: wins.filter(w => w.recorded_at >= oneDayAgo).length,
+        weeklyWins: wins.filter(w => w.recorded_at >= oneWeekAgo).length,
+    };
 }
 
 // Donut chart component
@@ -93,7 +141,7 @@ export function CompactStatsCard({
     isLoading = false
 }: CompactStatsCardProps) {
     const stats = useMemo(
-        () => calculateStats(focusHistory, wins),
+        () => calculateStatsFromBackendFocus(focusHistory, wins),
         [focusHistory, wins]
     )
 

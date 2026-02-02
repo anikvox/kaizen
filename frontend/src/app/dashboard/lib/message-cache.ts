@@ -19,6 +19,9 @@ class MessageCacheManager {
   }
 
   private loadFromStorage() {
+    // Skip if we're in a server-side environment
+    if (typeof window === 'undefined') return;
+
     try {
       const stored = localStorage.getItem(MESSAGE_CACHE_KEY);
       if (stored) {
@@ -31,6 +34,9 @@ class MessageCacheManager {
   }
 
   private saveToStorage() {
+    // Skip if we're in a server-side environment
+    if (typeof window === 'undefined') return;
+
     try {
       const data = Object.fromEntries(this.cache);
       localStorage.setItem(MESSAGE_CACHE_KEY, JSON.stringify(data));
@@ -59,7 +65,10 @@ class MessageCacheManager {
 
   clear() {
     this.cache.clear();
-    localStorage.removeItem(MESSAGE_CACHE_KEY);
+    // Skip if we're in a server-side environment
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(MESSAGE_CACHE_KEY);
+    }
   }
 
   // Clean up old entries (older than 7 days)

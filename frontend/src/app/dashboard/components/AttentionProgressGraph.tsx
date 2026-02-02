@@ -3,10 +3,10 @@
 import { TrendingUp } from "lucide-react"
 import { useMemo, useState } from "react"
 
-import type { FocusWithParsedData } from "../types"
+import type { BackendFocus } from "../types"
 
 interface AttentionProgressGraphProps {
-    focusHistory: FocusWithParsedData[]
+    focusHistory: BackendFocus[]
     isLoading?: boolean
 }
 
@@ -64,6 +64,7 @@ export function AttentionProgressGraph({
             }
         }
 
+        // Convert BackendFocus to sessions based on time windows
         const allSessions: {
             start: number
             end: number
@@ -72,17 +73,16 @@ export function AttentionProgressGraph({
         }[] = []
 
         focusHistory.forEach((focus) => {
-            focus.time_spent.forEach((ts) => {
-                const end = ts.end || Date.now()
-                const duration = end - ts.start
-                allSessions.push({
-                    start: ts.start,
-                    end,
-                    duration,
-                    focusItem: focus.focus_item || focus.item
-                })
-            })
-        })
+            const start = new Date(focus.windowStart).getTime();
+            const end = new Date(focus.windowEnd).getTime();
+            const duration = end - start;
+            allSessions.push({
+                start,
+                end,
+                duration,
+                focusItem: focus.summary.slice(0, 50) // Use summary as focus item
+            });
+        });
 
         if (allSessions.length === 0) {
             return {

@@ -1,55 +1,76 @@
-import { useState, useEffect } from 'react';
-import type { FocusWithParsedData } from '../types';
+import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '@clerk/nextjs';
+import type { BackendFocus } from '../types';
+import { FocusService } from '../lib/focus';
 
 interface UseFocusDataReturn {
-    currentFocus: FocusWithParsedData | null;
-    focusHistory: FocusWithParsedData[];
+    currentFocus: BackendFocus | null;
+    focusHistory: BackendFocus[];
     isLoading: boolean;
     error: Error | null;
+    refetch: () => Promise<void>;
 }
 
+// Poll every 30 seconds for new focus data
+const POLL_INTERVAL_MS = 30 * 1000;
+
 export function useFocusData(): UseFocusDataReturn {
-    const [data, setData] = useState<{ currentFocus: FocusWithParsedData | null, focusHistory: FocusWithParsedData[] }>({
+    const { getToken } = useAuth();
+    const [data, setData] = useState<{ currentFocus: BackendFocus | null, focusHistory: BackendFocus[] }>({
         currentFocus: null,
         focusHistory: []
     });
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<Error | null>(null);
 
-    useEffect(() => {
-        // Mock data for now, you can replace this with actual fetch
-        const mockHistory: FocusWithParsedData[] = [
-            {
-                id: 1,
-                item: "Bitcoin Design System",
-                focus_item: "Bitcoin Design System",
-                keywords: ["bitcoin", "design", "crypto"],
-                time_spent: [{ start: Date.now() - 3600000, end: null }],
-                last_updated: Date.now(),
-                duration: 3600000,
-                total_time_spent: 3600000
-            },
-            {
-                id: 2,
-                item: "Fundamental Theorem of Calculus",
-                focus_item: "Fundamental Theorem of Calculus",
-                keywords: ["math", "calculus"],
-                time_spent: [{ start: Date.now() - 7200000, end: Date.now() - 5400000 }],
-                last_updated: Date.now() - 5400000,
-                duration: 1800000,
-                total_time_spent: 1800000
+    const fetchFocusData = useCallback(async () => {
+        try {
+            const token = await getToken();
+            if (!token) {
+                setError(new Error('Not authenticated'));
+                setIsLoading(false);
+                return;
             }
-        ];
 
-        setData({
-            currentFocus: mockHistory[0],
-            focusHistory: mockHistory
-        });
-        setIsLoading(false);
-    }, []);
+            const focusService = new FocusService(token);
+
+            // Fetch latest focus and history in parallel
+            const [latest, history] = await Promise.all([
+                focusService.getLatestFocus(),
+                focusService.getFocusHistory(10, 0)
+            ]);
+
+            setData({
+                currentFocus: latest,
+                focusHistory: history
+            });
+            setError(null);
+        } catch (err) {
+            console.error('Error fetching focus data:', err);
+            setError(err instanceof Error ? err : new Error('Unknown error'));
+        } finally {
+            setIsLoading(false);
+        }
+    }, [getToken]);
+
+    // Initial fetch
+    useEffect(() => {
+        fetchFocusData();
+    }, [fetchFocusData]);
+
+    // Set up polling
+    useEffect(() => {
+        const interval = setInterval(() => {
+            fetchFocusData();
+        }, POLL_INTERVAL_MS);
+
+        return () => clearInterval(interval);
+    }, [fetchFocusData]);
 
     return {
         ...data,
         isLoading,
-        error: null
+        error,
+        refetch: fetchFocusData
     };
 }

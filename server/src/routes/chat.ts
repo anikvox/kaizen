@@ -8,10 +8,126 @@ import fs from "fs";
 import path from "path";
 
 import { requireAuth, AuthRequest } from "../middleware/auth";
-import { fetchAttentionData } from "../lib/inference";
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+// Attention data interface
+interface AttentionData {
+  websiteVisits: Array<{
+    id: number;
+    url: string;
+    title: string;
+    activeTime: number;
+    openedAt: Date;
+    closedAt: Date | null;
+  }>;
+  textActivities: Array<{
+    id: number;
+    url: string;
+    text: string;
+    timestamp: Date;
+  }>;
+  imageActivities: Array<{
+    id: number;
+    url: string;
+    src: string;
+    alt: string;
+    title: string;
+    width: number;
+    caption: string;
+    timestamp: Date;
+  }>;
+  youtubeActivities: Array<{
+    id: string;
+    videoId: string;
+    title: string;
+    channelName: string;
+    caption: string | null;
+    activeWatchTime: number | null;
+    timestamp: Date;
+  }>;
+  audioActivities: Array<{
+    id: number;
+    url: string;
+    src: string;
+    title: string;
+    duration: number;
+    summary: string;
+    timestamp: Date;
+  }>;
+}
+
+/**
+ * Fetches attention data from the database for a given time window
+ */
+async function fetchAttentionData(
+  windowStart: Date,
+  windowEnd: Date,
+  userId: string
+): Promise<AttentionData> {
+  const [websiteVisits, textActivities, imageActivities, youtubeActivities, audioActivities] =
+    await Promise.all([
+      prisma.websiteVisit.findMany({
+        where: {
+          userId,
+          openedAt: {
+            gte: windowStart,
+            lte: windowEnd,
+          },
+        },
+        orderBy: { openedAt: "desc" },
+      }),
+      prisma.textAttention.findMany({
+        where: {
+          userId,
+          timestamp: {
+            gte: windowStart,
+            lte: windowEnd,
+          },
+        },
+        orderBy: { timestamp: "desc" },
+      }),
+      prisma.imageAttention.findMany({
+        where: {
+          userId,
+          timestamp: {
+            gte: windowStart,
+            lte: windowEnd,
+          },
+        },
+        orderBy: { timestamp: "desc" },
+      }),
+      prisma.youtubeAttention.findMany({
+        where: {
+          userId,
+          timestamp: {
+            gte: windowStart,
+            lte: windowEnd,
+          },
+        },
+        orderBy: { timestamp: "desc" },
+      }),
+      prisma.audioAttention.findMany({
+        where: {
+          userId,
+          timestamp: {
+            gte: windowStart,
+            lte: windowEnd,
+          },
+        },
+        orderBy: { timestamp: "desc" },
+      }),
+    ]);
+
+  return {
+    websiteVisits,
+    textActivities,
+    imageActivities,
+    youtubeActivities,
+    audioActivities,
+  };
+}
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const genAIFiles = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });

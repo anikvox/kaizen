@@ -23,6 +23,10 @@ import db, { type Focus, type PomodoroState } from "~db"
 import { INTENT_QUEUE_NOTIFY, SERVER_URL } from "~default-settings"
 
 import { parseFocus, type FocusWithParsedData } from "./sidepanel-api/focus"
+import {
+  getLatestFocusFromBackend,
+  type BackendFocus
+} from "./sidepanel-api/focus-backend"
 import { getPomodoroState, togglePomodoro } from "./sidepanel-api/pomodoro"
 import { getWinsData } from "./sidepanel-api/wins"
 import { IntentsTab } from "./sidepanel-components/IntentsTab"
@@ -54,6 +58,7 @@ const Popup = () => {
 
   const [activeTab, setActiveTab] = useState<TabType>("focus")
   const [focusData, setFocusData] = useState<FocusWithParsedData | null>(null)
+  const [backendFocus, setBackendFocus] = useState<BackendFocus | null>(null)
   const [currentChatId, setCurrentChatId] = useState<string>("")
   const [isDeviceLinked, setIsDeviceLinked] = useState<boolean | null>(null)
 
@@ -227,15 +232,37 @@ const Popup = () => {
     fetchData()
   }, [])
   
+  // Poll for backend focus data
+  useEffect(() => {
+    console.log("[Focus Polling] Setting up backend focus polling")
+
+    // Initial fetch
+    const fetchBackendFocus = async () => {
+      const focus = await getLatestFocusFromBackend()
+      console.log("[Focus Polling] Received focus data:", focus)
+      setBackendFocus(focus)
+    }
+
+    fetchBackendFocus()
+
+    // Poll every 30 seconds
+    const focusPollInterval = setInterval(fetchBackendFocus, 30000)
+
+    return () => {
+      console.log("[Focus Polling] Cleaning up backend focus polling")
+      clearInterval(focusPollInterval)
+    }
+  }, [])
+
   // Poll for session updates to stay in sync with dashboard
   // Only switch to a new session if it was created externally (not by this sidepanel)
   useEffect(() => {
     let lastKnownSessionCount = 0
-    
+
     const sessionPollInterval = setInterval(async () => {
       try {
         const sessions = await chatService.getSessions()
-        
+
         // Only switch if a new session was created externally (session count increased)
         // and we don't have a current chat selected
         if (sessions.length > lastKnownSessionCount && !currentChatId) {
@@ -379,6 +406,86 @@ const Popup = () => {
   const renderInsightsTab = () => {
     return (
       <div className="flex-1 overflow-y-auto p-2 space-y-4">
+        {/* Backend Focus Score Section */}
+        {backendFocus && (
+          <div className="bg-gradient-to-br from-purple-50/80 to-blue-50/80 dark:from-purple-900/20 dark:to-blue-900/20 backdrop-blur-sm rounded-xl border border-purple-300/50 dark:border-purple-700/50 p-5 shadow-lg">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-purple-100/80 dark:bg-purple-900/40 backdrop-blur-sm rounded-lg border border-purple-200/50 dark:border-purple-800/50">
+                <Target className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                  Latest Focus Analysis
+                </h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  AI-powered focus tracking
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                  {Math.round(backendFocus.score)}
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">
+                  Score
+                </div>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    backendFocus.category === "deep_work"
+                      ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                      : backendFocus.category === "shallow_work"
+                        ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
+                        : backendFocus.category === "distraction"
+                          ? "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400"
+                          : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-400"
+                  }`}>
+                  {backendFocus.category.replace("_", " ").toUpperCase()}
+                </span>
+                <span className="text-xs text-gray-600 dark:text-gray-400">
+                  {new Date(backendFocus.windowStart).toLocaleTimeString()} - {new Date(backendFocus.windowEnd).toLocaleTimeString()}
+                </span>
+              </div>
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                {backendFocus.summary}
+              </p>
+              {backendFocus.insights && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                  <p className="text-xs text-blue-900 dark:text-blue-100 leading-relaxed">
+                    💡 {backendFocus.insights}
+                  </p>
+                </div>
+              )}
+              {(backendFocus.textCount > 0 || backendFocus.imageCount > 0 || backendFocus.youtubeCount > 0 || backendFocus.audioCount > 0) && (
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                  {backendFocus.textCount > 0 && (
+                    <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-md text-xs font-medium">
+                      {backendFocus.textCount} text
+                    </span>
+                  )}
+                  {backendFocus.imageCount > 0 && (
+                    <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-md text-xs font-medium">
+                      {backendFocus.imageCount} images
+                    </span>
+                  )}
+                  {backendFocus.youtubeCount > 0 && (
+                    <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-md text-xs font-medium">
+                      {backendFocus.youtubeCount} videos
+                    </span>
+                  )}
+                  {backendFocus.audioCount > 0 && (
+                    <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-md text-xs font-medium">
+                      {backendFocus.audioCount} audio
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Refresher Quiz Section */}
         <div className="bg-white/40 dark:bg-slate-700/40 backdrop-blur-sm rounded-xl border border-gray-300/50 dark:border-slate-600/50 p-5">
           <div className="flex items-center gap-3 mb-4">

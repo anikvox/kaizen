@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { AuthRequest } from "../middleware/auth";
+import { generateWebsiteSummary } from "../lib/website-summary";
 
 const router = Router();
 
@@ -100,6 +101,48 @@ router.post("/website", async (req: AuthRequest<{}, {}, WebsiteVisitBody>, res: 
             activeTime: 0,  // Reset active time on re-open
           },
         });
+
+        // Trigger website summary generation asynchronously (don't block response)
+        (async () => {
+          try {
+            // Get related text attention for context
+            const textAttention = await prisma.textAttention.findMany({
+              where: {
+                userId,
+                url: body.url,
+              },
+              orderBy: {
+                timestamp: "asc",
+              },
+              take: 10,
+            });
+
+            const concatenatedText = textAttention
+              .map((t) => t.text)
+              .join("\n\n");
+
+            // Generate summary
+            const summary = await generateWebsiteSummary({
+              url: body.url,
+              title: body.title,
+              textContent: concatenatedText || undefined,
+            });
+
+            // Update the visit with the summary
+            await prisma.websiteVisit.update({
+              where: { id: visit.id },
+              data: {
+                summary,
+                summaryGeneratedAt: new Date(),
+              },
+            });
+
+            console.log(`[WebsiteSummary] Generated summary for: ${body.title} (${body.url})`);
+          } catch (error) {
+            console.error(`[WebsiteSummary] Error generating summary for ${body.url}:`, error);
+          }
+        })();
+
         res.status(201).json(visit);
         break;
       }
