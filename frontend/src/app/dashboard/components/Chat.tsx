@@ -4,6 +4,7 @@ import { useAuth } from "@clerk/nextjs";
 import { MessageSquare, Plus, Send, Sparkles, Trash2, Loader2, Image as ImageIcon, Mic, MoreVertical, X } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { DashboardChatService, ChatSession, ChatMessage } from "../lib/chat";
+import { AIService } from "../lib/ai";
 import { marked } from "marked";
 import { motion, AnimatePresence } from "framer-motion";
 import { messageCache } from "../lib/message-cache";
@@ -50,9 +51,11 @@ export function Chat() {
     const [selectedAudio, setSelectedAudio] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [imageBlobUrls, setImageBlobUrls] = useState<Map<string, string>>(new Map());
+    const [isWriting, setIsWriting] = useState(false);
     const focusScore = 82;
 
     const chatServiceRef = useRef<DashboardChatService | null>(null);
+    const aiServiceRef = useRef<AIService | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const imageInputRef = useRef<HTMLInputElement>(null);
@@ -436,6 +439,58 @@ export function Chat() {
         if (audioInputRef.current) audioInputRef.current.value = '';
     };
 
+    const handleWrite = async () => {
+        if (isWriting || isSending) return;
+        
+        setIsWriting(true);
+        try {
+            const token = await getToken();
+            if (!token) {
+                alert("Authentication required");
+                return;
+            }
+
+            if (!aiServiceRef.current) {
+                aiServiceRef.current = new AIService(token);
+            }
+
+            // Generate a creative prompt based on recent activity
+            const prompt = "Generate an interesting question or prompt about productivity, focus, or personal growth.";
+            const generated = await aiServiceRef.current.write(prompt);
+            setMessage(generated);
+        } catch (error) {
+            console.error("Failed to generate text:", error);
+            alert("Failed to generate text. Please try again.");
+        } finally {
+            setIsWriting(false);
+        }
+    };
+
+    const handleRewrite = async () => {
+        if (!message.trim() || isWriting || isSending) return;
+        
+        setIsWriting(true);
+        try {
+            const token = await getToken();
+            if (!token) {
+                alert("Authentication required");
+                return;
+            }
+
+            if (!aiServiceRef.current) {
+                aiServiceRef.current = new AIService(token);
+            }
+
+            const rewritten = await aiServiceRef.current.rewrite(message);
+            setMessage(rewritten);
+        } catch (error) {
+            console.error("Failed to rewrite text:", error);
+            alert("Failed to rewrite text. Please try again.");
+        } finally {
+            setIsWriting(false);
+        }
+    };
+
     // Component to render authenticated images
     const AuthenticatedImage = ({ filename, alt, className }: { filename: string; alt: string; className: string }) => {
         const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -760,8 +815,9 @@ export function Chat() {
                                         }}
                                         placeholder="Message Kaizen AI..."
                                         rows={1}
-                                        className="w-full resize-none bg-transparent px-4 py-3 pr-32 focus:outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 overflow-y-auto"
+                                        className="w-full resize-none bg-transparent px-4 py-3 pr-40 focus:outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 overflow-y-auto"
                                         style={{ minHeight: '44px', maxHeight: '300px' }}
+                                        disabled={isWriting}
                                     />
                                     <input
                                         ref={imageInputRef}
@@ -791,6 +847,14 @@ export function Chat() {
                                             className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all"
                                         >
                                             <Mic size={18} />
+                                        </button>
+                                        <button
+                                            onClick={message.trim() ? handleRewrite : handleWrite}
+                                            disabled={isWriting || isSending}
+                                            title={message.trim() ? "Rewrite with AI" : "Generate message with AI"}
+                                            className="p-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {isWriting ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
                                         </button>
                                         <button
                                             onClick={handleSendMessage}

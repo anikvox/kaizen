@@ -1,5 +1,5 @@
 // AI model wrappers for Chrome AI and kaizen backend
-// These will be replaced with kaizen backend API calls
+// These connect to the kaizen backend API
 
 export type AIModelCapabilities = {
   available: boolean
@@ -29,18 +29,62 @@ export type AISummarizer = {
   ) => AsyncGenerator<string, void, unknown>
 }
 
+const API_BASE_URL = process.env.PLASMO_PUBLIC_SERVER_URL || "http://localhost:60092"
+
+// Get device token from storage
+const getDeviceToken = async (): Promise<string | null> => {
+  const result = await chrome.storage.local.get("deviceToken")
+  return result.deviceToken || null
+}
+
 // Get AI writer instance
 export const getWriter = async (): Promise<AIWriter> => {
-  // TODO: Connect to kaizen backend
+  const token = await getDeviceToken()
+  
   return {
     write: async (input: string) => {
-      return `Rewritten: ${input}`
+      if (!token) throw new Error("Not authenticated")
+      
+      console.log("[AI Writer] Calling API with token:", token?.substring(0, 10) + "...")
+      
+      const response = await fetch(`${API_BASE_URL}/api/ai/write`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ prompt: input })
+      })
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("[AI Writer] API error:", response.status, errorText)
+        throw new Error(`Failed to generate text: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      return data.text
     },
     writeStreaming: async function* (input: string) {
-      const response = `Rewritten: ${input}`
-      const words = response.split(" ")
+      if (!token) throw new Error("Not authenticated")
+      
+      const response = await fetch(`${API_BASE_URL}/api/ai/write`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ prompt: input })
+      })
+      
+      if (!response.ok) {
+        throw new Error("Failed to generate text")
+      }
+      
+      const data = await response.json()
+      const words = data.text.split(" ")
       for (const word of words) {
-        await new Promise((resolve) => setTimeout(resolve, 50))
+        await new Promise((resolve) => setTimeout(resolve, 30))
         yield word + " "
       }
     }
@@ -49,16 +93,52 @@ export const getWriter = async (): Promise<AIWriter> => {
 
 // Get AI rewriter instance
 export const getRewriter = async (): Promise<AIRewriter> => {
-  // TODO: Connect to kaizen backend
+  const token = await getDeviceToken()
+  
   return {
     rewrite: async (input: string, context?: string) => {
-      return `Rewritten: ${input}`
+      if (!token) throw new Error("Not authenticated")
+      
+      console.log("[AI Rewriter] Calling API with token:", token?.substring(0, 10) + "...")
+      
+      const response = await fetch(`${API_BASE_URL}/api/ai/rewrite`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ text: input, context })
+      })
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("[AI Rewriter] API error:", response.status, errorText)
+        throw new Error(`Failed to rewrite text: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      return data.text
     },
     rewriteStreaming: async function* (input: string, context?: string) {
-      const response = `Rewritten: ${input}`
-      const words = response.split(" ")
+      if (!token) throw new Error("Not authenticated")
+      
+      const response = await fetch(`${API_BASE_URL}/api/ai/rewrite`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ text: input, context })
+      })
+      
+      if (!response.ok) {
+        throw new Error("Failed to rewrite text")
+      }
+      
+      const data = await response.json()
+      const words = data.text.split(" ")
       for (const word of words) {
-        await new Promise((resolve) => setTimeout(resolve, 50))
+        await new Promise((resolve) => setTimeout(resolve, 30))
         yield word + " "
       }
     }
@@ -67,16 +147,48 @@ export const getRewriter = async (): Promise<AIRewriter> => {
 
 // Get AI summarizer instance
 export const getSummarizer = async (): Promise<AISummarizer> => {
-  // TODO: Connect to kaizen backend
+  const token = await getDeviceToken()
+  
   return {
     summarize: async (input: string) => {
-      return `Summary: ${input.substring(0, 100)}...`
+      if (!token) throw new Error("Not authenticated")
+      
+      const response = await fetch(`${API_BASE_URL}/api/ai/summarize`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ text: input })
+      })
+      
+      if (!response.ok) {
+        throw new Error("Failed to summarize text")
+      }
+      
+      const data = await response.json()
+      return data.text
     },
     summarizeStreaming: async function* (input: string) {
-      const response = `Summary: ${input.substring(0, 100)}...`
-      const words = response.split(" ")
+      if (!token) throw new Error("Not authenticated")
+      
+      const response = await fetch(`${API_BASE_URL}/api/ai/summarize`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ text: input })
+      })
+      
+      if (!response.ok) {
+        throw new Error("Failed to summarize text")
+      }
+      
+      const data = await response.json()
+      const words = data.text.split(" ")
       for (const word of words) {
-        await new Promise((resolve) => setTimeout(resolve, 50))
+        await new Promise((resolve) => setTimeout(resolve, 30))
         yield word + " "
       }
     }
@@ -85,16 +197,48 @@ export const getSummarizer = async (): Promise<AISummarizer> => {
 
 // Get language model instance
 export const getLanguageModel = async () => {
-  // TODO: Connect to kaizen backend
+  const token = await getDeviceToken()
+  
   return {
     prompt: async (input: string) => {
-      return `Response to: ${input}`
+      if (!token) throw new Error("Not authenticated")
+      
+      const response = await fetch(`${API_BASE_URL}/api/ai/prompt`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ prompt: input })
+      })
+      
+      if (!response.ok) {
+        throw new Error("Failed to generate response")
+      }
+      
+      const data = await response.json()
+      return data.text
     },
     promptStreaming: async function* (input: string) {
-      const response = `Response to: ${input}`
-      const words = response.split(" ")
+      if (!token) throw new Error("Not authenticated")
+      
+      const response = await fetch(`${API_BASE_URL}/api/ai/prompt`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ prompt: input })
+      })
+      
+      if (!response.ok) {
+        throw new Error("Failed to generate response")
+      }
+      
+      const data = await response.json()
+      const words = data.text.split(" ")
       for (const word of words) {
-        await new Promise((resolve) => setTimeout(resolve, 50))
+        await new Promise((resolve) => setTimeout(resolve, 30))
         yield word + " "
       }
     }
@@ -103,9 +247,9 @@ export const getLanguageModel = async () => {
 
 // Check if Chrome AI is available
 export const checkAIAvailability = async (): Promise<AIModelCapabilities> => {
-  // For now, return not available - will use kaizen backend instead
+  const token = await getDeviceToken()
   return {
-    available: false,
-    status: "no"
+    available: !!token,
+    status: token ? "readily" : "no"
   }
 }

@@ -483,6 +483,9 @@ export const Chat: React.FC<ChatProps> = ({
       const rewritten = await rewriter.rewrite(messageText)
       setMessageText(rewritten)
       if ((rewriter as any).destroy) (rewriter as any).destroy()
+    } catch (error) {
+      console.error("Failed to rewrite text:", error)
+      alert("Failed to rewrite text. Please try again.")
     } finally {
       setWriting(false)
     }
@@ -509,6 +512,9 @@ export const Chat: React.FC<ChatProps> = ({
       )
       setMessageText(written)
       if ((writer as any).destroy) (writer as any).destroy()
+    } catch (error) {
+      console.error("Failed to generate text:", error)
+      alert("Failed to generate text. Please try again.")
     } finally {
       setWriting(false)
     }
@@ -711,7 +717,7 @@ export const Chat: React.FC<ChatProps> = ({
       {/* Bottom Section Container - Takes remaining height */}
       <div
         className="flex flex-col flex-1"
-        style={{ height: `${80 - messagesHeight}%` }}>
+        style={{ height: `${190 - messagesHeight}%` }}>
         {/* Input Container */}
         <div className="flex-1 flex flex-col justify-end border-t border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/50">
           {/* Selected Files Preview */}
@@ -820,7 +826,7 @@ export const Chat: React.FC<ChatProps> = ({
               />
 
               {/* Write / Rewrite Button */}
-              <button
+              {/* <button
                 onClick={messageText.trim() ? handleRewrite : handleWrite}
                 disabled={isStreaming || writing}
                 className="p-2 self-center text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -830,7 +836,7 @@ export const Chat: React.FC<ChatProps> = ({
                     : "Generate message with AI"
                 }>
                 <Sparkles size={18} />
-              </button>
+              </button> */}
 
               {/* Send Button */}
               <button
