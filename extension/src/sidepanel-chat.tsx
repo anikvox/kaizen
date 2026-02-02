@@ -71,14 +71,38 @@ export const Chat: React.FC<ChatProps> = ({
     return service
   }, [chatId])
 
-  // Fetch messages for this chat
-  const messages = useLiveQuery(() => {
-    return db
-      .table<ChatMessage>("chatMessages")
-      .where("chatId")
-      .equals(chatId)
-      .toArray()
-  }, [chatId])
+  // Fetch messages from server instead of IndexedDB
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false)
+
+  // Fetch messages from server when chatId changes
+  useEffect(() => {
+    const fetchMessages = async () => {
+      if (!chatId || chatId.startsWith('chat-')) {
+        // Local chat ID, no server messages
+        setMessages([])
+        return
+      }
+
+      setIsLoadingMessages(true)
+      try {
+        const serverMessages = await chatService.getMessages(chatId)
+        console.log(`[Sidepanel Chat] Fetched ${serverMessages.length} messages from server for session: ${chatId}`)
+        setMessages(serverMessages)
+      } catch (error) {
+        console.error("[Sidepanel Chat] Error fetching messages:", error)
+        setMessages([])
+      } finally {
+        setIsLoadingMessages(false)
+      }
+    }
+
+    fetchMessages()
+    
+    // Poll for new messages every 3 seconds
+    const interval = setInterval(fetchMessages, 3000)
+    return () => clearInterval(interval)
+  }, [chatId, chatService])
   
   useEffect(() => {
     console.log(`[Sidepanel Chat] Displaying ${messages?.length || 0} messages for chatId: ${chatId}`, messages)
@@ -262,94 +286,76 @@ export const Chat: React.FC<ChatProps> = ({
     )
       return
 
-    if (messageText.trim()) {
-      await db.table<ChatMessage>("chatMessages").add({
-        chatId,
-        by: "user",
-        type: "text",
-        content: messageText
-      })
-    }
-
-    for (const image of selectedImages) {
-      const reader = new FileReader()
-      const base64 = await new Promise<string>((resolve) => {
-        reader.onloadend = () => resolve(reader.result as string)
-        reader.readAsDataURL(image)
-      })
-      await db.table<ChatMessage>("chatMessages").add({
-        chatId,
-        by: "user",
-        type: "image",
-        content: base64
-      })
-    }
-
-    for (const audio of selectedAudios) {
-      const reader = new FileReader()
-      const base64 = await new Promise<string>((resolve) => {
-        reader.onloadend = () => resolve(reader.result as string)
-        reader.readAsDataURL(audio)
-      })
-      await db.table<ChatMessage>("chatMessages").add({
-        chatId,
-        by: "user",
-        type: "audio",
-        content: base64
-      })
-    }
+    console.log(`[Sidepanel Chat] Sending message to session: ${chatId}`)
 
     const userMessage = messageText
     const images = selectedImages.length > 0 ? selectedImages : null
     const audios = selectedAudios.length > 0 ? selectedAudios : null
 
+    // Add user message to local state immediately for UI feedback
+    const tempUserMsg: ChatMessage = {
+      id: `temp-${Date.now()}`,
+      role: "user",
+      content: userMessage,
+      createdAt: new Date().toISOString()
+    }
+    setMessages(prev => [...prev, tempUserMsg])
+
     setMessageText("")
     setSelectedImages([])
     setSelectedAudios([])
-
-    if (isNewChat) {
-      onChatCreated?.(chatId)
-    }
 
     setIsStreaming(true)
     setStreamingMessage("")
 
     try {
-      for await (const response of chatService.streamResponse(userMessage)) {
-        setStreamingMessage(response.text)
+      let fullResponse = ""
+      
+      // Build context from recent activity
+      const attention = attentionContent(
+        await allUserActivityForLastMs(CONTEXT_WINDOW_MS)
+      )
+      const context = `Recent Activity Context:\n${attention}`
+
+      console.log(`[Sidepanel Chat] Streaming response for session: ${chatId}`)
+      
+      for await (const response of chatService.streamResponse(userMessage, context)) {
+        fullResponse = response.text
+        setStreamingMessage(fullResponse)
 
         if (response.done) {
-          await db.table<ChatMessage>("chatMessages").add({
-            chatId,
-            by: "bot",
-            type: "text",
-            content: response.text
-          })
-          setIsStreaming(false)
-          setStreamingMessage("")
-          
-          const backendMessages = await chatService.getMessages(chatId)
-          if (backendMessages && backendMessages.length > 0) {
-            const table = db.table<ChatMessage>("chatMessages")
-            await table.where("chatId").equals(chatId).delete()
-            
-            for (const msg of backendMessages) {
-              await table.add({
-                chatId,
-                by: msg.role === 'user' ? 'user' : 'bot',
-                type: 'text' as const,
-                content: msg.content,
-                timestamp: new Date(msg.createdAt).getTime()
-              })
-            }
+          // Add assistant message to local state
+          const assistantMsg: ChatMessage = {
+            id: `temp-${Date.now()}-assistant`,
+            role: "assistant",
+            content: fullResponse,
+            createdAt: new Date().toISOString()
           }
+          setMessages(prev => [...prev, assistantMsg])
+          setStreamingMessage("")
+          setIsStreaming(false)
+          
+          console.log("[Sidepanel Chat] Message sent successfully to session:", chatId)
+          
+          // Refresh messages from server after a short delay
+          setTimeout(async () => {
+            try {
+              const serverMessages = await chatService.getMessages(chatId)
+              setMessages(serverMessages)
+            } catch (error) {
+              console.error("[Sidepanel Chat] Error refreshing messages:", error)
+            }
+          }, 1000)
+          
           break
         }
       }
     } catch (error) {
-      console.error("Error getting response:", error)
+      console.error("[Sidepanel Chat] Error sending message:", error)
       setIsStreaming(false)
       setStreamingMessage("")
+      // Remove the temporary user message on error
+      setMessages(prev => prev.filter(m => m.id !== tempUserMsg.id))
     }
   }
 
@@ -431,38 +437,51 @@ export const Chat: React.FC<ChatProps> = ({
     }
   }
 
+  const formatMessageTime = (timestamp: string) => {
+    const date = new Date(timestamp)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    // Just now (< 1 min)
+    if (diffMins < 1) return 'Just now'
+    // Minutes ago (< 1 hour)
+    if (diffMins < 60) return `${diffMins}m ago`
+    // Hours ago (< 24 hours)
+    if (diffHours < 24) return `${diffHours}h ago`
+    // Days ago (< 7 days)
+    if (diffDays < 7) return `${diffDays}d ago`
+    // Older: show date
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
+  }
+
   const renderMessage = (message: ChatMessage) => {
-    const isUser = message.by === "user"
+    // Handle both server format (role) and local format (by)
+    const isUser = (message as any).role === "user" || (message as any).by === "user"
 
     return (
       <div
         key={message.id}
         className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4 animate-fadeIn`}>
-        <div
-          className={`max-w-xs lg:max-w-md xl:max-w-lg px-4 py-3 backdrop-blur-sm rounded-2xl shadow-sm ${isUser
-            ? "bg-blue-600 text-white rounded-br-sm"
-            : " text-slate-900 dark:text-slate-100 rounded-bl-sm"
-            }`}>
-          {message.type === "text" && (
+        <div className={`flex flex-col ${isUser ? "items-end" : "items-start"} max-w-xs lg:max-w-md xl:max-w-lg`}>
+          <div
+            className={`px-4 py-3 backdrop-blur-sm rounded-2xl shadow-sm ${isUser
+              ? "bg-blue-600 text-white rounded-br-sm"
+              : " text-slate-900 dark:text-slate-100 rounded-bl-sm"
+              }`}>
             <div
               className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-headings:my-2 break-words overflow-wrap-anywhere"
               dangerouslySetInnerHTML={{
                 __html: marked.parse(message.content) as string
               }}
             />
-          )}
-          {message.type === "image" && (
-            <img
-              src={message.content}
-              alt="Uploaded"
-              className="max-w-full rounded-lg"
-            />
-          )}
-          {message.type === "audio" && (
-            <audio controls className="max-w-full">
-              <source src={message.content} />
-              Your browser does not support the audio element.
-            </audio>
+          </div>
+          {message.createdAt && (
+            <span className={`text-[10px] mt-1 px-1 ${isUser ? 'text-slate-400 dark:text-slate-500' : 'text-slate-500 dark:text-slate-400'}`}>
+              {formatMessageTime(message.createdAt)}
+            </span>
           )}
         </div>
       </div>

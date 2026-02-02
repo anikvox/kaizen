@@ -57,6 +57,26 @@ export function Chat() {
     const audioInputRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+    const formatMessageTime = (timestamp: string) => {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        // Just now (< 1 min)
+        if (diffMins < 1) return 'Just now';
+        // Minutes ago (< 1 hour)
+        if (diffMins < 60) return `${diffMins}m ago`;
+        // Hours ago (< 24 hours)
+        if (diffHours < 24) return `${diffHours}h ago`;
+        // Days ago (< 7 days)
+        if (diffDays < 7) return `${diffDays}d ago`;
+        // Older: show date
+        return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    };
+
     const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
         messagesEndRef.current?.scrollIntoView({ behavior });
     }, []);
@@ -189,10 +209,13 @@ export function Chat() {
     const handleCreateChat = async () => {
         if (!chatServiceRef.current) return;
         try {
+            console.log("[Chat] Creating new chat session...");
             const newSession = await chatServiceRef.current.createSession();
+            console.log("[Chat] New session created:", newSession.id);
             setChats([newSession, ...chats]);
             setSelectedChatId(newSession.id);
             setMessages([]);
+            console.log("[Chat] Switched to new session:", newSession.id);
         } catch (error) {
             console.error("Failed to create chat:", error);
         }
@@ -218,6 +241,8 @@ export function Chat() {
 
     const handleSendMessage = async () => {
         if (!message.trim() || !selectedChatId || !chatServiceRef.current || isSending) return;
+
+        console.log("[Chat] Sending message to session:", selectedChatId);
 
         const userMsg: ChatMessage = {
             id: Date.now().toString(),
@@ -252,6 +277,7 @@ export function Chat() {
 
             for await (const response of stream) {
                 if (response.title) {
+                    console.log("[Chat] Title updated:", response.title);
                     setChats(prev => prev.map(c => c.id === selectedChatId ? { ...c, title: response.title! } : c));
                 }
                 if (response.chunk) {
@@ -269,6 +295,7 @@ export function Chat() {
 
             setMessages(prev => [...prev, assistantMsg]);
             setStreamingMessage("");
+            console.log("[Chat] Message sent successfully to session:", selectedChatId);
         } catch (error) {
             console.error("Failed to send message:", error);
             if (error instanceof Error) {
@@ -358,7 +385,7 @@ export function Chat() {
                                 </div>
                                 <button
                                     onClick={(e) => handleDeleteChat(e, chat.id)}
-                                    className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-all"
+                                    className="opacity-0 group-hover:opacity-100 mt-1 p-1 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-all"
                                 >
                                     <Trash2 size={14} />
                                 </button>
@@ -419,27 +446,34 @@ export function Chat() {
                                                 </div>
                                             </div>
                                         )}
-                                        <div className={`max-w-[85%] px-5 py-3.5 rounded-3xl shadow-sm transition-all group-hover:shadow-md ${m.role === "user"
-                                            ? "bg-blue-600 text-white rounded-br-md ml-auto"
-                                            : "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 rounded-bl-md"
-                                            }`}>
-                                            {m.imagePreview && (
-                                                <img 
-                                                    src={m.imagePreview} 
-                                                    alt="Attached" 
-                                                    className="rounded-lg mb-2 max-w-xs max-h-64 object-cover"
+                                        <div className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"} max-w-[85%]`}>
+                                            <div className={`px-5 py-3.5 rounded-3xl shadow-sm transition-all group-hover:shadow-md ${m.role === "user"
+                                                ? "bg-blue-600 text-white rounded-br-md"
+                                                : "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 rounded-bl-md"
+                                                }`}>
+                                                {m.imagePreview && (
+                                                    <img 
+                                                        src={m.imagePreview} 
+                                                        alt="Attached" 
+                                                        className="rounded-lg mb-2 max-w-xs max-h-64 object-cover"
+                                                    />
+                                                )}
+                                                {m.audioName && (
+                                                    <div className={`flex items-center gap-2 mb-2 px-3 py-2 rounded-lg ${m.role === "user" ? "bg-blue-700" : "bg-gray-100 dark:bg-gray-700"}`}>
+                                                        <Mic size={16} />
+                                                        <span className="text-sm">{m.audioName}</span>
+                                                    </div>
+                                                )}
+                                                <div
+                                                    className={`prose prose-sm max-w-none break-words ${m.role === 'user' ? 'prose-invert text-white' : 'dark:prose-invert text-gray-800 dark:text-gray-200'}`}
+                                                    dangerouslySetInnerHTML={{ __html: marked.parse(m.content) as string }}
                                                 />
+                                            </div>
+                                            {m.createdAt && (
+                                                <span className={`text-[10px] mt-1 px-1 ${m.role === "user" ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'}`}>
+                                                    {formatMessageTime(m.createdAt)}
+                                                </span>
                                             )}
-                                            {m.audioName && (
-                                                <div className={`flex items-center gap-2 mb-2 px-3 py-2 rounded-lg ${m.role === "user" ? "bg-blue-700" : "bg-gray-100 dark:bg-gray-700"}`}>
-                                                    <Mic size={16} />
-                                                    <span className="text-sm">{m.audioName}</span>
-                                                </div>
-                                            )}
-                                            <div
-                                                className={`prose prose-sm max-w-none break-words ${m.role === 'user' ? 'prose-invert text-white' : 'dark:prose-invert text-gray-800 dark:text-gray-200'}`}
-                                                dangerouslySetInnerHTML={{ __html: marked.parse(m.content) as string }}
-                                            />
                                         </div>
                                         {m.role === "user" && (
                                             <div className="flex-shrink-0 ml-3 mt-1">

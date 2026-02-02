@@ -184,15 +184,18 @@ const Popup = () => {
         } catch (pomodoroError) {
           console.error("Error fetching pomodoro state:", pomodoroError)
         }
-        // Initialize chat session - always use most recent session
+        // Initialize chat session - use most recent session or create new one
         try {
           const sessions = await chatService.getSessions()
           if (sessions.length > 0) {
-            // Always use the most recent session (first in the list)
+            // Use the most recent session
+            console.log("[Sidepanel] Using most recent session:", sessions[0].id)
             setCurrentChatId(sessions[0].id)
           } else {
+            // No sessions exist, create a new one
             const newSession = await chatService.createSession("New Chat")
             if (newSession) {
+              console.log("[Sidepanel] Created new session:", newSession.id)
               setCurrentChatId(newSession.id)
             } else {
               setCurrentChatId(generateChatId())
@@ -214,16 +217,22 @@ const Popup = () => {
   }, [])
   
   // Poll for session updates to stay in sync with dashboard
+  // Only switch to a new session if it was created externally (not by this sidepanel)
   useEffect(() => {
+    let lastKnownSessionCount = 0
+    
     const sessionPollInterval = setInterval(async () => {
       try {
         const sessions = await chatService.getSessions()
-        console.log(`[Sidepanel] Polled sessions. Current: ${currentChatId}, Most recent: ${sessions[0]?.id}`)
-        if (sessions.length > 0 && sessions[0].id !== currentChatId) {
-          console.log(`[Sidepanel] Switching to most recent session: ${sessions[0].id} (was: ${currentChatId})`)
-          // If the most recent session changed, switch to it
+        
+        // Only switch if a new session was created externally (session count increased)
+        // and we don't have a current chat selected
+        if (sessions.length > lastKnownSessionCount && !currentChatId) {
+          console.log(`[Sidepanel] New session detected externally, switching to: ${sessions[0].id}`)
           setCurrentChatId(sessions[0].id)
         }
+        
+        lastKnownSessionCount = sessions.length
       } catch (error) {
         console.error("Error polling sessions:", error)
       }
@@ -285,10 +294,13 @@ const Popup = () => {
 
   const handleNewChatRequest = useCallback(async () => {
     try {
+      console.log("[Sidepanel] Creating new chat session...")
       const newSession = await chatService.createSession("New Chat")
       if (newSession) {
+        console.log("[Sidepanel] New session created:", newSession.id)
         setCurrentChatId(newSession.id)
       } else {
+        console.log("[Sidepanel] Failed to create session, using local ID")
         setCurrentChatId(generateChatId())
       }
     } catch (error) {
