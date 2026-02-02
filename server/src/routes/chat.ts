@@ -8,6 +8,7 @@ import fs from "fs";
 import path from "path";
 
 import { requireAuth, AuthRequest } from "../middleware/auth";
+import { fetchAttentionData } from "../lib/inference";
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -58,6 +59,106 @@ router.get("/uploads/:filename", requireAuth, async (req: AuthRequest, res: Resp
     res.status(500).json({ error: "Failed to serve file" });
   }
 });
+
+// Helper to parse reflection range from context string (e.g., "Reflection Range: 30m")
+function parseReflectionRange(context?: string): number {
+  if (!context) return 30 * 60 * 1000; // Default: 30 minutes
+
+  const match = context.match(/Reflection Range:\s*(\d+)(m|h|d)/i);
+  if (!match) return 30 * 60 * 1000;
+
+  const value = parseInt(match[1]);
+  const unit = match[2].toLowerCase();
+
+  switch (unit) {
+    case 'm':
+      return value * 60 * 1000; // minutes to milliseconds
+    case 'h':
+      return value * 60 * 60 * 1000; // hours to milliseconds
+    case 'd':
+      return value * 24 * 60 * 60 * 1000; // days to milliseconds
+    default:
+      return 30 * 60 * 1000;
+  }
+}
+
+// Helper to format attention data for AI context
+function formatAttentionData(attentionData: Awaited<ReturnType<typeof fetchAttentionData>>): string {
+  const { websiteVisits, textActivities, imageActivities, youtubeActivities, audioActivities } = attentionData;
+
+  let formatted = "\n\n## User's Recent Activity:\n";
+
+  // Website visits
+  if (websiteVisits.length > 0) {
+    formatted += "\n### Websites Visited:\n";
+    websiteVisits.slice(0, 10).forEach(visit => {
+      const activeMinutes = Math.round(visit.activeTime / 60000);
+      formatted += `- ${visit.title} (${visit.url})\n  Active time: ${activeMinutes} minutes\n`;
+    });
+  }
+
+  // Text reading activities
+  if (textActivities.length > 0) {
+    formatted += "\n### Reading Activity:\n";
+    textActivities.slice(0, 10).forEach(activity => {
+      const preview = activity.text.slice(0, 100) + (activity.text.length > 100 ? '...' : '');
+      formatted += `- Read on ${activity.url}\n  "${preview}"\n`;
+    });
+  }
+
+  // Image viewing activities
+  if (imageActivities.length > 0) {
+    formatted += "\n### Images Viewed:\n";
+    imageActivities.slice(0, 10).forEach(activity => {
+      formatted += `- ${activity.title || activity.alt} on ${activity.url}\n`;
+      if (activity.caption) {
+        formatted += `  Caption: ${activity.caption.slice(0, 100)}\n`;
+      }
+    });
+  }
+
+  // YouTube videos
+  if (youtubeActivities.length > 0) {
+    formatted += "\n### Videos Watched:\n";
+    youtubeActivities.slice(0, 10).forEach(activity => {
+      const watchMinutes = activity.activeWatchTime ? Math.round(activity.activeWatchTime / 60) : 0;
+      formatted += `- "${activity.title}" by ${activity.channelName}\n`;
+      if (watchMinutes > 0) {
+        formatted += `  Watch time: ${watchMinutes} minutes\n`;
+      }
+    });
+  }
+
+  // Audio listening
+  if (audioActivities.length > 0) {
+    formatted += "\n### Audio Content:\n";
+    audioActivities.slice(0, 10).forEach(activity => {
+      const durationMinutes = Math.round(activity.duration / 60);
+      formatted += `- ${activity.title}\n  Duration: ${durationMinutes} minutes\n`;
+      if (activity.summary) {
+        formatted += `  Summary: ${activity.summary.slice(0, 100)}\n`;
+      }
+    });
+  }
+
+  // Summary stats
+  const totalActivities = websiteVisits.length + textActivities.length +
+                          imageActivities.length + youtubeActivities.length +
+                          audioActivities.length;
+
+  if (totalActivities === 0) {
+    formatted += "\nNo recent activity data available in this time range.\n";
+  } else {
+    formatted += `\n### Activity Summary:\n`;
+    formatted += `- Total website visits: ${websiteVisits.length}\n`;
+    formatted += `- Reading activities: ${textActivities.length}\n`;
+    formatted += `- Images viewed: ${imageActivities.length}\n`;
+    formatted += `- Videos watched: ${youtubeActivities.length}\n`;
+    formatted += `- Audio content: ${audioActivities.length}\n`;
+  }
+
+  return formatted;
+}
 
 // Helper to generate a chat title
 async function generateChatTitle(userMessage: string, assistantResponse: string): Promise<string> {
@@ -247,16 +348,40 @@ router.post(
         take: 10,
       });
 
+      // Parse reflection range and fetch attention data
+      const reflectionRangeMs = parseReflectionRange(context);
+      const windowEnd = new Date();
+      const windowStart = new Date(windowEnd.getTime() - reflectionRangeMs);
+
+      console.log("[Chat] Fetching attention data:", {
+        reflectionRangeMs,
+        windowStart,
+        windowEnd,
+        userId
+      });
+
+      let attentionContext = "";
+      try {
+        const attentionData = await fetchAttentionData(windowStart, windowEnd, userId);
+        attentionContext = formatAttentionData(attentionData);
+        console.log("[Chat] Fetched attention data successfully");
+      } catch (error) {
+        console.error("[Chat] Error fetching attention data:", error);
+        attentionContext = "\n\nNo recent activity data available.";
+      }
+
       const systemInstruction = `You are Kaizen AI, an advanced productivity assistant.
         You have access to the user's activity and focus data.
-        
+
         PRINCIPLES:
         1. Be concise and direct.
         2. Use the provided context to offer personalized insights.
         3. Citations: If referring to specific websites, include their URLs.
         4. Focus: Help the user stay in the flow and improve their productivity.
-        
-        User Context: ${context || "No specific activity context provided yet."}`;
+        5. When discussing the user's activities, reference specific websites, articles, videos, or content they've engaged with.
+        6. Provide actionable insights based on their actual browsing and attention patterns.
+
+        ${attentionContext}`;
 
       const model = genAI.getGenerativeModel({
         model: "gemini-2.5-flash",

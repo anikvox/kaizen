@@ -52,6 +52,7 @@ export function Chat() {
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [imageBlobUrls, setImageBlobUrls] = useState<Map<string, string>>(new Map());
     const [isWriting, setIsWriting] = useState(false);
+    const [streamingContent, setStreamingContent] = useState("");
     const focusScore = 82;
 
     const chatServiceRef = useRef<DashboardChatService | null>(null);
@@ -206,7 +207,7 @@ export function Chat() {
         };
     }, [isLoaded, isSignedIn, getToken, selectedChatId]);
 
-    // Fetch messages for selected chat with polling
+    // Fetch messages for selected chat with polling and smart deduplication
     useEffect(() => {
         let isActive = true;
         let pollInterval: NodeJS.Timeout | null = null;
@@ -220,25 +221,73 @@ export function Chat() {
                 const service = new DashboardChatService(token);
                 chatServiceRef.current = service;
 
-                const msgs = await service.getMessages(selectedChatId);
-                console.log("[Chat] Fetched messages:", msgs);
-                console.log("[Chat] First message full object:", msgs[0]);
-                console.log("[Chat] First message metadata type:", typeof msgs[0]?.metadata);
-                console.log("[Chat] First message metadata:", JSON.stringify(msgs[0]?.metadata, null, 2));
+                const serverMsgs = await service.getMessages(selectedChatId);
+                console.log("[Chat] Fetched messages from server:", serverMsgs.length);
+
                 if (isActive) {
-                    // Merge with cached metadata (imagePreview, audioName)
-                    setMessages(msgs.map(msg => {
-                        console.log("[Chat] Message metadata:", msg.id, msg.metadata);
-                        const cached = messageCache.get(msg.id);
-                        if (cached) {
-                            return {
-                                ...msg,
-                                imagePreview: cached.imagePreview || msg.imagePreview,
-                                audioName: cached.audioName || msg.audioName
-                            };
+                    setMessages(prevMessages => {
+                        // Smart merge: keep optimistic messages, add new server messages
+                        const merged = [...prevMessages];
+
+                        serverMsgs.forEach(serverMsg => {
+                            // Check if this message already exists (by ID or by content matching)
+                            const existingIndex = merged.findIndex(m => {
+                                // Exact ID match
+                                if (m.id === serverMsg.id) return true;
+
+                                // Content match for optimistic messages (within 30 seconds)
+                                if (m.id.startsWith('temp-') &&
+                                    m.role === serverMsg.role &&
+                                    m.content === serverMsg.content &&
+                                    Math.abs(new Date(m.createdAt).getTime() - new Date(serverMsg.createdAt).getTime()) < 30000) {
+                                    return true;
+                                }
+
+                                return false;
+                            });
+
+                            if (existingIndex !== -1) {
+                                // Update existing message with server data but keep same array position
+                                const cached = messageCache.get(serverMsg.id);
+                                merged[existingIndex] = {
+                                    ...serverMsg,
+                                    imagePreview: cached?.imagePreview || merged[existingIndex].imagePreview || serverMsg.imagePreview,
+                                    audioName: cached?.audioName || merged[existingIndex].audioName || serverMsg.audioName
+                                };
+                            } else {
+                                // New message from server, add it
+                                const cached = messageCache.get(serverMsg.id);
+                                merged.push({
+                                    ...serverMsg,
+                                    imagePreview: cached?.imagePreview || serverMsg.imagePreview,
+                                    audioName: cached?.audioName || serverMsg.audioName
+                                });
+                            }
+                        });
+
+                        // Sort by creation time to maintain order
+                        merged.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+                        return merged;
+                    });
+
+                    // Clear streaming message if server has caught up
+                    setStreamingContent(prevContent => {
+                        if (!prevContent) return prevContent;
+
+                        // Check if an assistant message with matching content exists in server messages
+                        const hasMatchingAssistant = serverMsgs.some(m =>
+                            m.role === 'assistant' &&
+                            m.content === prevContent
+                        );
+
+                        if (hasMatchingAssistant) {
+                            setStreamingMessage("");
+                            return "";
                         }
-                        return msg;
-                    }));
+
+                        return prevContent;
+                    });
                 }
             } catch (error) {
                 console.error("Failed to fetch messages:", error);
@@ -247,17 +296,17 @@ export function Chat() {
 
         if (selectedChatId) {
             fetchMessages();
-            
+
             pollInterval = setInterval(fetchMessages, 3000);
-            
+
             const handleVisibilityChange = () => {
                 if (document.visibilityState === 'visible') {
                     fetchMessages();
                 }
             };
-            
+
             document.addEventListener('visibilitychange', handleVisibilityChange);
-            
+
             return () => {
                 isActive = false;
                 if (pollInterval) {
@@ -306,8 +355,10 @@ export function Chat() {
 
         console.log("[Chat] Sending message to session:", selectedChatId);
 
+        // Create optimistic user message with temp ID
+        const tempUserId = `temp-user-${Date.now()}`;
         const userMsg: ChatMessage = {
-            id: Date.now().toString(),
+            id: tempUserId,
             role: "user",
             content: message,
             createdAt: new Date().toISOString(),
@@ -315,22 +366,24 @@ export function Chat() {
             audioName: selectedAudio?.name
         };
 
+        // Add user message immediately (optimistic update)
         setMessages(prev => [...prev, userMsg]);
+
         const currentMsg = message;
         const currentImage = selectedImage;
         const currentAudio = selectedAudio;
         const currentImagePreview = imagePreview;
         const currentAudioName = selectedAudio?.name;
-        
+
         setMessage("");
         setSelectedImage(null);
         setSelectedAudio(null);
         setImagePreview(null);
         setIsSending(true);
         setStreamingMessage("");
+        setStreamingContent("");
 
         try {
-            let fullResponse = "";
             const stream = chatServiceRef.current.sendMessageStreaming(
                 selectedChatId,
                 currentMsg,
@@ -345,62 +398,27 @@ export function Chat() {
                     setChats(prev => prev.map(c => c.id === selectedChatId ? { ...c, title: response.title! } : c));
                 }
                 if (response.chunk) {
-                    fullResponse += response.chunk;
-                    setStreamingMessage(fullResponse);
+                    setStreamingMessage(prev => prev + response.chunk);
+                    setStreamingContent(prev => prev + response.chunk);
                 }
             }
 
-            const assistantMsg: ChatMessage = {
-                id: (Date.now() + 1).toString(),
-                role: "assistant",
-                content: fullResponse,
-                createdAt: new Date().toISOString()
-            };
-
-            setMessages(prev => [...prev, assistantMsg]);
-            setStreamingMessage("");
-            
-            // Refresh messages from server and cache the image preview
-            setTimeout(async () => {
-                try {
-                    const msgs = await chatServiceRef.current!.getMessages(selectedChatId);
-                    
-                    // Find the user message we just sent and cache its preview
-                    if (currentImagePreview || currentAudioName) {
-                        const userMsgFromServer = msgs.find(m => 
-                            m.role === 'user' && 
-                            m.content === currentMsg &&
-                            Math.abs(new Date(m.createdAt).getTime() - new Date(userMsg.createdAt).getTime()) < 10000
-                        );
-                        
-                        if (userMsgFromServer) {
-                            messageCache.set(userMsgFromServer.id, {
-                                imagePreview: currentImagePreview || undefined,
-                                audioName: currentAudioName,
-                                imageFileName: currentImage?.name,
-                                audioFileName: currentAudio?.name
-                            });
-                        }
-                    }
-                    
-                    // Merge with cache
-                    setMessages(msgs.map(msg => {
-                        const cached = messageCache.get(msg.id);
-                        if (cached) {
-                            return {
-                                ...msg,
-                                imagePreview: cached.imagePreview || msg.imagePreview,
-                                audioName: cached.audioName || msg.audioName
-                            };
-                        }
-                        return msg;
-                    }));
-                } catch (error) {
-                    console.error("Failed to refresh messages:", error);
-                }
-            }, 1000);
+            // Keep streaming message visible, polling will replace it with server message
+            // Cache attachment metadata for when server message arrives
+            if (currentImagePreview || currentAudioName) {
+                messageCache.set(tempUserId, {
+                    imagePreview: currentImagePreview || undefined,
+                    audioName: currentAudioName,
+                    imageFileName: currentImage?.name,
+                    audioFileName: currentAudio?.name
+                });
+            }
         } catch (error) {
             console.error("Failed to send message:", error);
+            // Remove optimistic user message on error
+            setMessages(prev => prev.filter(m => m.id !== tempUserId));
+            setStreamingMessage("");
+            setStreamingContent("");
             if (error instanceof Error) {
                 alert(`Failed to send message: ${error.message}`);
             }
@@ -633,6 +651,7 @@ export function Chat() {
                                         key={m.id}
                                         initial={{ opacity: 0, y: 10, scale: 0.98 }}
                                         animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: -10, scale: 0.98 }}
                                         className={`flex ${m.role === "user" ? "justify-end" : "justify-start"} group`}
                                     >
                                         {m.role !== "user" && (
@@ -720,15 +739,42 @@ export function Chat() {
                                         )}
                                     </motion.div>
                                 ))}
+                                {isSending && !streamingMessage && (
+                                    <motion.div
+                                        key="typing"
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.95 }}
+                                        className="flex justify-start"
+                                    >
+                                        <div className="flex-shrink-0 mr-3 mt-1">
+                                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md">
+                                                <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
+                                                    <circle cx="9" cy="16" r="1"/>
+                                                    <circle cx="15" cy="16" r="1"/>
+                                                </svg>
+                                            </div>
+                                        </div>
+                                        <div className="px-5 py-3.5 rounded-3xl shadow-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 rounded-bl-md">
+                                            <div className="flex gap-1">
+                                                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                                <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                                <div className="w-2 h-2 bg-blue-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
                                 {streamingMessage && (
                                     <motion.div
                                         key="streaming"
                                         initial={{ opacity: 0, scale: 0.95 }}
                                         animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.95 }}
                                         className="flex justify-start"
                                     >
                                         <div className="flex-shrink-0 mr-3 mt-1">
-                                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md animate-pulse">
+                                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md">
                                                 <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                     <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
                                                     <circle cx="9" cy="16" r="1"/>
@@ -741,11 +787,6 @@ export function Chat() {
                                                 className="prose prose-sm max-w-none dark:prose-invert text-gray-800 dark:text-gray-200"
                                                 dangerouslySetInnerHTML={{ __html: marked.parse(streamingMessage) as string }}
                                             />
-                                            <div className="inline-flex gap-1 mt-2">
-                                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                                <div className="w-1.5 h-1.5 bg-blue-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                                            </div>
                                         </div>
                                     </motion.div>
                                 )}
