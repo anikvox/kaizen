@@ -45,8 +45,6 @@ export function Chat() {
     const [isSending, setIsSending] = useState(false);
     const [streamingMessage, setStreamingMessage] = useState("");
     const [reflectionRange, setReflectionRange] = useState(30 * 60 * 1000);
-    const [messagesHeight, setMessagesHeight] = useState(70);
-    const [isDragging, setIsDragging] = useState(false);
     const [selectedImage, setSelectedImage] = useState<File | null>(null);
     const [selectedAudio, setSelectedAudio] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -57,6 +55,7 @@ export function Chat() {
     const containerRef = useRef<HTMLDivElement>(null);
     const imageInputRef = useRef<HTMLInputElement>(null);
     const audioInputRef = useRef<HTMLInputElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
         messagesEndRef.current?.scrollIntoView({ behavior });
@@ -65,6 +64,16 @@ export function Chat() {
     useEffect(() => {
         scrollToBottom();
     }, [messages, streamingMessage, scrollToBottom]);
+
+    // Auto-resize textarea based on content
+    useEffect(() => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+
+        textarea.style.height = 'auto';
+        const newHeight = Math.min(textarea.scrollHeight, 300);
+        textarea.style.height = `${newHeight}px`;
+    }, [message]);
 
     // Initialize chat and poll for session updates
     useEffect(() => {
@@ -137,26 +146,6 @@ export function Chat() {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [selectedChatId]);
-
-    // Handle dragging for resizable layout
-    useEffect(() => {
-        const handleMouseMove = (e: MouseEvent) => {
-            if (!isDragging || !containerRef.current) return;
-            const rect = containerRef.current.getBoundingClientRect();
-            const newHeight = ((e.clientY - rect.top) / rect.height) * 100;
-            setMessagesHeight(Math.max(20, Math.min(80, newHeight)));
-        };
-        const handleMouseUp = () => setIsDragging(false);
-
-        if (isDragging) {
-            window.addEventListener('mousemove', handleMouseMove);
-            window.addEventListener('mouseup', handleMouseUp);
-        }
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [isDragging]);
 
     const handleCreateChat = async () => {
         if (!chatServiceRef.current) return;
@@ -371,7 +360,6 @@ export function Chat() {
                         {/* Messages Area with AnimatePresence */}
                         <div
                             className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-800"
-                            style={{ height: `${messagesHeight}%` }}
                         >
                             <AnimatePresence mode="popLayout">
                                 {messages.map((m) => (
@@ -473,11 +461,8 @@ export function Chat() {
                             <div ref={messagesEndRef} />
                         </div>
 
-                        {/* Draggable Divider (Inspired by alphazero) */}
-                        <div
-                            onMouseDown={() => setIsDragging(true)}
-                            className={`h-1.5 w-full cursor-ns-resize transition-all border-y border-gray-100 dark:border-gray-800 ${isDragging ? 'bg-blue-500' : 'bg-transparent hover:bg-blue-400/30'}`}
-                        />
+                        {/* Divider */}
+                        <div className="h-px w-full bg-gray-200 dark:bg-gray-700" />
 
                         <div className="p-4 bg-white/60 dark:bg-gray-900/60 border-t border-gray-200 dark:border-gray-800 backdrop-blur-xl">
                             <div className="max-w-4xl mx-auto">
@@ -510,6 +495,7 @@ export function Chat() {
                                 )}
                                 <div className="relative bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg focus-within:border-blue-500 dark:focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
                                     <textarea
+                                        ref={textareaRef}
                                         value={message}
                                         onChange={(e) => setMessage(e.target.value)}
                                         onKeyDown={(e) => {
@@ -520,8 +506,8 @@ export function Chat() {
                                         }}
                                         placeholder="Message Kaizen AI..."
                                         rows={1}
-                                        className="w-full resize-none bg-transparent px-4 py-3 pr-32 focus:outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 max-h-[200px] overflow-y-auto"
-                                        style={{ minHeight: '44px' }}
+                                        className="w-full resize-none bg-transparent px-4 py-3 pr-32 focus:outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 overflow-y-auto"
+                                        style={{ minHeight: '44px', maxHeight: '300px' }}
                                     />
                                     <input
                                         ref={imageInputRef}
