@@ -4,7 +4,7 @@ import { SERVER_URL } from "./default-settings"
 
 import "./style.css"
 
-const WEBSITE_URL = process.env.PLASMO_PUBLIC_DASHBOARD_URL?.replace('/dashboard', '') || 'http://localhost:60091'
+const DASHBOARD_URL = process.env.PLASMO_PUBLIC_DASHBOARD_URL?.replace('/dashboard', '') || 'http://localhost:60091'
 const INSTALLATION_ID_KEY = "kaizen_installation_id"
 const DEVICE_TOKEN_KEY = "kaizen_device_token"
 const USER_DATA_KEY = "kaizen_user_data"
@@ -92,7 +92,7 @@ function IndexOptions() {
 
   const handleLinkAccount = () => {
     if (!installationId) return
-    const linkUrl = `${WEBSITE_URL}/link-extension?installationId=${installationId}`
+    const linkUrl = `${DASHBOARD_URL}/link-extension?installationId=${installationId}`
     chrome.tabs.create({ url: linkUrl })
   }
 

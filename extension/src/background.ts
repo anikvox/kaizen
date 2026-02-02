@@ -80,6 +80,13 @@ chrome.action.onClicked.addListener(async (tab) => {
           await chrome.sidePanel.open({ tabId: tab.id })
         }
         console.log("Side panel opened via action click")
+        
+        // Send message to content script to trigger glow overlay with retry
+        setTimeout(() => {
+          chrome.tabs.sendMessage(tab.id, { type: "SIDEPANEL_OPENED" }).catch((error) => {
+            console.log("Content script not ready yet:", error)
+          })
+        }, 100)
       } else {
         // Fallback for older Chrome versions - open popup manually
         console.warn("sidePanel API not available, falling back to popup")
@@ -134,6 +141,20 @@ const WEBSITE_VISIT_MESSAGE_NAME = "website-visit"
 
 // Unified message listener for all message types
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  // Handle sidepanel mounted notification
+  if (message.type === "SIDEPANEL_MOUNTED") {
+    console.log("[Background] Sidepanel mounted, broadcasting to active tab")
+    chrome.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, { type: "SIDEPANEL_OPENED" }).catch((error) => {
+          console.log("[Background] Content script not ready:", error)
+        })
+      }
+    })
+    sendResponse({ success: true })
+    return true
+  }
+  
   // Handle device token messages from popup
   if (message.type === "SET_AUTH_TOKEN") {
     chrome.storage.local.set({ [DEVICE_TOKEN_KEY]: message.token })
@@ -175,6 +196,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             await chrome.sidePanel.open({ tabId: tabs[0].id })
           }
           console.log("Side panel opened via OPEN_SIDEPANEL message")
+          
+          // Send message to content script to trigger glow overlay with delay
+          setTimeout(() => {
+            chrome.tabs.sendMessage(tabs[0].id, { type: "SIDEPANEL_OPENED" }).catch((error) => {
+              console.log("Content script not ready yet:", error)
+            })
+          }, 100)
+          
           // Small delay to ensure sidepanel is fully rendered before popup closes
           await new Promise(resolve => setTimeout(resolve, 150))
           sendResponse({ success: true, opened: true })

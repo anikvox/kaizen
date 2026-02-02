@@ -12,7 +12,7 @@ import {
 
 import "./style.css"
 
-const WEBSITE_URL = process.env.PLASMO_PUBLIC_DASHBOARD_URL?.replace('/dashboard', '') || 'http://localhost:60091'
+const DASHBOARD_URL = process.env.PLASMO_PUBLIC_DASHBOARD_URL?.replace('/dashboard', '') || 'http://localhost:60091'
 const DEVICE_TOKEN_KEY = "kaizen_device_token"
 const USER_DATA_KEY = "kaizen_user_data"
 
@@ -197,7 +197,7 @@ function SidePanel() {
   }
 
   const handleOpenDashboard = () => {
-    chrome.tabs.create({ url: `${WEBSITE_URL}/dashboard` })
+    chrome.tabs.create({ url: `${DASHBOARD_URL}/dashboard` })
   }
 
   if (isLoading) {

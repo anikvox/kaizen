@@ -46,6 +46,9 @@ const DEVICE_TOKEN_KEY = "kaizen_device_token"
 const USER_DATA_KEY = "kaizen_user_data"
 const INSTALLATION_ID_KEY = "kaizen_installation_id"
 
+// Frontend dashboard URL (separate from backend API)
+const DASHBOARD_URL = process.env.PLASMO_PUBLIC_DASHBOARD_URL || "http://localhost:60091/dashboard"
+
 const Popup = () => {
   console.log("Popup component rendering")
 
@@ -53,6 +56,14 @@ const Popup = () => {
   const [focusData, setFocusData] = useState<FocusWithParsedData | null>(null)
   const [currentChatId, setCurrentChatId] = useState<string>("")
   const [isDeviceLinked, setIsDeviceLinked] = useState<boolean | null>(null)
+
+  // Notify background script that sidepanel has opened
+  useEffect(() => {
+    console.log("[Sidepanel] Mounted - notifying background script")
+    chrome.runtime.sendMessage({ type: "SIDEPANEL_MOUNTED" }).catch((err) => {
+      console.log("[Sidepanel] Could not notify background:", err)
+    })
+  }, [])
 
   const focusDataDex = useLiveQuery(() => {
     return db.table<Focus>("focus").toArray()
@@ -385,7 +396,7 @@ const Popup = () => {
               </p>
               <button
                 onClick={() => {
-                  chrome.tabs.create({ url: "/tabs/dashboard.html" })
+                  chrome.tabs.create({ url: DASHBOARD_URL })
                 }}
                 className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-medium py-3 px-4 rounded-lg transition-all shadow-md hover:shadow-lg">
                 Start Refresher Quiz
@@ -845,7 +856,7 @@ const Popup = () => {
                 <button
                   id="tour-dashboard"
                   onClick={() =>
-                    chrome.tabs.create({ url: "/tabs/dashboard.html" })
+                    chrome.tabs.create({ url: DASHBOARD_URL })
                   }
                   className="cursor-pointer h-10 relative bg-gradient-to-br from-blue-500/90 to-purple-600/90 hover:from-blue-600 hover:to-purple-700 backdrop-blur-md px-3 py-2 rounded-xl border border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95"
                   aria-label="Open Dashboard">
