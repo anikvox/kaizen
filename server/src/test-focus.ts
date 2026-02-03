@@ -69,25 +69,11 @@ async function testFocusSystem() {
     if (currentFocus) {
       console.log(`✅ Current focus:`);
       console.log(`   ID: ${currentFocus.id}`);
-      console.log(`   Item: ${currentFocus.item}`);
-      console.log(`   Keywords: ${currentFocus.keywords.join(", ")}`);
-      console.log(`   Is Active: ${currentFocus.isActive}`);
-      console.log(`   Last Updated: ${currentFocus.lastUpdated.toISOString()}`);
-
-      const timeSpent = currentFocus.timeSpent as Array<{
-        start: number;
-        end: number | null;
-      }>;
-      console.log(`   Time segments: ${timeSpent.length}`);
-
-      if (timeSpent.length > 0) {
-        const lastSegment = timeSpent[timeSpent.length - 1];
-        const startStr = new Date(lastSegment.start).toISOString();
-        const endStr = lastSegment.end
-          ? new Date(lastSegment.end).toISOString()
-          : "active";
-        console.log(`   Latest: ${startStr} → ${endStr}`);
-      }
+      console.log(`   Summary: ${currentFocus.summary}`);
+      console.log(`   Insights: ${currentFocus.insights}`);
+      console.log(`   Category: ${currentFocus.category}`);
+      console.log(`   Window: ${currentFocus.windowStart} → ${currentFocus.windowEnd}`);
+      console.log(`   Last Updated: ${currentFocus.timestamp}`);
       console.log();
     } else {
       console.log("⚠️  No focus found (expected if no activity)\n");
@@ -99,28 +85,10 @@ async function testFocusSystem() {
     console.log(`✅ Found ${history.length} focus records:\n`);
 
     history.forEach((focus, i) => {
-      console.log(`${i + 1}. ${focus.item}`);
-      console.log(`   Keywords: ${focus.keywords.join(", ")}`);
-      console.log(`   Last Updated: ${focus.lastUpdated.toISOString()}`);
-
-      const timeSpent = focus.timeSpent as Array<{
-        start: number;
-        end: number | null;
-      }>;
-      console.log(`   Segments: ${timeSpent.length}`);
-
-      // Calculate total time
-      let totalMs = 0;
-      for (const segment of timeSpent) {
-        if (segment.end) {
-          totalMs += segment.end - segment.start;
-        } else {
-          totalMs += Date.now() - segment.start;
-        }
-      }
-
-      const minutes = Math.round(totalMs / 60000);
-      console.log(`   Total time: ${minutes} minutes`);
+      console.log(`${i + 1}. ${focus.summary}`);
+      console.log(`   Insights: ${focus.insights}`);
+      console.log(`   Category: ${focus.category}`);
+      console.log(`   Window: ${focus.windowStart} → ${focus.windowEnd}`);
       console.log();
     });
 

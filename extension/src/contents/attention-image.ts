@@ -1,6 +1,11 @@
 import type { PlasmoCSConfig } from "plasmo"
 
-import { COGNITIVE_ATTENTION_SHOW_OVERLAY } from "../default-settings"
+import { Storage } from "@plasmohq/storage"
+
+import {
+  COGNITIVE_ATTENTION_DEBUG_MODE,
+  COGNITIVE_ATTENTION_SHOW_OVERLAY
+} from "../default-settings"
 
 import CognitiveAttentionImageTracker from "../cognitive-attention/monitor-image"
 
@@ -18,8 +23,16 @@ const URL = location.href
 
 const cachedImageCaptions = new Set<string>()
 
-const initImageTracker = () => {
-  const showOverlay = COGNITIVE_ATTENTION_SHOW_OVERLAY.defaultValue
+const storage = new Storage()
+
+const initImageTracker = async () => {
+  // Load settings from storage
+  const showOverlay =
+    String(await storage.get(COGNITIVE_ATTENTION_SHOW_OVERLAY.key)) === "true" ||
+    COGNITIVE_ATTENTION_SHOW_OVERLAY.defaultValue
+  const debugMode =
+    String(await storage.get(COGNITIVE_ATTENTION_DEBUG_MODE.key)) === "true" ||
+    COGNITIVE_ATTENTION_DEBUG_MODE.defaultValue
 
   if (imageTracker) {
     imageTracker.destroy?.()
@@ -35,7 +48,9 @@ const initImageTracker = () => {
 
       cachedImageCaptions.add(data.src)
 
-      console.log("attention-image", { src: data.src, alt: data.alt })
+      if (debugMode) {
+        console.log("[Kaizen] attention-image", { src: data.src, alt: data.alt })
+      }
 
       // Send message to background script
       chrome.runtime.sendMessage({
@@ -57,6 +72,17 @@ const initImageTracker = () => {
 
   imageTracker.init()
 }
+
+// Listen for storage changes to update tracker config
+storage.watch({
+  [COGNITIVE_ATTENTION_SHOW_OVERLAY.key]: (c) => {
+    const showOverlay = String(c.newValue) === "true"
+    if (imageTracker) {
+      imageTracker.updateConfig({ showOverlay })
+      console.log("[Kaizen] Image overlay updated:", showOverlay)
+    }
+  }
+})
 
 // Initialize when DOM is ready
 if (document.readyState === "loading") {

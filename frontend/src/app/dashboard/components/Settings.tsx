@@ -3,6 +3,24 @@
 import { Eye, Target, Database, RotateCcw, Smartphone } from "lucide-react";
 import { useState, useEffect } from "react";
 
+// Type declaration for Chrome API
+declare global {
+    interface Window {
+        chrome?: any;
+    }
+}
+
+// Import storage keys from extension
+const COGNITIVE_ATTENTION_SUSTAINED_TIME_KEY = "setting-cognitive-attention-sustained-time";
+const COGNITIVE_ATTENTION_IDLE_THRESHOLD_TIME_KEY = "setting-cognitive-attention-idle-threshold-time";
+const COGNITIVE_ATTENTION_WORDS_PER_MINUTE_KEY = "setting-cognitive-attention-words-per-minute";
+const COGNITIVE_ATTENTION_DEBUG_MODE_KEY = "setting-cognitive-attention-debug-mode";
+const COGNITIVE_ATTENTION_SHOW_OVERLAY_KEY = "setting-cognitive-attention-show-overlay";
+const DOOMSCROLLING_ATTENTION_ITEMS_THRESHOLD_KEY = "setting-doomscrolling-attention-items-threshold";
+const DOOMSCROLLING_TIME_WINDOW_KEY = "setting-doomscrolling-time-window";
+const FOCUS_INACTIVITY_THRESHOLD_KEY = "setting-focus-inactivity-threshold";
+const GARBAGE_COLLECTION_INTERVAL_KEY = "setting-garbage-collection-interval";
+
 export function Settings() {
     const [sustainedTime, setSustainedTime] = useState(3000);
     const [idleThreshold, setIdleThreshold] = useState(30000);
@@ -25,6 +43,7 @@ export function Settings() {
     useEffect(() => {
         const loadSettings = async () => {
             try {
+                // Load from API (server settings)
                 const response = await fetch("/api/settings");
                 if (response.ok) {
                     const settings = await response.json();
@@ -40,6 +59,49 @@ export function Settings() {
                     if (settings.modelTemperature !== undefined) setModelTemperature(settings.modelTemperature);
                     if (settings.modelTopP !== undefined) setModelTopP(settings.modelTopP);
                 }
+
+                // Also try to load from extension storage if available
+                if (typeof window !== 'undefined' && window.chrome?.storage) {
+                    window.chrome.storage.local.get([
+                        COGNITIVE_ATTENTION_DEBUG_MODE_KEY,
+                        COGNITIVE_ATTENTION_SHOW_OVERLAY_KEY,
+                        COGNITIVE_ATTENTION_SUSTAINED_TIME_KEY,
+                        COGNITIVE_ATTENTION_IDLE_THRESHOLD_TIME_KEY,
+                        COGNITIVE_ATTENTION_WORDS_PER_MINUTE_KEY,
+                        DOOMSCROLLING_ATTENTION_ITEMS_THRESHOLD_KEY,
+                        DOOMSCROLLING_TIME_WINDOW_KEY,
+                        FOCUS_INACTIVITY_THRESHOLD_KEY,
+                        GARBAGE_COLLECTION_INTERVAL_KEY
+                    ], (result: Record<string, any>) => {
+                        if (result[COGNITIVE_ATTENTION_DEBUG_MODE_KEY] !== undefined) {
+                            setDebugMode(result[COGNITIVE_ATTENTION_DEBUG_MODE_KEY] === true || result[COGNITIVE_ATTENTION_DEBUG_MODE_KEY] === "true");
+                        }
+                        if (result[COGNITIVE_ATTENTION_SHOW_OVERLAY_KEY] !== undefined) {
+                            setShowOverlay(result[COGNITIVE_ATTENTION_SHOW_OVERLAY_KEY] === true || result[COGNITIVE_ATTENTION_SHOW_OVERLAY_KEY] === "true");
+                        }
+                        if (result[COGNITIVE_ATTENTION_SUSTAINED_TIME_KEY]) {
+                            setSustainedTime(Number(result[COGNITIVE_ATTENTION_SUSTAINED_TIME_KEY]));
+                        }
+                        if (result[COGNITIVE_ATTENTION_IDLE_THRESHOLD_TIME_KEY]) {
+                            setIdleThreshold(Number(result[COGNITIVE_ATTENTION_IDLE_THRESHOLD_TIME_KEY]));
+                        }
+                        if (result[COGNITIVE_ATTENTION_WORDS_PER_MINUTE_KEY]) {
+                            setWordsPerMinute(Number(result[COGNITIVE_ATTENTION_WORDS_PER_MINUTE_KEY]));
+                        }
+                        if (result[DOOMSCROLLING_ATTENTION_ITEMS_THRESHOLD_KEY]) {
+                            setItemsThreshold(Number(result[DOOMSCROLLING_ATTENTION_ITEMS_THRESHOLD_KEY]));
+                        }
+                        if (result[DOOMSCROLLING_TIME_WINDOW_KEY]) {
+                            setTimeWindow(Number(result[DOOMSCROLLING_TIME_WINDOW_KEY]));
+                        }
+                        if (result[FOCUS_INACTIVITY_THRESHOLD_KEY]) {
+                            setFocusInactivityThreshold(Number(result[FOCUS_INACTIVITY_THRESHOLD_KEY]));
+                        }
+                        if (result[GARBAGE_COLLECTION_INTERVAL_KEY]) {
+                            setGcInterval(Number(result[GARBAGE_COLLECTION_INTERVAL_KEY]));
+                        }
+                    });
+                }
             } catch (error) {
                 console.error("Failed to load settings:", error);
             }
@@ -49,6 +111,7 @@ export function Settings() {
 
     const saveSettings = async () => {
         try {
+            // Save to API (server)
             await fetch("/api/settings", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -66,6 +129,24 @@ export function Settings() {
                     modelTopP
                 })
             });
+
+            // Also save to extension storage if available
+            if (typeof window !== 'undefined' && window.chrome?.storage) {
+                window.chrome.storage.local.set({
+                    [COGNITIVE_ATTENTION_DEBUG_MODE_KEY]: debugMode,
+                    [COGNITIVE_ATTENTION_SHOW_OVERLAY_KEY]: showOverlay,
+                    [COGNITIVE_ATTENTION_SUSTAINED_TIME_KEY]: sustainedTime,
+                    [COGNITIVE_ATTENTION_IDLE_THRESHOLD_TIME_KEY]: idleThreshold,
+                    [COGNITIVE_ATTENTION_WORDS_PER_MINUTE_KEY]: wordsPerMinute,
+                    [DOOMSCROLLING_ATTENTION_ITEMS_THRESHOLD_KEY]: itemsThreshold,
+                    [DOOMSCROLLING_TIME_WINDOW_KEY]: timeWindow,
+                    [FOCUS_INACTIVITY_THRESHOLD_KEY]: focusInactivityThreshold,
+                    [GARBAGE_COLLECTION_INTERVAL_KEY]: gcInterval
+                }, () => {
+                    console.log("[Kaizen] Settings saved to extension storage");
+                });
+            }
+
             showSaveMessage();
         } catch (error) {
             console.error("Failed to save settings:", error);

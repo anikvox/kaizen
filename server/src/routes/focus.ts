@@ -94,11 +94,31 @@ router.get("/current", async (req: AuthRequest, res: Response) => {
 });
 
 /**
+ * GET /focus/latest - Alias for /focus/current (for frontend compatibility)
+ */
+router.get("/latest", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.auth!.userId;
+    const current = await getActiveFocus(userId);
+
+    if (!current) {
+      res.status(404).json({ error: "No focus data found" });
+      return;
+    }
+
+    res.json(current);
+  } catch (error) {
+    console.error("Error fetching latest focus:", error);
+    res.status(500).json({ error: "Failed to fetch latest focus" });
+  }
+});
+
+/**
  * GET /focus/:id - Get a specific focus by ID
  */
 router.get("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const userId = req.auth!.userId;
 
     if (isNaN(id)) {
@@ -127,7 +147,7 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
  */
 router.delete("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const userId = req.auth!.userId;
 
     if (isNaN(id)) {

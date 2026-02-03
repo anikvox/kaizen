@@ -1,6 +1,11 @@
 import type { PlasmoCSConfig } from "plasmo"
 
-import { COGNITIVE_ATTENTION_SHOW_OVERLAY } from "../default-settings"
+import { Storage } from "@plasmohq/storage"
+
+import {
+  COGNITIVE_ATTENTION_DEBUG_MODE,
+  COGNITIVE_ATTENTION_SHOW_OVERLAY
+} from "../default-settings"
 
 import CognitiveAttentionAudioTracker from "../cognitive-attention/monitor-audio"
 
@@ -18,8 +23,16 @@ const URL = location.href
 
 const cachedAudioSources = new Set<string>()
 
-const initAudioTracker = () => {
-  const showOverlay = COGNITIVE_ATTENTION_SHOW_OVERLAY.defaultValue
+const storage = new Storage()
+
+const initAudioTracker = async () => {
+  // Load settings from storage
+  const showOverlay =
+    String(await storage.get(COGNITIVE_ATTENTION_SHOW_OVERLAY.key)) === "true" ||
+    COGNITIVE_ATTENTION_SHOW_OVERLAY.defaultValue
+  const debugMode =
+    String(await storage.get(COGNITIVE_ATTENTION_DEBUG_MODE.key)) === "true" ||
+    COGNITIVE_ATTENTION_DEBUG_MODE.defaultValue
 
   if (audioTracker) {
     audioTracker.destroy?.()
@@ -36,7 +49,9 @@ const initAudioTracker = () => {
 
       cachedAudioSources.add(data.src)
 
-      console.log("attention-audio", { src: data.src, title: data.title })
+      if (debugMode) {
+        console.log("[Kaizen] attention-audio", { src: data.src, title: data.title })
+      }
 
       // Send message to background script
       chrome.runtime.sendMessage({
@@ -57,6 +72,17 @@ const initAudioTracker = () => {
 
   audioTracker.init()
 }
+
+// Listen for storage changes to update tracker config
+storage.watch({
+  [COGNITIVE_ATTENTION_SHOW_OVERLAY.key]: (c) => {
+    const showOverlay = String(c.newValue) === "true"
+    if (audioTracker) {
+      audioTracker.updateConfig({ showOverlay })
+      console.log("[Kaizen] Audio overlay updated:", showOverlay)
+    }
+  }
+})
 
 // Initialize when DOM is ready
 if (document.readyState === "loading") {

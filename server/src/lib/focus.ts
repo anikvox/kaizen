@@ -620,7 +620,7 @@ export async function processFocusSession(
 
     // 6. Handle focus drift (close previous focus)
     if (focusDrifted && previousFocus) {
-      const timeSpent = previousFocus.timeSpent as TimeSpentSegment[];
+      const timeSpent = previousFocus.timeSpent as unknown as TimeSpentSegment[];
       const lastSegment = timeSpent[timeSpent.length - 1];
 
       if (lastSegment && lastSegment.end === null) {
@@ -633,7 +633,7 @@ export async function processFocusSession(
           await prisma.focus.update({
             where: { id: previousFocus.id },
             data: {
-              timeSpent: timeSpent,
+              timeSpent: timeSpent as any,
               lastUpdated: new Date(now),
             },
           });
@@ -782,6 +782,7 @@ export async function processFocusSession(
 
 /**
  * Gets the most recent focus for a user
+ * Transforms to match frontend expectations
  */
 export async function getActiveFocus(userId: string) {
   const session = await prisma.focus.findFirst({
@@ -791,28 +792,92 @@ export async function getActiveFocus(userId: string) {
 
   if (!session) return null;
 
-  const timeSpent = session.timeSpent as TimeSpentSegment[];
+  const timeSpent = session.timeSpent as unknown as TimeSpentSegment[];
   const lastSegment = timeSpent[timeSpent.length - 1];
   const isActive = lastSegment && lastSegment.end === null;
 
+  // Calculate window start and end from timeSpent
+  const windowStart = timeSpent.length > 0 
+    ? new Date(timeSpent[0].start) 
+    : session.lastUpdated;
+  
+  const windowEnd = lastSegment?.end 
+    ? new Date(lastSegment.end) 
+    : new Date();
+
+  // Transform to match frontend BackendFocus type
   return {
-    ...session,
+    id: session.id,
+    score: 75, // Default score - could be calculated based on focus duration
+    category: isActive ? "deep_work" : "shallow_work",
+    summary: session.item, // Use item as summary
+    insights: session.keywords.join(", "),
+    windowStart: windowStart.toISOString(),
+    windowEnd: windowEnd.toISOString(),
+    textCount: 0, // These would need to be calculated from activity data
+    imageCount: 0,
+    youtubeCount: 0,
+    audioCount: 0,
+    modelUsed: session.modelUsed,
+    traceId: session.traceId || undefined,
+    timestamp: session.lastUpdated.toISOString(),
+    updatedAt: session.lastUpdated.toISOString(),
+    // Include original fields for backward compatibility
+    item: session.item,
+    keywords: session.keywords,
+    timeSpent: timeSpent,
+    lastUpdated: session.lastUpdated.getTime(),
     isActive,
   };
 }
 
 /**
  * Gets focus history
+ * Transforms to match frontend expectations
  */
 export async function getFocusHistory(
   userId: string,
   limit: number = 10,
   offset: number = 0
 ) {
-  return prisma.focus.findMany({
+  const sessions = await prisma.focus.findMany({
     where: { userId },
     orderBy: { lastUpdated: "desc" },
     take: limit,
     skip: offset,
+  });
+
+  // Transform each session to match frontend BackendFocus type
+  return sessions.map((session) => {
+    const timeSpent = session.timeSpent as unknown as TimeSpentSegment[];
+    const lastSegment = timeSpent[timeSpent.length - 1];
+    const isActive = lastSegment && lastSegment.end === null;
+
+    // Calculate window start and end from timeSpent
+    const windowStart = timeSpent.length > 0 
+      ? new Date(timeSpent[0].start) 
+      : session.lastUpdated;
+    
+    const windowEnd = lastSegment?.end 
+      ? new Date(lastSegment.end) 
+      : new Date();
+
+    return {
+      id: session.id,
+      score: 75, // Default score
+      category: isActive ? "deep_work" : "shallow_work",
+      summary: session.item,
+      insights: session.keywords.join(", "),
+      windowStart: windowStart.toISOString(),
+      windowEnd: windowEnd.toISOString(),
+      textCount: 0,
+      imageCount: 0,
+      youtubeCount: 0,
+      audioCount: 0,
+      modelUsed: session.modelUsed,
+      traceId: session.traceId || undefined,
+      timestamp: session.lastUpdated.toISOString(),
+      updatedAt: session.lastUpdated.toISOString(),
+    };
   });
 }
