@@ -1,70 +1,85 @@
 "use client";
 
 import { Eye, Target, Database, RotateCcw, Smartphone } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useAuth } from "@clerk/nextjs";
+import { SettingsService } from "../lib/settings";
 
 export function Settings() {
+    const { getToken } = useAuth();
+    const settingsServiceRef = useRef<SettingsService | null>(null);
+
     const [sustainedTime, setSustainedTime] = useState(3000);
     const [idleThreshold, setIdleThreshold] = useState(30000);
     const [wordsPerMinute, setWordsPerMinute] = useState(150);
     const [debugMode, setDebugMode] = useState(false);
     const [showOverlay, setShowOverlay] = useState(false);
-    
+
     const [itemsThreshold, setItemsThreshold] = useState(5);
     const [timeWindow, setTimeWindow] = useState(300000);
-    
+
     const [focusInactivityThreshold, setFocusInactivityThreshold] = useState(300000);
     const [gcInterval, setGcInterval] = useState(172800000);
-    
+
     const [modelTemperature, setModelTemperature] = useState(1.0);
     const [modelTopP, setModelTopP] = useState(0.95);
-    
+
     const [saveMessage, setSaveMessage] = useState("");
     const [modelSettingsSaved, setModelSettingsSaved] = useState(false);
+
+    // Initialize settings service with auth token
+    const getSettingsService = useCallback(async () => {
+        const token = await getToken();
+        if (!token) return null;
+
+        if (!settingsServiceRef.current) {
+            settingsServiceRef.current = new SettingsService(token);
+        }
+        return settingsServiceRef.current;
+    }, [getToken]);
 
     useEffect(() => {
         const loadSettings = async () => {
             try {
-                const response = await fetch("/api/settings");
-                if (response.ok) {
-                    const settings = await response.json();
-                    if (settings.sustainedTime) setSustainedTime(settings.sustainedTime);
-                    if (settings.idleThreshold) setIdleThreshold(settings.idleThreshold);
-                    if (settings.wordsPerMinute) setWordsPerMinute(settings.wordsPerMinute);
-                    if (settings.debugMode !== undefined) setDebugMode(settings.debugMode);
-                    if (settings.showOverlay !== undefined) setShowOverlay(settings.showOverlay);
-                    if (settings.itemsThreshold) setItemsThreshold(settings.itemsThreshold);
-                    if (settings.timeWindow) setTimeWindow(settings.timeWindow);
-                    if (settings.focusInactivityThreshold) setFocusInactivityThreshold(settings.focusInactivityThreshold);
-                    if (settings.gcInterval) setGcInterval(settings.gcInterval);
-                    if (settings.modelTemperature !== undefined) setModelTemperature(settings.modelTemperature);
-                    if (settings.modelTopP !== undefined) setModelTopP(settings.modelTopP);
-                }
+                const service = await getSettingsService();
+                if (!service) return;
+
+                const settings = await service.getSettings();
+                if (settings.sustainedTime) setSustainedTime(settings.sustainedTime);
+                if (settings.idleThreshold) setIdleThreshold(settings.idleThreshold);
+                if (settings.wordsPerMinute) setWordsPerMinute(settings.wordsPerMinute);
+                if (settings.debugMode !== undefined) setDebugMode(settings.debugMode);
+                if (settings.showOverlay !== undefined) setShowOverlay(settings.showOverlay);
+                if (settings.itemsThreshold) setItemsThreshold(settings.itemsThreshold);
+                if (settings.timeWindow) setTimeWindow(settings.timeWindow);
+                if (settings.focusInactivityThreshold) setFocusInactivityThreshold(settings.focusInactivityThreshold);
+                if (settings.gcInterval) setGcInterval(settings.gcInterval);
+                if (settings.modelTemperature !== undefined) setModelTemperature(settings.modelTemperature);
+                if (settings.modelTopP !== undefined) setModelTopP(settings.modelTopP);
             } catch (error) {
                 console.error("Failed to load settings:", error);
             }
         };
         loadSettings();
-    }, []);
+    }, [getSettingsService]);
 
     const saveSettings = async () => {
         try {
-            await fetch("/api/settings", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    sustainedTime,
-                    idleThreshold,
-                    wordsPerMinute,
-                    debugMode,
-                    showOverlay,
-                    itemsThreshold,
-                    timeWindow,
-                    focusInactivityThreshold,
-                    gcInterval,
-                    modelTemperature,
-                    modelTopP
-                })
+            const service = await getSettingsService();
+            if (!service) return;
+
+            await service.saveSettings({
+                sustainedTime,
+                idleThreshold,
+                wordsPerMinute,
+                debugMode,
+                showOverlay,
+                itemsThreshold,
+                timeWindow,
+                focusInactivityThreshold,
+                gcInterval,
+                modelTemperature,
+                modelTopP
             });
             showSaveMessage();
         } catch (error) {

@@ -51,3 +51,11 @@ export enum NotificationMessageType {
   FOCUS_DRIFT_DETECTED = "FOCUS_DRIFT_DETECTED",
   FOCUS_INACTIVITY_DETECTED = "FOCUS_INACTIVITY_DETECTED"
 }
+
+// Settings sync storage keys
+export const SETTINGS_STORAGE_KEY = "kaizen_user_settings"
+export const SETTINGS_VERSION_KEY = "kaizen_settings_version"
+
+// Message types for settings sync
+export const SETTINGS_UPDATED_MESSAGE = "settings-updated"
+export const GET_SETTINGS_MESSAGE = "get-settings"

@@ -1,11 +1,14 @@
 import type { PlasmoCSConfig } from "plasmo"
+import type { UserSettings } from "@kaizen/api"
 
 import {
   COGNITIVE_ATTENTION_DEBUG_MODE,
   COGNITIVE_ATTENTION_IDLE_THRESHOLD_TIME,
   COGNITIVE_ATTENTION_SHOW_OVERLAY,
   COGNITIVE_ATTENTION_SUSTAINED_TIME,
-  COGNITIVE_ATTENTION_WORDS_PER_MINUTE
+  COGNITIVE_ATTENTION_WORDS_PER_MINUTE,
+  SETTINGS_UPDATED_MESSAGE,
+  GET_SETTINGS_MESSAGE
 } from "../default-settings"
 
 import CognitiveAttentionTextTracker from "../cognitive-attention/monitor-text"
@@ -24,23 +27,84 @@ const URL = location.href
 
 const readingProgressTracker = new Map<number, number>()
 
-const initTextTracker = () => {
-  const cognitiveAttentionThreshold = COGNITIVE_ATTENTION_SUSTAINED_TIME.defaultValue
-  const idleThreshold = COGNITIVE_ATTENTION_IDLE_THRESHOLD_TIME.defaultValue
-  const wordsPerMinute = COGNITIVE_ATTENTION_WORDS_PER_MINUTE.defaultValue
-  const debugMode = COGNITIVE_ATTENTION_DEBUG_MODE.defaultValue
-  const showOverlay = COGNITIVE_ATTENTION_SHOW_OVERLAY.defaultValue
+// Default settings
+let currentSettings = {
+  cognitiveAttentionThreshold: COGNITIVE_ATTENTION_SUSTAINED_TIME.defaultValue,
+  idleThreshold: COGNITIVE_ATTENTION_IDLE_THRESHOLD_TIME.defaultValue,
+  wordsPerMinute: COGNITIVE_ATTENTION_WORDS_PER_MINUTE.defaultValue,
+  debugMode: COGNITIVE_ATTENTION_DEBUG_MODE.defaultValue,
+  showOverlay: COGNITIVE_ATTENTION_SHOW_OVERLAY.defaultValue
+}
 
+/**
+ * Update tracker configuration with new settings
+ */
+const updateTrackerSettings = (settings: Partial<UserSettings>) => {
+  if (!textTracker) return
+
+  const newConfig: Parameters<typeof textTracker.updateConfig>[0] = {}
+
+  if (settings.sustainedTime !== undefined) {
+    newConfig.cognitiveAttentionThreshold = settings.sustainedTime
+    currentSettings.cognitiveAttentionThreshold = settings.sustainedTime
+  }
+  if (settings.idleThreshold !== undefined) {
+    newConfig.idleThreshold = settings.idleThreshold
+    currentSettings.idleThreshold = settings.idleThreshold
+  }
+  if (settings.wordsPerMinute !== undefined) {
+    newConfig.wordsPerMinute = settings.wordsPerMinute
+    currentSettings.wordsPerMinute = settings.wordsPerMinute
+  }
+  if (settings.debugMode !== undefined) {
+    newConfig.debugMode = settings.debugMode
+    currentSettings.debugMode = settings.debugMode
+  }
+  if (settings.showOverlay !== undefined) {
+    newConfig.showOverlay = settings.showOverlay
+    currentSettings.showOverlay = settings.showOverlay
+  }
+
+  textTracker.updateConfig(newConfig)
+  console.log("[attention-text] Settings updated:", newConfig)
+}
+
+/**
+ * Request initial settings from background script
+ */
+const requestInitialSettings = async () => {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: GET_SETTINGS_MESSAGE })
+    if (response?.success && response.settings) {
+      updateTrackerSettings(response.settings)
+    }
+  } catch (error) {
+    console.log("[attention-text] Error requesting settings:", error)
+  }
+}
+
+/**
+ * Listen for settings update messages from background script
+ */
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type === SETTINGS_UPDATED_MESSAGE && message.payload) {
+    updateTrackerSettings(message.payload)
+    sendResponse({ success: true })
+  }
+  return false
+})
+
+const initTextTracker = () => {
   if (textTracker) {
     textTracker.destroy?.()
   }
 
   textTracker = new CognitiveAttentionTextTracker({
-    debugMode,
-    showOverlay,
-    cognitiveAttentionThreshold,
-    idleThreshold,
-    wordsPerMinute,
+    debugMode: currentSettings.debugMode,
+    showOverlay: currentSettings.showOverlay,
+    cognitiveAttentionThreshold: currentSettings.cognitiveAttentionThreshold,
+    idleThreshold: currentSettings.idleThreshold,
+    wordsPerMinute: currentSettings.wordsPerMinute,
     onSustainedAttentionChange: async (data) => {
       const { text, wordsRead } = data
       if (!text || wordsRead <= 0) return
@@ -59,7 +123,7 @@ const initTextTracker = () => {
       console.log("attention-text", { deltaText, deltaWords })
 
       readingProgressTracker.set(textHash, wordsRead)
-      
+
       // Send message to background script
       chrome.runtime.sendMessage({
         type: COGNITIVE_ATTENTION_TEXT_MESSAGE_NAME,
@@ -74,6 +138,9 @@ const initTextTracker = () => {
   })
 
   textTracker.init()
+
+  // Request initial settings after tracker is initialized
+  requestInitialSettings()
 }
 
 // Initialize when DOM is ready

@@ -148,6 +148,43 @@ model User {
   focusScores       Focus[]
   deviceTokens      DeviceToken[]
   chatSessions      ChatSession[]
+  settings          UserSettings?
+}
+
+// User settings for cognitive attention and extension configuration
+model UserSettings {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  // Cognitive Attention Settings
+  sustainedTime    Int     @default(3000) // Focus duration threshold (ms)
+  idleThreshold    Int     @default(30000) // Inactivity time before idle detection (ms)
+  wordsPerMinute   Int     @default(150) // Reading speed calculation parameter
+  debugMode        Boolean @default(false) // Console logging for debugging
+  showOverlay      Boolean @default(false) // Visual indicator for attention tracking
+
+  // Doomscrolling Detection
+  itemsThreshold Int @default(5) // Items before rapid scrolling alert
+  timeWindow     Int @default(300000) // Tracking period for doomscrolling (ms)
+
+  // Focus Management
+  focusInactivityThreshold Int @default(300000) // Time before focus pause detection (ms)
+
+  // System/Maintenance
+  gcInterval Int @default(172800000) // Data cleanup frequency (ms) - 2 days
+
+  // Model Settings (Advanced)
+  modelTemperature Float @default(1.0) // AI model creativity parameter
+  modelTopP        Float @default(0.95) // Nucleus sampling parameter
+
+  // Versioning for sync - incremented on each update
+  version   Int      @default(1)
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([version])
 }
 
 // Device tokens for browser extension authentication

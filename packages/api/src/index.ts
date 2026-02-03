@@ -6,7 +6,8 @@ export {
   ChatService,
   AIService,
   ActivityService,
-  DeviceTokenService
+  DeviceTokenService,
+  SettingsService
 } from "./services"
 
 // Types
@@ -26,7 +27,10 @@ export type {
   TextActivityPayload,
   ImageActivityPayload,
   AudioActivityPayload,
-  WebsiteVisitPayload
+  WebsiteVisitPayload,
+  // Settings
+  UserSettings,
+  SettingsSyncResponse
 } from "./types"
 
 // Device Token types

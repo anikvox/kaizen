@@ -1,12 +1,30 @@
 import {
   ApiClient,
   ActivityService,
+  SettingsService,
   createAuthProvider,
   type TextActivityPayload,
   type ImageActivityPayload,
   type AudioActivityPayload,
-  type WebsiteVisitPayload
+  type WebsiteVisitPayload,
+  type UserSettings
 } from "@kaizen/api"
+
+import {
+  SETTINGS_STORAGE_KEY,
+  SETTINGS_VERSION_KEY,
+  SETTINGS_UPDATED_MESSAGE,
+  GET_SETTINGS_MESSAGE,
+  COGNITIVE_ATTENTION_SUSTAINED_TIME,
+  COGNITIVE_ATTENTION_IDLE_THRESHOLD_TIME,
+  COGNITIVE_ATTENTION_WORDS_PER_MINUTE,
+  COGNITIVE_ATTENTION_DEBUG_MODE,
+  COGNITIVE_ATTENTION_SHOW_OVERLAY,
+  DOOMSCROLLING_ATTENTION_ITEMS_THRESHOLD,
+  DOOMSCROLLING_TIME_WINDOW,
+  FOCUS_INACTIVITY_THRESHOLD,
+  GARBAGE_COLLECTION_INTERVAL
+} from "./default-settings"
 
 console.log("Kaizen background script initialized")
 
@@ -40,6 +58,157 @@ const apiClient = new ApiClient({
 })
 
 const activityService = new ActivityService(apiClient)
+const settingsService = new SettingsService(apiClient)
+
+// =============================================================================
+// SETTINGS SYNC
+// =============================================================================
+
+let settingsSyncCleanup: (() => void) | null = null
+
+/**
+ * Default settings to use when not synced from server
+ */
+const DEFAULT_SETTINGS: UserSettings = {
+  sustainedTime: COGNITIVE_ATTENTION_SUSTAINED_TIME.defaultValue,
+  idleThreshold: COGNITIVE_ATTENTION_IDLE_THRESHOLD_TIME.defaultValue,
+  wordsPerMinute: COGNITIVE_ATTENTION_WORDS_PER_MINUTE.defaultValue,
+  debugMode: COGNITIVE_ATTENTION_DEBUG_MODE.defaultValue,
+  showOverlay: COGNITIVE_ATTENTION_SHOW_OVERLAY.defaultValue,
+  itemsThreshold: DOOMSCROLLING_ATTENTION_ITEMS_THRESHOLD.defaultValue,
+  timeWindow: DOOMSCROLLING_TIME_WINDOW.defaultValue,
+  focusInactivityThreshold: FOCUS_INACTIVITY_THRESHOLD.defaultValue,
+  gcInterval: GARBAGE_COLLECTION_INTERVAL.defaultValue,
+  modelTemperature: 1.0,
+  modelTopP: 0.95,
+  version: 0
+}
+
+/**
+ * Get current settings version from storage
+ */
+async function getCurrentSettingsVersion(): Promise<number> {
+  try {
+    const result = await chrome.storage.local.get(SETTINGS_VERSION_KEY)
+    return result[SETTINGS_VERSION_KEY] || 0
+  } catch {
+    return 0
+  }
+}
+
+/**
+ * Get current settings from storage
+ */
+async function getCurrentSettings(): Promise<UserSettings> {
+  try {
+    const result = await chrome.storage.local.get(SETTINGS_STORAGE_KEY)
+    return result[SETTINGS_STORAGE_KEY] || DEFAULT_SETTINGS
+  } catch {
+    return DEFAULT_SETTINGS
+  }
+}
+
+/**
+ * Save settings to storage and notify content scripts
+ */
+async function saveSettingsToStorage(settings: UserSettings): Promise<void> {
+  await chrome.storage.local.set({
+    [SETTINGS_STORAGE_KEY]: settings,
+    [SETTINGS_VERSION_KEY]: settings.version
+  })
+
+  // Notify all tabs that settings have changed
+  notifyContentScriptsOfSettingsChange(settings)
+}
+
+/**
+ * Notify all content scripts that settings have changed
+ */
+async function notifyContentScriptsOfSettingsChange(settings: UserSettings): Promise<void> {
+  try {
+    const tabs = await chrome.tabs.query({})
+    for (const tab of tabs) {
+      if (tab.id) {
+        chrome.tabs.sendMessage(tab.id, {
+          type: SETTINGS_UPDATED_MESSAGE,
+          payload: settings
+        }).catch(() => {
+          // Content script not available in this tab, ignore
+        })
+      }
+    }
+    console.log("[Settings] Notified content scripts of settings change")
+  } catch (error) {
+    console.error("[Settings] Error notifying content scripts:", error)
+  }
+}
+
+/**
+ * Handle settings update from server
+ */
+function handleSettingsUpdate(settings: UserSettings): void {
+  console.log("[Settings] Received settings update from server:", settings)
+  saveSettingsToStorage(settings)
+}
+
+/**
+ * Start settings sync loop
+ */
+function startSettingsSync(): void {
+  // Stop existing sync if running
+  if (settingsSyncCleanup) {
+    settingsSyncCleanup()
+    settingsSyncCleanup = null
+  }
+
+  console.log("[Settings] Starting settings sync loop")
+
+  settingsSyncCleanup = settingsService.startSyncLoop(
+    () => {
+      // Get current version synchronously (will be called from async context)
+      let version = 0
+      chrome.storage.local.get(SETTINGS_VERSION_KEY).then((result) => {
+        version = result[SETTINGS_VERSION_KEY] || 0
+      })
+      return version
+    },
+    handleSettingsUpdate,
+    (error) => {
+      console.error("[Settings] Sync error:", error)
+    }
+  )
+}
+
+/**
+ * Stop settings sync loop
+ */
+function stopSettingsSync(): void {
+  if (settingsSyncCleanup) {
+    console.log("[Settings] Stopping settings sync loop")
+    settingsSyncCleanup()
+    settingsSyncCleanup = null
+  }
+}
+
+/**
+ * Fetch initial settings from server
+ */
+async function fetchInitialSettings(): Promise<void> {
+  try {
+    const token = await getAuthToken()
+    if (!token) {
+      console.log("[Settings] No auth token, using default settings")
+      return
+    }
+
+    console.log("[Settings] Fetching initial settings from server")
+    const settings = await settingsService.getSettings()
+    await saveSettingsToStorage(settings)
+    console.log("[Settings] Initial settings loaded:", settings)
+  } catch (error) {
+    console.error("[Settings] Error fetching initial settings:", error)
+  }
+}
 
 // =============================================================================
 // AUTHENTICATION HELPERS
@@ -91,6 +260,10 @@ async function updateActionBehavior() {
       }
     }
     console.log("User authenticated - sidepanel mode enabled")
+
+    // Start settings sync when authenticated
+    await fetchInitialSettings()
+    startSettingsSync()
   } else {
     await chrome.action.setPopup({ popup: "popup.html" })
 
@@ -102,6 +275,9 @@ async function updateActionBehavior() {
       }
     }
     console.log("User not authenticated - popup mode enabled")
+
+    // Stop settings sync when not authenticated
+    stopSettingsSync()
   }
 }
 
@@ -180,6 +356,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     })
     sendResponse({ success: true })
     return true
+  }
+
+  // Handle get settings request from content scripts
+  if (message.type === GET_SETTINGS_MESSAGE) {
+    getCurrentSettings().then((settings) => {
+      sendResponse({ success: true, settings })
+    }).catch((error) => {
+      console.error("[Settings] Error getting settings:", error)
+      sendResponse({ success: false, error: String(error), settings: DEFAULT_SETTINGS })
+    })
+    return true // Indicates async response
   }
 
   // Handle device token messages from popup

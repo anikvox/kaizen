@@ -108,3 +108,38 @@ export interface WebsiteVisitPayload {
   time?: number
   timestamp: number
 }
+
+// =============================================================================
+// SETTINGS TYPES
+// =============================================================================
+
+export interface UserSettings {
+  // Cognitive Attention Settings
+  sustainedTime: number // Focus duration threshold (ms)
+  idleThreshold: number // Inactivity time before idle detection (ms)
+  wordsPerMinute: number // Reading speed calculation parameter
+  debugMode: boolean // Console logging for debugging
+  showOverlay: boolean // Visual indicator for attention tracking
+
+  // Doomscrolling Detection
+  itemsThreshold: number // Items before rapid scrolling alert
+  timeWindow: number // Tracking period for doomscrolling (ms)
+
+  // Focus Management
+  focusInactivityThreshold: number // Time before focus pause detection (ms)
+
+  // System/Maintenance
+  gcInterval: number // Data cleanup frequency (ms)
+
+  // Model Settings (Advanced)
+  modelTemperature: number // AI model creativity parameter
+  modelTopP: number // Nucleus sampling parameter
+
+  // Version for sync
+  version: number
+}
+
+export interface SettingsSyncResponse {
+  updated: boolean
+  settings?: UserSettings
+}

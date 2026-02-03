@@ -4,6 +4,7 @@ import focusRouter from "./focus";
 import deviceTokensRouter from "./device-tokens";
 import chatRouter from "./chat";
 import aiRouter from "./ai";
+import settingsRouter from "./settings";
 import { requireAuth } from "../middleware/auth";
 
 const router = Router();
@@ -20,5 +21,6 @@ router.use("/ai", aiRouter);
 // Apply auth middleware to all routes except health
 router.use("/activities", requireAuth, activitiesRouter);
 router.use("/focus", requireAuth, focusRouter);
+router.use("/settings", requireAuth, settingsRouter);
 
 export default router;

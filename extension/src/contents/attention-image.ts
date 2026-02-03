@@ -1,6 +1,11 @@
 import type { PlasmoCSConfig } from "plasmo"
+import type { UserSettings } from "@kaizen/api"
 
-import { COGNITIVE_ATTENTION_SHOW_OVERLAY } from "../default-settings"
+import {
+  COGNITIVE_ATTENTION_SHOW_OVERLAY,
+  SETTINGS_UPDATED_MESSAGE,
+  GET_SETTINGS_MESSAGE
+} from "../default-settings"
 
 import CognitiveAttentionImageTracker from "../cognitive-attention/monitor-image"
 
@@ -18,15 +23,56 @@ const URL = location.href
 
 const cachedImageCaptions = new Set<string>()
 
-const initImageTracker = () => {
-  const showOverlay = COGNITIVE_ATTENTION_SHOW_OVERLAY.defaultValue
+// Default settings
+let currentSettings = {
+  showOverlay: COGNITIVE_ATTENTION_SHOW_OVERLAY.defaultValue
+}
 
+/**
+ * Update tracker configuration with new settings
+ */
+const updateTrackerSettings = (settings: Partial<UserSettings>) => {
+  if (!imageTracker) return
+
+  if (settings.showOverlay !== undefined) {
+    currentSettings.showOverlay = settings.showOverlay
+    imageTracker.updateConfig({ showOverlay: settings.showOverlay })
+    console.log("[attention-image] Settings updated:", { showOverlay: settings.showOverlay })
+  }
+}
+
+/**
+ * Request initial settings from background script
+ */
+const requestInitialSettings = async () => {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: GET_SETTINGS_MESSAGE })
+    if (response?.success && response.settings) {
+      updateTrackerSettings(response.settings)
+    }
+  } catch (error) {
+    console.log("[attention-image] Error requesting settings:", error)
+  }
+}
+
+/**
+ * Listen for settings update messages from background script
+ */
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type === SETTINGS_UPDATED_MESSAGE && message.payload) {
+    updateTrackerSettings(message.payload)
+    sendResponse({ success: true })
+  }
+  return false
+})
+
+const initImageTracker = () => {
   if (imageTracker) {
     imageTracker.destroy?.()
   }
 
   imageTracker = new CognitiveAttentionImageTracker({
-    showOverlay,
+    showOverlay: currentSettings.showOverlay,
     onSustainedImageAttention: async (data) => {
       // Skip if we've already processed this image
       if (cachedImageCaptions.has(data.src)) {
@@ -56,6 +102,9 @@ const initImageTracker = () => {
   })
 
   imageTracker.init()
+
+  // Request initial settings after tracker is initialized
+  requestInitialSettings()
 }
 
 // Initialize when DOM is ready
