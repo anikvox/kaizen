@@ -117,7 +117,24 @@ function IndexOptions() {
   useEffect(() => {
     checkStatus()
     const interval = setInterval(checkStatus, 3000)
-    return () => clearInterval(interval)
+    
+    // Listen for storage changes (when sidepanel revokes token)
+    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
+      if (areaName === 'local') {
+        if (changes[DEVICE_TOKEN_KEY]?.newValue === undefined || changes[USER_DATA_KEY]?.newValue === undefined) {
+          // Token or user data was removed
+          setIsLinked(false)
+          setUser(null)
+        }
+      }
+    }
+    
+    chrome.storage.onChanged.addListener(handleStorageChange)
+    
+    return () => {
+      clearInterval(interval)
+      chrome.storage.onChanged.removeListener(handleStorageChange)
+    }
   }, [checkStatus])
 
   const handleLinkAccount = () => {
@@ -127,10 +144,19 @@ function IndexOptions() {
   }
 
   const handleUnlink = async () => {
-    await chrome.storage.local.remove([DEVICE_TOKEN_KEY, USER_DATA_KEY])
-    chrome.runtime.sendMessage({ type: "CLEAR_AUTH_TOKEN" })
+    try {
+      // Call server to delete the device token
+      await deviceTokenService.unlink()
+    } catch (error) {
+      console.error("Error unlinking device:", error)
+    }
+    
+    await chrome.storage.local.remove([DEVICE_TOKEN_KEY, USER_DATA_KEY, INSTALLATION_ID_KEY])
+    chrome.runtime.sendMessage({ type: "CLEAR_AUTH_TOKEN" }).catch(err => console.log("Message error:", err))
+    chrome.runtime.sendMessage({ type: "AUTH_STATE_CHANGED", isAuthenticated: false }).catch(err => console.log("Message error:", err))
     setIsLinked(false)
     setUser(null)
+    setInstallationId(null)
   }
 
   if (isLoading) {

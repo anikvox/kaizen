@@ -14,7 +14,8 @@ import {
   Play,
   Target,
   Timer,
-  Trophy
+  Trophy,
+  X
 } from "lucide-react"
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 
@@ -81,6 +82,8 @@ const Popup = () => {
   const [focusData, setFocusData] = useState<FocusWithParsedData | null>(null)
   const [currentChatId, setCurrentChatId] = useState<string>("")
   const [isDeviceLinked, setIsDeviceLinked] = useState<boolean | null>(null)
+  const [showRevokeModal, setShowRevokeModal] = useState(false)
+  const [isPomodoroExpanded, setIsPomodoroExpanded] = useState(true)
 
   // Notify background script that sidepanel has opened
   useEffect(() => {
@@ -346,10 +349,6 @@ const Popup = () => {
   }, [])
 
   const handleRevokeToken = useCallback(async () => {
-    if (!confirm("Are you sure you want to revoke this device? You'll need to link your account again.")) {
-      return
-    }
-
     try {
       // Get the current device token
       const cached = await chrome.storage.local.get([DEVICE_TOKEN_KEY])
@@ -364,12 +363,20 @@ const Popup = () => {
     }
 
     // Always clear local storage regardless of server response
-    await chrome.storage.local.remove([DEVICE_TOKEN_KEY, USER_DATA_KEY])
-    chrome.runtime.sendMessage({ type: "CLEAR_AUTH_TOKEN" })
-    chrome.runtime.sendMessage({ type: "AUTH_STATE_CHANGED", isAuthenticated: false })
+    await chrome.storage.local.remove([DEVICE_TOKEN_KEY, USER_DATA_KEY, INSTALLATION_ID_KEY])
+    
+    // Send messages to background script
+    chrome.runtime.sendMessage({ type: "CLEAR_AUTH_TOKEN" }).catch(err => console.log("Message error:", err))
+    chrome.runtime.sendMessage({ type: "AUTH_STATE_CHANGED", isAuthenticated: false }).catch(err => console.log("Message error:", err))
 
-    // Close the sidepanel
-    window.close()
+    // Update local state immediately
+    setIsDeviceLinked(false)
+    setShowRevokeModal(false)
+
+    // Close the sidepanel after a brief delay to show the unlinked state
+    setTimeout(() => {
+      window.close()
+    }, 500)
   }, [])
 
   const renderFocusTab = () => {
@@ -958,86 +965,152 @@ const Popup = () => {
 
                 {/* Revoke Device Button */}
                 <button
-                  onClick={handleRevokeToken}
+                  onClick={() => setShowRevokeModal(true)}
                   className="cursor-pointer h-10 relative bg-white/60 hover:bg-red-500/80 backdrop-blur-md px-3 py-2 rounded-xl border border-gray-200/50 hover:border-red-300/50 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 active:scale-95 group"
                   aria-label="Revoke Device"
                   title="Revoke this device">
                   <LogOut className="w-4 h-4 text-gray-600 group-hover:text-white transition-colors" />
                 </button>
 
-                {/* Pomodoro Timer */}
-                <div className="relative group/pomodoro mr-3" id="tour-pomodoro">
-                  <div className="flex items-center gap-2 bg-gradient-to-r from-emerald-100/70 via-emerald-50/40 to-white/20 dark:from-emerald-900/50 dark:via-emerald-950/30 dark:to-slate-900/30 backdrop-blur-md px-4 py-2 rounded-xl border border-white/30 dark:border-slate-600/40 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
-                    {/* Progress indicator background - Subtle fill */}
-                    <div
-                      className={`absolute inset-0 rounded-xl transition-all duration-1000 ease-in-out ${pomodoroState.isActive
-                        ? pomodoroState.state === "focus"
-                          ? "bg-gradient-to-r from-red-500/5 via-orange-500/5 to-transparent dark:from-red-600/10 dark:via-orange-600/10 dark:to-transparent"
-                          : "bg-gradient-to-r from-green-500/5 via-teal-500/5 to-transparent dark:from-green-600/10 dark:via-teal-600/10 dark:to-transparent"
-                        : "bg-transparent"
-                        }`}
-                      style={{
-                        width: `${pomodoroState.state === "focus"
-                          ? ((1500 - pomodoroState.remainingTime) / 1500) *
-                          100
-                          : ((300 - pomodoroState.remainingTime) / 300) * 100
-                          }%`,
-                        mixBlendMode: "multiply",
-                        backdropFilter: "blur(4px)"
-                      }}
-                    />
+                {/* Pomodoro Timer - Collapsible */}
+                <div 
+                  className="relative group/pomodoro mr-3" 
+                  id="tour-pomodoro"
+                  ref={(node) => {
+                    if (node) {
+                      const handleClickOutside = (e: MouseEvent) => {
+                        if (!node.contains(e.target as Node)) {
+                          setIsPomodoroExpanded(false)
+                        }
+                      }
+                      if (isPomodoroExpanded) {
+                        document.addEventListener('mousedown', handleClickOutside)
+                        return () => document.removeEventListener('mousedown', handleClickOutside)
+                      }
+                    }
+                  }}
+                >
+                  {isPomodoroExpanded ? (
+                    // Expanded State
+                    <div className="flex items-center gap-2 bg-gradient-to-r from-emerald-100/70 via-emerald-50/40 to-white/20 dark:from-emerald-900/50 dark:via-emerald-950/30 dark:to-slate-900/30 backdrop-blur-md px-4 py-2 rounded-xl border border-white/30 dark:border-slate-600/40 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
+                      {/* Progress indicator background - Subtle fill */}
+                      <div
+                        className={`absolute inset-0 rounded-xl transition-all duration-1000 ease-in-out ${pomodoroState.isActive
+                          ? pomodoroState.state === "focus"
+                            ? "bg-gradient-to-r from-red-500/5 via-orange-500/5 to-transparent dark:from-red-600/10 dark:via-orange-600/10 dark:to-transparent"
+                            : "bg-gradient-to-r from-green-500/5 via-teal-500/5 to-transparent dark:from-green-600/10 dark:via-teal-600/10 dark:to-transparent"
+                          : "bg-transparent"
+                          }`}
+                        style={{
+                          width: `${pomodoroState.state === "focus"
+                            ? ((1500 - pomodoroState.remainingTime) / 1500) * 100
+                            : ((300 - pomodoroState.remainingTime) / 300) * 100
+                            }%`,
+                          mixBlendMode: "multiply",
+                          backdropFilter: "blur(4px)"
+                        }}
+                      />
 
-                    <div className="relative flex items-center gap-2">
-                      {/* Timer display with state icon */}
-                      <div className="flex items-center gap-1.5">
-                        <div
-                          className={`transition-transform duration-300 ${pomodoroState.isActive ? "animate-pulse" : ""
-                            }`}>
-                          {pomodoroState.state === "focus" ? (
-                            <Timer className="w-4 h-4 text-red-600 dark:text-red-400" />
-                          ) : (
-                            <Coffee className="w-4 h-4 text-green-600 dark:text-green-400" />
-                          )}
+                      <div className="relative flex items-center gap-2">
+                        {/* Timer display with state icon */}
+                        <div className="flex items-center gap-1.5">
+                          <div
+                            className={`transition-transform duration-300 ${pomodoroState.isActive ? "animate-pulse" : ""
+                              }`}>
+                            {pomodoroState.state === "focus" ? (
+                              <Timer className="w-4 h-4 text-red-600 dark:text-red-400" />
+                            ) : (
+                              <Coffee className="w-4 h-4 text-green-600 dark:text-green-400" />
+                            )}
+                          </div>
+                          <span className="text-sm font-mono font-bold text-gray-800 dark:text-gray-100 tabular-nums">
+                            {formattedPomodoroTime}
+                          </span>
                         </div>
-                        <span className="text-sm font-mono font-bold text-gray-800 dark:text-gray-100 tabular-nums">
-                          {formattedPomodoroTime}
-                        </span>
+
+                        {/* Vertical divider */}
+                        <div className="w-px h-5 bg-gray-300 dark:bg-slate-600" />
+
+                        {/* Play/Pause button - Enhanced */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handlePomodoroToggle()
+                          }}
+                          className={`group relative flex items-center justify-center w-7 h-7 rounded-lg transition-all duration-300 ${pomodoroState.isActive
+                            ? "bg-gradient-to-br from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 shadow-md"
+                            : "bg-gradient-to-br from-green-400 to-emerald-500 hover:from-green-500 hover:to-emerald-600 shadow-md"
+                            } hover:scale-110 active:scale-95 hover:shadow-lg`}
+                          aria-label={
+                            pomodoroState.isActive
+                              ? `Pause ${pomodoroState.state}`
+                              : `Start ${pomodoroState.state}`
+                          }>
+                          {pomodoroState.isActive ? (
+                            <Pause className="w-3.5 h-3.5 text-white fill-white" />
+                          ) : (
+                            <Play className="w-3.5 h-3.5 text-white fill-white" />
+                          )}
+                          {/* Button glow effect */}
+                          <div className="absolute inset-0 rounded-lg bg-white/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                        </button>
                       </div>
 
-                      {/* Vertical divider */}
-                      <div className="w-px h-5 bg-gray-300 dark:bg-slate-600" />
+                      {/* Pomodoro count indicator */}
+                      {pomodoroState.totalPomodoros > 0 && (
+                        <div className="absolute -top-1 -right-1 bg-gradient-to-br from-purple-500 to-pink-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg border border-white/30">
+                          {pomodoroState.totalPomodoros}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // Collapsed State - Icon Button Only with Fill Progress
+                    <button
+                      onClick={() => setIsPomodoroExpanded(true)}
+                      className="relative h-10 w-10 bg-gradient-to-r from-emerald-100/70 via-emerald-50/40 to-white/20 dark:from-emerald-900/50 dark:via-emerald-950/30 dark:to-slate-900/30 backdrop-blur-md rounded-xl border border-white/30 dark:border-slate-600/40 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 flex items-center justify-center overflow-hidden"
+                      aria-label="Expand Pomodoro Timer"
+                    >
+                      {/* Progress Fill Overlay */}
+                      {pomodoroState.isActive && (
+                        <div
+                          className={`absolute inset-0 rounded-xl transition-all duration-1000 ease-linear ${
+                            pomodoroState.state === "focus"
+                              ? "bg-gradient-to-t from-emerald-400/40 via-teal-300/30 to-green-400/40 dark:from-emerald-500/50 dark:via-teal-400/40 dark:to-green-500/50"
+                              : "bg-gradient-to-t from-green-400/40 via-emerald-300/30 to-teal-400/40 dark:from-green-500/50 dark:via-emerald-400/40 dark:to-teal-500/50"
+                          }`}
+                          style={{
+                            height: `${
+                              pomodoroState.state === "focus"
+                                ? ((1500 - pomodoroState.remainingTime) / 1500) * 100
+                                : ((300 - pomodoroState.remainingTime) / 300) * 100
+                            }%`,
+                            bottom: 0,
+                            top: 'auto'
+                          }}
+                        />
+                      )}
 
-                      {/* Play/Pause button - Enhanced */}
-                      <button
-                        onClick={handlePomodoroToggle}
-                        className={`group relative flex items-center justify-center w-7 h-7 rounded-lg transition-all duration-300 ${pomodoroState.isActive
-                          ? "bg-gradient-to-br from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 shadow-md"
-                          : "bg-gradient-to-br from-green-400 to-emerald-500 hover:from-green-500 hover:to-emerald-600 shadow-md"
-                          } hover:scale-110 active:scale-95 hover:shadow-lg`}
-                        aria-label={
-                          pomodoroState.isActive
-                            ? `Pause ${pomodoroState.state}`
-                            : `Start ${pomodoroState.state}`
-                        }>
+                      <div
+                        className={`relative z-10 transition-transform duration-300 ${
+                          pomodoroState.isActive ? "animate-pulse" : ""
+                        }`}>
                         {pomodoroState.isActive ? (
-                          <Pause className="w-3.5 h-3.5 text-white fill-white" />
+                          <Timer className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                         ) : (
-                          <Play className="w-3.5 h-3.5 text-white fill-white" />
+                          <Coffee className="w-5 h-5 text-teal-600 dark:text-teal-400" />
                         )}
-                        {/* Button glow effect */}
-                        <div className="absolute inset-0 rounded-lg bg-white/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                      </button>
-                    </div>
-                  </div>
+                      </div>
 
-                  {/* Pomodoro count indicator */}
-                  {pomodoroState.totalPomodoros > 0 && (
-                    <div className="absolute -top-1 -right-1 mr-3 bg-gradient-to-br from-purple-500 to-pink-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg border border-white/30">
-                      {pomodoroState.totalPomodoros}
-                    </div>
+                      {/* Pomodoro count indicator */}
+                      {pomodoroState.totalPomodoros > 0 && (
+                        <div className="absolute -top-1 -right-1 bg-gradient-to-br from-purple-500 to-pink-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg border border-white/30 z-20">
+                          {pomodoroState.totalPomodoros}
+                        </div>
+                      )}
+                    </button>
                   )}
 
-                  {/* Hover Popover */}
+                  {/* Hover Popover - Shows for both collapsed and expanded states */}
                   <div className="absolute top-full right-0 mt-2 w-64 opacity-0 invisible group-hover/pomodoro:opacity-100 group-hover/pomodoro:visible transition-all duration-300 pointer-events-none z-50">
                     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-gray-200 dark:border-slate-700 p-4 backdrop-blur-md">
                       {/* Arrow */}
@@ -1202,6 +1275,104 @@ const Popup = () => {
             </div>
           </div>
         </div>
+
+        {/* Revoke Device Confirmation Modal */}
+        {showRevokeModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+            {/* Backdrop */}
+            <div 
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setShowRevokeModal(false)}
+            />
+            
+            {/* Modal */}
+            <div className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200/50 dark:border-slate-700/50 max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+              {/* Header with gradient */}
+              <div className="relative bg-gradient-to-br from-red-50 via-orange-50 to-amber-50 dark:from-red-900/30 dark:via-orange-900/30 dark:to-amber-900/30 px-6 py-5 border-b border-red-100 dark:border-red-900/50">
+                <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/20 to-transparent" />
+                <div className="relative flex items-center gap-3">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-gradient-to-br from-red-400 to-orange-500 rounded-xl blur-lg opacity-40" />
+                    <div className="relative w-12 h-12 bg-gradient-to-br from-red-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg">
+                      <LogOut className="w-6 h-6 text-white" strokeWidth={2.5} />
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                      Revoke Device Access
+                    </h3>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                      This action will unlink your device
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="px-6 py-5">
+                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed mb-4">
+                  Are you sure you want to revoke this device? This will:
+                </p>
+
+                <div className="space-y-2.5 mb-5">
+                  <div className="flex items-start gap-3 p-3 bg-red-50/50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-900/40">
+                    <div className="flex-shrink-0 w-5 h-5 bg-red-100 dark:bg-red-900/40 rounded-full flex items-center justify-center mt-0.5">
+                      <span className="text-xs text-red-600 dark:text-red-400">✕</span>
+                    </div>
+                    <p className="text-xs text-gray-700 dark:text-gray-300">
+                      <span className="font-semibold">Disconnect</span> this device from your Kaizen account
+                    </p>
+                  </div>
+
+                  <div className="flex items-start gap-3 p-3 bg-red-50/50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-900/40">
+                    <div className="flex-shrink-0 w-5 h-5 bg-red-100 dark:bg-red-900/40 rounded-full flex items-center justify-center mt-0.5">
+                      <span className="text-xs text-red-600 dark:text-red-400">✕</span>
+                    </div>
+                    <p className="text-xs text-gray-700 dark:text-gray-300">
+                      <span className="font-semibold">Stop syncing</span> your focus data and insights
+                    </p>
+                  </div>
+
+                  <div className="flex items-start gap-3 p-3 bg-red-50/50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-900/40">
+                    <div className="flex-shrink-0 w-5 h-5 bg-red-100 dark:bg-red-900/40 rounded-full flex items-center justify-center mt-0.5">
+                      <span className="text-xs text-red-600 dark:text-red-400">✕</span>
+                    </div>
+                    <p className="text-xs text-gray-700 dark:text-gray-300">
+                      <span className="font-semibold">Require re-linking</span> to use the extension again
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50/80 dark:bg-blue-900/20 border border-blue-200/60 dark:border-blue-800/40 rounded-lg px-4 py-3">
+                  <div className="flex items-start gap-2.5">
+                    <div className="flex-shrink-0 w-4 h-4 bg-blue-500/20 dark:bg-blue-500/30 rounded-lg flex items-center justify-center mt-0.5">
+                      <span className="text-xs">💡</span>
+                    </div>
+                    <p className="text-xs text-blue-800 dark:text-blue-200 leading-relaxed">
+                      Your focus data is safely stored and will be available when you reconnect
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="px-6 py-4 bg-gray-50/50 dark:bg-slate-900/50 border-t border-gray-200/50 dark:border-slate-700/50 flex gap-3">
+                <button
+                  onClick={() => setShowRevokeModal(false)}
+                  className="flex-1 px-4 py-2.5 bg-white dark:bg-slate-700 hover:bg-gray-50 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 font-medium text-sm rounded-lg border border-gray-300 dark:border-slate-600 transition-all duration-200 hover:shadow-md"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRevokeToken}
+                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white font-semibold text-sm rounded-lg shadow-md hover:shadow-lg transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  Revoke Device
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

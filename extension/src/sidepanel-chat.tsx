@@ -52,6 +52,7 @@ export const Chat: React.FC<ChatProps> = ({
   const [messageText, setMessageText] = useState("")
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamingMessage, setStreamingMessage] = useState("")
+  const [hasReceivedResponse, setHasReceivedResponse] = useState(false)
   const [selectedImages, setSelectedImages] = useState<File[]>([])
   const [selectedAudios, setSelectedAudios] = useState<File[]>([])
   const [writing, setWriting] = useState(false)
@@ -64,6 +65,17 @@ export const Chat: React.FC<ChatProps> = ({
   const containerRef = useRef<HTMLDivElement>(null)
 
   const MAX_FILES = 5
+  const MAX_TOKENS = 32000 // 32k token limit
+  const WORDS_PER_TOKEN = 4 / 2.5 // 4 words = 2.5 tokens, so 1 token = 1.6 words
+
+  // Calculate token usage from messages
+  const calculateTokenUsage = (messages: ChatMessage[]): number => {
+    const totalWords = messages.reduce((acc, msg) => {
+      const words = msg.content.trim().split(/\s+/).length
+      return acc + words
+    }, 0)
+    return Math.ceil(totalWords / WORDS_PER_TOKEN)
+  }
 
   // Memoize ChatService instance
   const chatService = useMemo(() => {
@@ -242,20 +254,20 @@ export const Chat: React.FC<ChatProps> = ({
     scrollToBottom()
   }, [messages?.length, streamingMessage])
 
+  // Calculate and update token usage based on messages
   useEffect(() => {
-    const fetchSessionUsage = async () => {
-      const session = await chatService.getSession()
-      if (session && 'inputUsage' in session && 'inputQuota' in session) {
-        const usage = {
-          inputUsage: session.inputUsage as number,
-          inputQuota: session.inputQuota as number
-        }
-        setUsageInfo(usage)
-        onUsageUpdate?.(usage)
+    if (messages && messages.length > 0) {
+      const tokenUsage = calculateTokenUsage(messages)
+      const usage = {
+        inputUsage: tokenUsage,
+        inputQuota: MAX_TOKENS
       }
+      setUsageInfo(usage)
+      onUsageUpdate?.(usage)
+    } else {
+      setUsageInfo({ inputUsage: 0, inputQuota: MAX_TOKENS })
     }
-    fetchSessionUsage()
-  }, [messages, onUsageUpdate, chatService])
+  }, [messages, onUsageUpdate])
 
   useEffect(() => {
     // Component mount/unmount logic - Currently nothing to cleanup
@@ -344,6 +356,7 @@ export const Chat: React.FC<ChatProps> = ({
 
     setIsStreaming(true)
     setStreamingMessage("")
+    setHasReceivedResponse(false)
 
     try {
       let fullResponse = ""
@@ -363,6 +376,7 @@ export const Chat: React.FC<ChatProps> = ({
       for await (const response of chatService.streamResponse(userMessage, context, imageFile, audioFile)) {
         fullResponse = response.text
         setStreamingMessage(fullResponse)
+        setHasReceivedResponse(true)
 
         if (response.done) {
           // Add assistant message to local state
@@ -547,7 +561,7 @@ export const Chat: React.FC<ChatProps> = ({
     
     // Get image source - prefer cached preview, fallback to server URL
     const imageSource = metadata?.imagePreview || 
-      (metadata?.imagePath ? `${process.env.PLASMO_PUBLIC_SERVER_URL || 'http://localhost:60092'}/api/chat/uploads/${metadata.imagePath.split('/').pop()}` : null)
+      (metadata?.imagePath ? `${process.env.PLASMO_PUBLIC_SERVER_URL || 'http://localhost:60092'}/chat/uploads/${metadata.imagePath.split('/').pop()}` : null)
 
     return (
       <div
@@ -611,7 +625,7 @@ export const Chat: React.FC<ChatProps> = ({
                         __html: marked.parse(streamingMessage) as string
                       }}
                     />
-                  ) : (
+                  ) : !hasReceivedResponse ? (
                     <div className="flex items-center gap-1.5">
                       <div
                         className="w-2 h-2 bg-slate-400 dark:bg-slate-500 rounded-full animate-bounce"
@@ -626,7 +640,7 @@ export const Chat: React.FC<ChatProps> = ({
                         style={{ animationDelay: "300ms" }}
                       />
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </div>
             )}
@@ -669,11 +683,13 @@ export const Chat: React.FC<ChatProps> = ({
             </button>
             {usageInfo && (
               <div
-                className={`flex items-center justify-center mt-1 w-8 h-8 rounded-full shadow-sm ${usageInfo.inputUsage / (usageInfo.inputQuota / 1.2) < 0.75
-                  ? "bg-white"
-                  : "bg-white"
+                className={`flex items-center justify-center mt-1 w-8 h-8 rounded-full shadow-sm ${usageInfo.inputUsage / usageInfo.inputQuota < 0.75
+                  ? "bg-white dark:bg-slate-800"
+                  : usageInfo.inputUsage / usageInfo.inputQuota < 0.9
+                  ? "bg-white dark:bg-slate-800"
+                  : "bg-white dark:bg-slate-800"
                   }`}
-                title={`${usageInfo.inputUsage} / ${usageInfo.inputQuota / 1.2}`}>
+                title={`${usageInfo.inputUsage.toLocaleString()} / ${usageInfo.inputQuota.toLocaleString()} tokens (${Math.round((usageInfo.inputUsage / usageInfo.inputQuota) * 100)}%)`}>
                 <svg className="w-5 h-5 -rotate-90" viewBox="0 0 20 20">
                   <circle
                     cx="10"
@@ -681,9 +697,11 @@ export const Chat: React.FC<ChatProps> = ({
                     r="8"
                     fill="none"
                     strokeWidth="3"
-                    className={usageInfo.inputUsage / (usageInfo.inputQuota / 1.2) < 0.75
+                    className={usageInfo.inputUsage / usageInfo.inputQuota < 0.75
                       ? "stroke-green-200 dark:stroke-green-800"
-                      : "stroke-yellow-200 dark:stroke-yellow-800"
+                      : usageInfo.inputUsage / usageInfo.inputQuota < 0.9
+                      ? "stroke-yellow-200 dark:stroke-yellow-800"
+                      : "stroke-red-200 dark:stroke-red-800"
                     }
                   />
                   <circle
@@ -693,10 +711,12 @@ export const Chat: React.FC<ChatProps> = ({
                     fill="none"
                     strokeWidth="3"
                     strokeLinecap="round"
-                    strokeDasharray={`${(usageInfo.inputUsage / (usageInfo.inputQuota / 1.2)) * 50.27} 50.27`}
-                    className={usageInfo.inputUsage / (usageInfo.inputQuota / 1.2) < 0.75
+                    strokeDasharray={`${(usageInfo.inputUsage / usageInfo.inputQuota) * 50.27} 50.27`}
+                    className={usageInfo.inputUsage / usageInfo.inputQuota < 0.75
                       ? "stroke-green-600 dark:stroke-green-400"
-                      : "stroke-yellow-600 dark:stroke-yellow-400"
+                      : usageInfo.inputUsage / usageInfo.inputQuota < 0.9
+                      ? "stroke-yellow-600 dark:stroke-yellow-400"
+                      : "stroke-red-600 dark:stroke-red-400"
                     }
                   />
                 </svg>

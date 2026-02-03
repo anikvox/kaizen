@@ -46,6 +46,7 @@ export function Chat() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSending, setIsSending] = useState(false);
     const [streamingMessage, setStreamingMessage] = useState("");
+    const [hasReceivedResponse, setHasReceivedResponse] = useState(false);
     const [reflectionRange, setReflectionRange] = useState(30 * 60 * 1000);
     const [selectedImage, setSelectedImage] = useState<File | null>(null);
     const [selectedAudio, setSelectedAudio] = useState<File | null>(null);
@@ -382,6 +383,7 @@ export function Chat() {
         setIsSending(true);
         setStreamingMessage("");
         setStreamingContent("");
+        setHasReceivedResponse(false);
 
         try {
             const stream = chatServiceRef.current.sendMessageStreaming(
@@ -396,10 +398,12 @@ export function Chat() {
                 if (response.title) {
                     console.log("[Chat] Title updated:", response.title);
                     setChats(prev => prev.map(c => c.id === selectedChatId ? { ...c, title: response.title! } : c));
+                    setHasReceivedResponse(true);
                 }
                 if (response.chunk) {
                     setStreamingMessage(prev => prev + response.chunk);
                     setStreamingContent(prev => prev + response.chunk);
+                    setHasReceivedResponse(true);
                 }
             }
 
@@ -739,7 +743,7 @@ export function Chat() {
                                         )}
                                     </motion.div>
                                 ))}
-                                {isSending && !streamingMessage && (
+                                {isSending && !hasReceivedResponse && (
                                     <motion.div
                                         key="typing"
                                         initial={{ opacity: 0, scale: 0.95 }}

@@ -32,7 +32,7 @@ const extensionAuthProvider = createAuthProvider(async () => {
 
 // API client for device token operations
 const apiClient = new ApiClient({
-  baseUrl: `${API_BASE_URL}/api`,
+  baseUrl: `${API_BASE_URL}`,
   authProvider: extensionAuthProvider
 })
 
@@ -200,83 +200,136 @@ function IndexPopup() {
 
   if (isLoading) {
     return (
-      <div className="p-6 min-w-[300px] bg-[#050505] text-white">
-        <div className="flex justify-center py-8">
-          <Loader2 className="w-6 h-6 animate-spin text-gray-500" />
+      <div className="p-6 min-w-[340px] bg-gradient-to-br from-[#050505] via-[#0a0a0a] to-[#050505] text-white rounded-lg overflow-hidden">
+        <div className="flex flex-col items-center gap-6 py-8">
+          {/* Animated logo skeleton */}
+          <div className="relative">
+            <div className="absolute inset-0 bg-blue-600/20 blur-2xl rounded-full animate-pulse" />
+            <div className="relative w-14 h-14 bg-gradient-to-br from-blue-500/20 to-blue-700/20 flex items-center justify-center rounded-xl border border-blue-500/20">
+              <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
+            </div>
+          </div>
+          
+          {/* Loading text */}
+          <div className="flex flex-col items-center gap-2">
+            <div className="h-6 w-32 bg-white/5 rounded animate-pulse" />
+            <div className="h-4 w-48 bg-white/5 rounded animate-pulse" />
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="p-6 min-w-[300px] bg-[#050505] text-white">
+    <div className="p-6 min-w-[340px] bg-gradient-to-br from-[#050505] via-[#0a0a0a] to-[#050505] text-white rounded-lg overflow-hidden">
       {isLinked ? (
         // Fallback UI for authenticated users if sidepanel can't open
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-5 animate-in fade-in duration-300">
+          {/* Header with logo and user */}
           <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-white flex items-center justify-center">
-                <div className="w-3 h-3 bg-black rotate-45" />
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center rounded-lg shadow-lg shadow-blue-500/30 transition-all duration-300 hover:shadow-blue-500/50 hover:scale-105">
+                <div className="w-4 h-4 bg-white rotate-45 rounded-sm" />
               </div>
-              <h1 className="text-lg font-bold tracking-tighter uppercase">KAIZEN</h1>
+              <h1 className="text-lg font-bold tracking-tighter uppercase bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                KAIZEN
+              </h1>
             </div>
             <div className="flex items-center gap-2">
               {user?.image ? (
-                <img src={user.image} alt="" className="w-7 h-7" />
+                <img 
+                  src={user.image} 
+                  alt="" 
+                  className="w-8 h-8 rounded-full border-2 border-white/10 ring-2 ring-blue-500/20 transition-all duration-300 hover:ring-blue-500/40 hover:scale-105" 
+                />
               ) : (
-                <div className="w-7 h-7 bg-white/10 flex items-center justify-center">
+                <div className="w-8 h-8 bg-gradient-to-br from-white/10 to-white/5 rounded-full flex items-center justify-center border border-white/10 transition-all duration-300 hover:border-white/20">
                   <User className="w-4 h-4 text-gray-400" />
                 </div>
               )}
             </div>
           </div>
 
-          <div className="bg-[#0A0A0A] border border-white/10 p-4">
-            <p className="text-[10px] font-mono text-green-500 uppercase font-bold">Active</p>
-            <p className="text-xs text-gray-400 mt-1">
-              Linked as {user?.name || user?.email}
-            </p>
-            <p className="text-[10px] text-gray-500 mt-2">
-              Click the extension icon on a regular webpage to open the side panel.
-            </p>
+          {/* Status card with glassmorphism */}
+          <div className="relative group">
+            <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/5 rounded-lg blur-sm group-hover:blur-md transition-all duration-300" />
+            <div className="relative bg-gradient-to-br from-[#0A0A0A] to-[#0f0f0f] border border-white/10 rounded-lg p-4 backdrop-blur-sm transition-all duration-300 hover:border-green-500/30">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500 shadow-lg shadow-green-500/50"></span>
+                </span>
+                <p className="text-[11px] font-mono text-green-400 uppercase font-bold tracking-wider">Active</p>
+              </div>
+              <p className="text-sm text-gray-300 font-medium mb-1">
+                {user?.name || user?.email}
+              </p>
+              <p className="text-[11px] text-gray-500 leading-relaxed">
+                Click the extension icon on any webpage to open the side panel
+              </p>
+            </div>
           </div>
 
+          {/* Primary action button */}
           <button
             onClick={handleOpenDashboard}
-            className="w-full py-3 bg-white text-black font-bold uppercase text-xs tracking-widest hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+            className="relative w-full py-3.5 bg-white text-black font-bold rounded-lg uppercase text-xs tracking-widest transition-all duration-300 flex items-center justify-center gap-2 group overflow-hidden hover:shadow-lg hover:shadow-white/20 hover:scale-[1.02] active:scale-[0.98]"
           >
-            Open Dashboard
-            <ExternalLink className="w-3 h-3" />
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-700" />
+            <span className="relative flex items-center gap-2">
+              Open Dashboard
+              <ExternalLink className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform duration-300" />
+            </span>
           </button>
 
+          {/* Secondary action button */}
           <button
             onClick={handleUnlink}
-            className="w-full py-2 bg-transparent border border-white/10 text-gray-400 font-medium uppercase text-[10px] tracking-widest hover:bg-white/5 hover:text-white transition-colors flex items-center justify-center gap-2"
+            className="w-full py-3 bg-transparent border border-white/10 text-gray-400 font-medium rounded-lg uppercase text-[10px] tracking-widest transition-all duration-300 flex items-center justify-center gap-2 group hover:bg-red-500/5 hover:border-red-500/30 hover:text-red-400"
           >
-            <LogOut className="w-3 h-3" />
+            <LogOut className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform duration-300" />
             Unlink Account
           </button>
         </div>
       ) : (
-        <div className="flex flex-col items-center gap-4 py-2">
-          <div className="w-10 h-10 bg-white flex items-center justify-center mb-2">
-            <div className="w-5 h-5 bg-black rotate-45" />
+        <div className="flex flex-col items-center gap-6 py-4 animate-in fade-in duration-300">
+          {/* Logo with enhanced glow effect */}
+          <div className="relative group">
+            <div className="absolute inset-0 bg-blue-600/30 blur-2xl rounded-full group-hover:bg-blue-500/40 transition-all duration-500" />
+            <div className="relative w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center rounded-xl shadow-xl shadow-blue-500/40 transition-all duration-500 group-hover:shadow-blue-500/60 group-hover:scale-110 group-hover:rotate-3">
+              <div className="w-8 h-8 bg-white rotate-45 rounded-sm transition-transform duration-500 group-hover:rotate-[50deg]" />
+            </div>
           </div>
-          <h1 className="text-xl font-bold tracking-tighter uppercase">KAIZEN</h1>
-          <p className="text-gray-400 text-sm text-center">
-            Link your account to start tracking focus
-          </p>
+
+          {/* Title and description */}
+          <div className="flex flex-col items-center gap-3">
+            <h1 className="text-2xl font-bold tracking-tighter uppercase bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
+              KAIZEN
+            </h1>
+            <p className="text-gray-400 text-sm text-center max-w-[260px] leading-relaxed">
+              Link your account to start tracking focus and unlock insights
+            </p>
+          </div>
+
+          {/* Link button with enhanced styling */}
           <button
             onClick={handleLinkAccount}
-            className="w-full py-3 bg-white text-black font-bold uppercase text-xs tracking-widest hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 group"
+            className="relative w-full py-4 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 bg-size-200 bg-pos-0 text-white font-bold rounded-lg uppercase text-xs tracking-widest transition-all duration-500 flex items-center justify-center gap-2 group shadow-xl shadow-blue-600/40 hover:shadow-blue-500/60 hover:bg-pos-100 hover:scale-[1.03] active:scale-[0.97] overflow-hidden"
           >
-            <Link2 className="w-3 h-3" />
-            Link Account
-            <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-700" />
+            <span className="relative flex items-center gap-2">
+              <Link2 className="w-4 h-4 group-hover:rotate-12 transition-transform duration-300" />
+              Link Account
+              <ExternalLink className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform duration-300" />
+            </span>
           </button>
-          <p className="text-[10px] text-gray-500 text-center">
-            You'll be redirected to sign in on the website
-          </p>
+
+          {/* Footer note with better styling */}
+          <div className="flex items-center gap-2.5 text-[10px] text-gray-500 text-center px-4">
+            <div className="w-1 h-1 bg-gray-600 rounded-full animate-pulse" />
+            <p className="font-medium">Secure authentication via Clerk</p>
+            <div className="w-1 h-1 bg-gray-600 rounded-full animate-pulse" />
+          </div>
         </div>
       )}
     </div>

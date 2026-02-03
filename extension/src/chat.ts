@@ -49,7 +49,7 @@ export class ChatService {
   constructor(chatId?: string, apiUrl?: string) {
     this.chatId = chatId || "default"
     this.client = new ApiClient({
-      baseUrl: `${apiUrl || SERVER_URL}/api`,
+      baseUrl: `${apiUrl || SERVER_URL}`,
       authProvider: extensionAuthProvider
     })
     this.baseService = new BaseChatService(this.client)

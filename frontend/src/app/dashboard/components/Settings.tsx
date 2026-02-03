@@ -41,10 +41,19 @@ export function Settings() {
     useEffect(() => {
         const loadSettings = async () => {
             try {
+                const token = await getToken();
+                console.log("Loading settings - Token available:", !!token);
+                
                 const service = await getSettingsService();
-                if (!service) return;
+                if (!service) {
+                    console.error("Settings service not available - no token");
+                    return;
+                }
 
+                console.log("Fetching settings from API...");
                 const settings = await service.getSettings();
+                console.log("Settings loaded successfully:", settings);
+                
                 if (settings.sustainedTime) setSustainedTime(settings.sustainedTime);
                 if (settings.idleThreshold) setIdleThreshold(settings.idleThreshold);
                 if (settings.wordsPerMinute) setWordsPerMinute(settings.wordsPerMinute);
@@ -58,15 +67,25 @@ export function Settings() {
                 if (settings.modelTopP !== undefined) setModelTopP(settings.modelTopP);
             } catch (error) {
                 console.error("Failed to load settings:", error);
+                if (error instanceof Error) {
+                    console.error("Error details:", error.message);
+                }
             }
         };
         loadSettings();
-    }, [getSettingsService]);
+    }, [getSettingsService, getToken]);
 
     const saveSettings = async () => {
         try {
+            const token = await getToken();
+            console.log("Token available:", !!token);
+            console.log("Token preview:", token?.substring(0, 20) + "...");
+            
             const service = await getSettingsService();
-            if (!service) return;
+            if (!service) {
+                console.error("Settings service not available - no token");
+                return;
+            }
 
             await service.saveSettings({
                 sustainedTime,
@@ -84,6 +103,8 @@ export function Settings() {
             showSaveMessage();
         } catch (error) {
             console.error("Failed to save settings:", error);
+            setSaveMessage("Error: " + (error as Error).message);
+            setTimeout(() => setSaveMessage(""), 3000);
         }
     };
 
