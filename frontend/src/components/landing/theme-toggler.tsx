@@ -58,16 +58,22 @@ export default function ThemeToggler() {
     return (
         <button
             onClick={TOGGLE_THEME}
-            className="p-2 rounded-lg border border-white/5 bg-secondary/50 backdrop-blur-sm hover:bg-white/10 transition-colors text-gray-400 hover:text-white"
+            className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 shadow-sm hover:shadow-md"
         >
             <div className="relative w-4 h-4">
                 <Sun
-                    className={theme === "dark" ? "scale-0 rotate-90 transition-all duration-300" : "scale-100 rotate-0 transition-all duration-300"}
+                    className={`absolute inset-0 text-amber-500 transition-all duration-200 ease-in-out ${
+                        theme === "dark" ? "scale-0 rotate-90 opacity-0" : "scale-100 rotate-0 opacity-100"
+                    }`}
                     size={16}
+                    style={{ transformOrigin: 'center' }}
                 />
                 <Moon
-                    className={theme === "dark" ? "absolute top-0 left-0 scale-100 rotate-0 transition-all duration-300" : "absolute top-0 left-0 scale-0 -rotate-90 transition-all duration-300"}
+                    className={`absolute inset-0 text-blue-500 transition-all duration-200 ease-in-out ${
+                        theme === "dark" ? "scale-100 rotate-0 opacity-100" : "scale-0 -rotate-90 opacity-0"
+                    }`}
                     size={16}
+                    style={{ transformOrigin: 'center' }}
                 />
             </div>
             <span className="sr-only">Toggle theme</span>

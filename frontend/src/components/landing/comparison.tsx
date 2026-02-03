@@ -113,22 +113,22 @@ const othersItems = [
 const productItems = [
     {
         icon: <Check size={16} />,
-        text: "On-Device Gemini Inference",
+        text: "Gemini Flash with Local LLM Option",
     },
     {
         icon: <Settings2 size={16} />,
-        text: "Zero-Knowledge Local Storage",
+        text: "Privacy-First Architecture",
     },
     {
         icon: <Zap size={16} />,
-        text: "Deterministic Concurrency",
+        text: "Comet Opik Observability",
     },
     {
         icon: <FileText size={16} />,
-        text: "Full Data Sovereignty",
+        text: "GDPR-Compliant Data Control",
     },
     {
         icon: <PenTool size={16} />,
-        text: "Passive Focus Guardianship",
+        text: "Non-Intrusive Focus Support",
     },
 ];

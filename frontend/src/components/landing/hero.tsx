@@ -69,7 +69,7 @@ export function Hero() {
                     <span className="font-semibold font-heading theme-gradient">
                         Kaizen:
                     </span>{" "}
-                    Semantic indexing of your focus. Powered by Gemini Nano. Private by design.
+                    Turn browser time into personal growth. AI-powered focus tracking that respects your privacy.
                 </motion.p>
             </motion.div>
 
@@ -115,7 +115,7 @@ export function Hero() {
                         <div className="w-20 aspect-square rounded-full border border-blue-500/20 bg-blue-500/10 flex justify-center items-center hover:scale-105 duration-200 transition-all ease-out cursor-pointer shadow-2xl">
                             <Play size={32} className="text-blue-500 fill-blue-500/20" />
                         </div>
-                        <p className="text-blue-500/40 font-mono text-[10px] uppercase tracking-[0.3em] font-bold">System Architecture</p>
+                        <p className="text-blue-500/40 font-mono text-[10px] uppercase tracking-[0.3em] font-bold">KAIZEN DEMO VIDEO</p>
                     </div>
                     {/* Background grid for the preview - matched to page grid */}
                     <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px]" />

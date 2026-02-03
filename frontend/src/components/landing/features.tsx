@@ -12,38 +12,38 @@ const iconSize = 18
 const FeaturesData: Feature[] = [
     {
         id: 1,
-        name: "Edge-Native Intelligence",
-        description: "Zero-knowledge inference. Gemini Nano runs locally in your browser kernel. Your data never leaves the silicon.",
+        name: "Privacy-First Architecture",
+        description: "Powered by Gemini Flash with optional local LLM. Your data never leaves your device. GDPR compliant from day one.",
         icon: <Shield size={iconSize} />,
     },
     {
         id: 2,
-        name: "Cognitive Telemetry",
-        description: "High-fidelity focus tracking with 3s granularity. Map the topography of your attention in real-time.",
+        name: "Intelligent Focus Tracking",
+        description: "Understand your attention patterns without disruption. No content blocking, no rigid timers—just smart insights.",
         icon: <Target size={iconSize} />,
     },
     {
         id: 3,
-        name: "Temporal Compression",
-        description: "Transform hours of deep research into actionable deltas. Auto-generated context for your past self.",
+        name: "AI-Powered Retention",
+        description: "Transform hours of browsing into actionable knowledge. Automated summaries that help you remember what matters.",
         icon: <Zap size={iconSize} />,
     },
     {
         id: 4,
-        name: "Multimodal Vision",
-        description: "Native image understanding and autonomous captioning. Context-aware perception for every pixel.",
+        name: "Multimodal Intelligence",
+        description: "Process text, images, and videos with context-aware AI. Capture insights from everything you engage with.",
         icon: <Eye size={iconSize} />,
     },
     {
         id: 5,
-        name: "Semantic Refinement",
-        description: "Real-time summarization and translation via native browser APIs. Precision editing at the edge.",
+        name: "Enterprise-Grade Observability",
+        description: "Built with Comet Opik for full traceability. Monitor AI behavior, evaluate outputs, and continuously improve quality.",
         icon: <PenTool size={iconSize} />,
     },
     {
         id: 6,
-        name: "Algorithmic Guardrails",
-        description: "Detect doom-scrolling before it drains your flow. Passive behavior analysis for active humans.",
+        name: "Built for Real Humans",
+        description: "Designed by CS students who understand ADHD. Supports focus and retention without forcing rigid workflows.",
         icon: <ShieldAlert size={iconSize} />,
     },
 ]
@@ -51,17 +51,17 @@ const FeaturesData: Feature[] = [
 const FeaturesGrid = () => {
     return (
         <div>
-            <div className="mt-8 grid w-full grid-cols-2 gap-12 md:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-8 grid w-full grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
                 {FeaturesData.map((feature) => {
                     return (
                         <div key={feature.id} className="width-fit text-left group">
-                            <div className="mb-2 w-fit rounded-lg bg-blue-600 p-1.5 text-center text-white transition-transform group-hover:scale-110 shadow-lg shadow-blue-500/20">
+                            <div className="mb-3 w-fit rounded-lg bg-blue-600 p-1.5 text-center text-white transition-transform group-hover:scale-110 shadow-lg shadow-blue-500/20">
                                 {feature.icon}
                             </div>
-                            <div className="text-md mb-1 font-bold font-heading text-foreground group-hover:text-blue-500 transition-colors">
+                            <div className="text-base mb-2 font-bold font-heading text-foreground group-hover:text-blue-500 transition-colors">
                                 {feature.name}
                             </div>
-                            <div className="font-regular max-w-sm text-xs text-muted-foreground leading-relaxed group-hover:text-foreground transition-colors">
+                            <div className="font-regular max-w-sm text-sm text-muted-foreground leading-relaxed group-hover:text-foreground transition-colors">
                                 {feature.description}
                             </div>
                         </div>

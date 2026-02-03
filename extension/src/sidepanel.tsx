@@ -8,6 +8,7 @@ import {
   // HelpCircle,
   LayoutDashboard,
   Lightbulb,
+  Link2Off,
   LogOut,
   Pause,
   Play,
@@ -770,53 +771,125 @@ const Popup = () => {
   // Show device not linked page if user is not authenticated
   if (isDeviceLinked === false) {
     return (
-      <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 p-8">
-        <div className="max-w-md w-full">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 p-8 text-center">
-            {/* Logo */}
+      <div className="h-screen w-full bg-white relative overflow-hidden">
+        {/* Enhanced background with subtle animation */}
+        <div
+          className="absolute inset-0 z-0"
+          style={{
+            backgroundImage: `
+              radial-gradient(125% 125% at 50% 90%, #ffffff 50%, #10b981 100%)
+            `,
+            backgroundSize: "100% 100%",
+            filter: "hue-rotate(60deg)"
+          }}
+        />
+        
+        {/* Subtle decorative elements */}
+        <div className="absolute top-20 right-10 w-64 h-64 bg-emerald-200/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-20 left-10 w-80 h-80 bg-blue-200/10 rounded-full blur-3xl" />
+
+        <div className="relative z-10 flex items-center justify-center h-full px-4 py-6">
+          <div className="max-w-md w-full">
+            {/* Logo - more compact */}
             <div className="flex justify-center mb-6">
-              <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center">
-                <LogOut className="w-8 h-8 text-white" />
+              <img
+                src={chrome.runtime.getURL("assets/logo_NPxx.png")}
+                className="w-20 bg-transparent opacity-90"
+                alt="Kaizen"
+              />
+            </div>
+
+            {/* Main card with enhanced styling */}
+            <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-2xl rounded-3xl border border-white/80 dark:border-slate-600/80 shadow-2xl overflow-hidden">
+              {/* Header section with gradient and icon */}
+              <div className="relative bg-gradient-to-br from-amber-50/90 via-orange-50/90 to-red-50/90 dark:from-amber-900/30 dark:via-orange-900/30 dark:to-red-900/30 px-6 py-6 text-center">
+                {/* Decorative gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/20 to-transparent" />
+                
+                <div className="relative">
+                  <div className="flex justify-center mb-3">
+                    <div className="relative">
+                      {/* Glow effect */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-amber-400 to-red-500 rounded-2xl blur-xl opacity-40" />
+                      {/* Icon container */}
+                      <div className="relative w-16 h-16 bg-gradient-to-br from-amber-500 via-orange-500 to-red-500 rounded-2xl flex items-center justify-center shadow-xl">
+                        <Link2Off className="w-8 h-8 text-white" strokeWidth={2.5} />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
+                    Device Not Linked
+                  </h2>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    Your device needs to be reconnected
+                  </p>
+                </div>
+              </div>
+
+              {/* Content section */}
+              <div className="px-6 py-5">
+                <p className="text-xs text-gray-700 dark:text-gray-300 mb-4 text-center leading-relaxed">
+                  This device has been unlinked from your Kaizen account. Follow these steps to reconnect:
+                </p>
+
+                {/* Instructions with enhanced styling */}
+                <div className="space-y-2.5 mb-4">
+                  <div className="flex items-start gap-3 p-3 bg-gradient-to-br from-white/80 to-white/60 dark:from-slate-700/60 dark:to-slate-700/40 rounded-xl border border-gray-200/60 dark:border-slate-600/60 shadow-sm">
+                    <div className="flex-shrink-0 w-6 h-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center text-xs font-bold text-white shadow-md">
+                      1
+                    </div>
+                    <p className="text-xs font-medium text-gray-800 dark:text-gray-200 pt-0.5">
+                      Close this sidepanel
+                    </p>
+                  </div>
+                  
+                  <div className="flex items-start gap-3 p-3 bg-gradient-to-br from-white/80 to-white/60 dark:from-slate-700/60 dark:to-slate-700/40 rounded-xl border border-gray-200/60 dark:border-slate-600/60 shadow-sm">
+                    <div className="flex-shrink-0 w-6 h-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center text-xs font-bold text-white shadow-md">
+                      2
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-800 dark:text-gray-200">
+                        Click the Kaizen extension icon
+                      </p>
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                        Look for it in your browser toolbar
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3 p-3 bg-gradient-to-br from-white/80 to-white/60 dark:from-slate-700/60 dark:to-slate-700/40 rounded-xl border border-gray-200/60 dark:border-slate-600/60 shadow-sm">
+                    <div className="flex-shrink-0 w-6 h-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center text-xs font-bold text-white shadow-md">
+                      3
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-800 dark:text-gray-200">
+                        Complete the linking process
+                      </p>
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                        Follow the on-screen instructions
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Reassurance footer with icon */}
+                <div className="relative bg-gradient-to-br from-emerald-50/80 to-teal-50/80 dark:from-emerald-900/30 dark:to-teal-900/30 border border-emerald-200/60 dark:border-emerald-800/40 rounded-xl px-4 py-3 shadow-sm">
+                  <div className="flex items-start gap-2.5">
+                    <div className="flex-shrink-0 w-4 h-4 bg-emerald-500/20 dark:bg-emerald-500/30 rounded-lg flex items-center justify-center mt-0.5">
+                      <span className="text-xs">💡</span>
+                    </div>
+                    <p className="text-[10px] text-emerald-800 dark:text-emerald-200 leading-relaxed">
+                      Your focus data is safe and will automatically sync once you reconnect
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Title */}
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
-              Device Not Linked
-            </h1>
-
-            {/* Description */}
-            <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
-              This device has been unlinked from your Kaizen account. Please close this sidepanel and link your device again from the extension popup.
-            </p>
-
-            {/* Divider */}
-            <div className="border-t border-gray-200 dark:border-slate-700 my-6"></div>
-
-            {/* Instructions */}
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
-              <p className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-2">
-                To relink your device:
-              </p>
-              <ol className="text-sm text-blue-800 dark:text-blue-300 text-left space-y-2">
-                <li className="flex items-start gap-2">
-                  <span className="font-bold min-w-[20px]">1.</span>
-                  <span>Close this sidepanel</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="font-bold min-w-[20px]">2.</span>
-                  <span>Click the Kaizen extension icon in your browser toolbar</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="font-bold min-w-[20px]">3.</span>
-                  <span>Follow the instructions to link your account</span>
-                </li>
-              </ol>
-            </div>
-
-            {/* Close button hint */}
-            <p className="text-xs text-gray-500 dark:text-gray-400 italic">
-              You can now safely close this sidepanel
+            {/* Bottom hint with better styling */}
+            <p className="text-center text-[10px] text-gray-600/80 dark:text-gray-400/80 mt-4 px-4">
+              Need assistance? Visit your extension popup for help
             </p>
           </div>
         </div>
