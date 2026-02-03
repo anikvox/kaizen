@@ -1,10 +1,15 @@
 import { useEffect, useState, useCallback } from "react"
-import { SERVER_URL } from "./default-settings"
 import { ExternalLink, Loader2, Link2, LogOut, User } from "lucide-react"
+import {
+  ApiClient,
+  DeviceTokenService,
+  createAuthProvider
+} from "@kaizen/api"
 
 import "./style.css"
 
 const DASHBOARD_URL = process.env.PLASMO_PUBLIC_DASHBOARD_URL?.replace('/dashboard', '') || 'http://localhost:60091'
+const API_BASE_URL = process.env.PLASMO_PUBLIC_SERVER_URL || "http://localhost:60092"
 const INSTALLATION_ID_KEY = "kaizen_installation_id"
 const DEVICE_TOKEN_KEY = "kaizen_device_token"
 const USER_DATA_KEY = "kaizen_user_data"
@@ -14,6 +19,24 @@ interface UserData {
   name: string | null
   image: string | null
 }
+
+// Auth provider for authenticated requests (device token)
+const extensionAuthProvider = createAuthProvider(async () => {
+  try {
+    const result = await chrome.storage.local.get(DEVICE_TOKEN_KEY)
+    return result[DEVICE_TOKEN_KEY] || null
+  } catch {
+    return null
+  }
+})
+
+// API client for device token operations
+const apiClient = new ApiClient({
+  baseUrl: `${API_BASE_URL}/api`,
+  authProvider: extensionAuthProvider
+})
+
+const deviceTokenService = new DeviceTokenService(apiClient)
 
 // Generate a unique installation ID for this extension install
 async function getOrCreateInstallationId(): Promise<string> {
@@ -35,11 +58,16 @@ async function checkDeviceStatus(installationId: string): Promise<{
   user: UserData | null
 }> {
   try {
-    const response = await fetch(`${SERVER_URL}/device-tokens/status/${installationId}`)
-    if (!response.ok) {
-      throw new Error("Failed to check status")
+    const status = await deviceTokenService.getStatus(installationId)
+    return {
+      linked: status.linked,
+      token: status.token || null,
+      user: status.user ? {
+        email: status.user.email,
+        name: status.user.name,
+        image: status.user.image || null
+      } : null
     }
-    return await response.json()
   } catch (error) {
     console.error("Error checking device status:", error)
     return { linked: false, token: null, user: null }
@@ -149,16 +177,9 @@ function IndexPopup() {
       const cached = await chrome.storage.local.get(DEVICE_TOKEN_KEY)
       const token = cached[DEVICE_TOKEN_KEY]
 
-      if (token && installationId) {
-        // Call server to delete the device token
-        await fetch(`${SERVER_URL}/device-tokens/unlink`, {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
-          body: JSON.stringify({ installationId }),
-        })
+      if (token) {
+        // Call server to delete the device token (server identifies device by token)
+        await deviceTokenService.unlink()
       }
     } catch (error) {
       console.error("Error unlinking from server:", error)
@@ -167,6 +188,7 @@ function IndexPopup() {
     // Always clear local storage regardless of server response
     await chrome.storage.local.remove([DEVICE_TOKEN_KEY, USER_DATA_KEY])
     chrome.runtime.sendMessage({ type: "CLEAR_AUTH_TOKEN" })
+    chrome.runtime.sendMessage({ type: "AUTH_STATE_CHANGED", isAuthenticated: false })
     setIsLinked(false)
     setUser(null)
   }

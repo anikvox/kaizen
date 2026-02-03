@@ -1,4 +1,4 @@
-import { cn } from "~sidepanel-lib/utils";
+import { cn } from "@kaizen/ui";
 
 // Chrome extension API types
 declare const chrome: {

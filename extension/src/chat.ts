@@ -1,73 +1,75 @@
-// Chat service for handling AI conversations with kaizen backend
+/**
+ * Chat service for handling AI conversations with kaizen backend.
+ *
+ * This is a backward-compatible wrapper around @kaizen/api ChatService
+ * that maintains the stateful chat ID pattern used by the extension.
+ */
 
-import { Storage } from "@plasmohq/storage"
+import {
+  ApiClient,
+  ChatService as BaseChatService,
+  createAuthProvider,
+  type ChatMessage,
+  type ChatSession,
+  type ChatResponse
+} from "@kaizen/api"
 
-export type ChatResponse = {
-  text: string
-  done: boolean
-}
+// Re-export API types with distinct names to avoid conflicts with local db types
+export type { ChatSession, ChatResponse }
+export type { ChatMessage as ApiChatMessage } from "@kaizen/api"
 
-export type ChatMessage = {
-  id: string
-  role: "user" | "assistant"
-  content: string
-  createdAt: string
-  metadata?: {
-    hasImage?: boolean
-    hasAudio?: boolean
-    imageFileName?: string
-    audioFileName?: string
-    imagePreview?: string
-  }
-}
-
-export type ChatSession = {
-  id: string
-  title: string
-  updatedAt: string
-  messages?: ChatMessage[]
-}
-
-const storage = new Storage({ area: "local" })
 const DEVICE_TOKEN_KEY = "kaizen_device_token"
 const SERVER_URL = process.env.PLASMO_PUBLIC_SERVER_URL || "http://localhost:60092"
 
+/**
+ * Auth provider that retrieves device token from Chrome storage.
+ */
+const extensionAuthProvider = createAuthProvider(async () => {
+  try {
+    if (typeof chrome !== "undefined" && chrome.storage?.local) {
+      const result = await chrome.storage.local.get(DEVICE_TOKEN_KEY)
+      return result[DEVICE_TOKEN_KEY] || null
+    }
+    return null
+  } catch (error) {
+    console.error("Failed to get device token:", error)
+    return null
+  }
+})
+
+/**
+ * Extension ChatService that wraps the shared @kaizen/api ChatService
+ * with stateful session management.
+ */
 export class ChatService {
-  private apiUrl: string
   private chatId: string
-  private contextWindowMs: number = 30 * 60 * 1000 // 30 minutes default
+  private baseService: BaseChatService
+  private client: ApiClient
 
   constructor(chatId?: string, apiUrl?: string) {
     this.chatId = chatId || "default"
-    this.apiUrl = apiUrl || `${SERVER_URL}`
+    this.client = new ApiClient({
+      baseUrl: `${apiUrl || SERVER_URL}/api`,
+      authProvider: extensionAuthProvider
+    })
+    this.baseService = new BaseChatService(this.client)
   }
 
-  setContextWindowMs(ms: number) {
-    this.contextWindowMs = ms
+  /**
+   * Set context window (no-op for backward compatibility)
+   * @deprecated Context window is now handled by the server
+   */
+  setContextWindowMs(_ms: number) {
+    // No-op - context window is handled by the server
   }
 
-  // Get authorization token from storage
-  private async getAuthToken(): Promise<string | null> {
-    try {
-      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-        const result = await chrome.storage.local.get(DEVICE_TOKEN_KEY)
-        return result[DEVICE_TOKEN_KEY] || null
-      }
-      // Fallback for Plasmo storage
-      const deviceToken = await storage.get(DEVICE_TOKEN_KEY)
-      return deviceToken
-    } catch (error) {
-      console.error("Failed to get device token:", error)
-      return null
-    }
-  }
-
-  // Get current session info (for compatibility with sidepanel usage tracking)
+  /**
+   * Get current session info (for compatibility with sidepanel usage tracking)
+   */
   async getSession() {
     try {
       const sessions = await this.getSessions()
       if (sessions.length > 0) {
-        // Mock usage info for now as backend doesn't provide it yet
         return {
           ...sessions[0],
           inputUsage: 0,
@@ -75,85 +77,51 @@ export class ChatService {
         }
       }
       return null
-    } catch (error) {
+    } catch {
       return null
     }
   }
 
-  // Get all chat sessions for user
+  /**
+   * Get all chat sessions for user
+   */
   async getSessions(): Promise<ChatSession[]> {
-    try {
-      const token = await this.getAuthToken()
-      if (!token) return []
-
-      const response = await fetch(`${this.apiUrl}/chat/sessions`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      if (!response.ok) throw new Error("Failed to fetch sessions")
-      return response.json()
-    } catch (error) {
-      console.error("Get sessions error:", error)
-      return []
-    }
+    return this.baseService.getSessions()
   }
 
-  // Create a new session
+  /**
+   * Create a new session
+   */
   async createSession(title?: string): Promise<ChatSession | null> {
     try {
-      const token = await this.getAuthToken()
-      if (!token) return null
-
-      const response = await fetch(`${this.apiUrl}/chat/sessions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ title: title || "New Extension Chat" })
-      })
-
-      if (!response.ok) throw new Error("Failed to create session")
-      return response.json()
+      return await this.baseService.createSession(title || "New Extension Chat")
     } catch (error) {
       console.error("Create session error:", error)
       return null
     }
   }
 
-  // Get messages for a session
+  /**
+   * Get messages for a session
+   */
   async getMessages(sessionId?: string): Promise<ChatMessage[]> {
-    try {
-      const id = sessionId || this.chatId
-      if (id === "default") return []
-
-      const token = await this.getAuthToken()
-      if (!token) return []
-
-      const response = await fetch(`${this.apiUrl}/chat/sessions/${id}/messages`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      if (!response.ok) throw new Error("Failed to fetch messages")
-      return response.json()
-    } catch (error) {
-      console.error("Get messages error:", error)
-      return []
-    }
+    const id = sessionId || this.chatId
+    if (id === "default") return []
+    return this.baseService.getMessages(id)
   }
 
-  // Stream AI response
+  /**
+   * Stream AI response using the stored chatId.
+   * Yields ChatResponse objects with accumulated text.
+   */
   async *streamResponse(
-    prompt: string, 
+    prompt: string,
     context?: string,
     image?: File,
     audio?: File
   ): AsyncGenerator<ChatResponse, void, unknown> {
-    const token = await this.getAuthToken()
+    // Check auth first
+    const token = await this.client.getToken()
     if (!token) {
       yield {
         text: "Error: Not authenticated. Please link your device first.",
@@ -171,98 +139,26 @@ export class ChatService {
     }
 
     try {
-      // Use FormData if files are present, otherwise JSON
-      let body: FormData | string
-      let headers: Record<string, string> = {
-        "Authorization": `Bearer ${token}`
-      }
-
-      if (image || audio) {
-        const formData = new FormData()
-        formData.append('content', prompt)
-        if (context) formData.append('context', context)
-        if (image) formData.append('image', image)
-        if (audio) formData.append('audio', audio)
-        body = formData
-        // Don't set Content-Type for FormData - browser will set it with boundary
-      } else {
-        headers["Content-Type"] = "application/json"
-        body = JSON.stringify({
-          content: prompt,
-          context: context
-        })
-      }
-
-      const response = await fetch(`${this.apiUrl}/chat/sessions/${this.chatId}/messages`, {
-        method: "POST",
-        headers,
-        body
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        yield {
-          text: `Error: ${errorData.error || "Failed to get response"}`,
-          done: true
-        }
-        return
-      }
-
-      const reader = response.body?.getReader()
-      if (!reader) {
-        yield {
-          text: "Error: No response body",
-          done: true
-        }
-        return
-      }
-
-      const decoder = new TextDecoder()
       let fullText = ""
 
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
+      for await (const chunk of this.baseService.sendMessageStreaming(
+        this.chatId,
+        prompt,
+        { context, image, audio }
+      )) {
+        if (chunk.error) {
+          yield { text: `Error: ${chunk.error}`, done: true }
+          return
+        }
 
-        const chunk = decoder.decode(value, { stream: true })
-        const lines = chunk.split("\n")
+        if (chunk.chunk) {
+          fullText += chunk.chunk
+          yield { text: fullText, done: false }
+        }
 
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const dataStr = line.substring(6).trim()
-            if (!dataStr) continue
-
-            let data
-            try {
-              data = JSON.parse(dataStr)
-            } catch (e) {
-              continue
-            }
-
-            if (data.error) {
-              yield {
-                text: `Error: ${data.error}`,
-                done: true
-              }
-              return
-            }
-
-            if (data.chunk) {
-              fullText += data.chunk
-              yield {
-                text: fullText,
-                done: false
-              }
-            }
-
-            if (data.done) {
-              yield {
-                text: fullText,
-                done: true
-              }
-              return
-            }
-          }
+        if (chunk.done) {
+          yield { text: fullText, done: true }
+          return
         }
       }
     } catch (error) {
@@ -274,7 +170,9 @@ export class ChatService {
     }
   }
 
-  // Send a single message and get complete response
+  /**
+   * Send a single message and get complete response
+   */
   async sendMessage(prompt: string, context?: string): Promise<string> {
     let fullResponse = ""
 
@@ -287,5 +185,5 @@ export class ChatService {
   }
 }
 
-// Export singleton instance
+// Export singleton instance for simple usage
 export const chatService = new ChatService()

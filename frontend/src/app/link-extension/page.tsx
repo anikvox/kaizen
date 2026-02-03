@@ -1,17 +1,26 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { useSearchParams } from "next/navigation";
 import { Check, X, Loader2, Link2, Chrome, Shield } from "lucide-react";
 import Link from "next/link";
+import {
+  ApiClient,
+  DeviceTokenService,
+  createStaticAuthProvider
+} from "@kaizen/api";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
+  ? `${process.env.NEXT_PUBLIC_API_URL}/api`
+  : "http://localhost:60092/api";
 
 export default function LinkExtensionPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
   const searchParams = useSearchParams();
   const installationId = searchParams.get("installationId");
-  
+
   const [status, setStatus] = useState<"loading" | "ready" | "linking" | "success" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState<string>("");
 
@@ -32,33 +41,30 @@ export default function LinkExtensionPage() {
     }
   }, [isLoaded, isSignedIn, installationId]);
 
-  const handleLink = async () => {
+  const handleLink = useCallback(async () => {
     if (!installationId) return;
-    
+
     setStatus("linking");
     try {
       const token = await getToken();
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:60092";
-      
-      const response = await fetch(`${apiUrl}/api/device-tokens/link`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          installationId,
-          deviceName: `Chrome Extension - ${new Date().toLocaleDateString()}`,
-          userEmail: user?.primaryEmailAddress?.emailAddress,
-          userName: user?.fullName || user?.firstName,
-          userImage: user?.imageUrl,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to link extension");
+      if (!token) {
+        throw new Error("Failed to get authentication token");
       }
+
+      // Create API client with Clerk JWT token
+      const apiClient = new ApiClient({
+        baseUrl: API_BASE_URL,
+        authProvider: createStaticAuthProvider(token)
+      });
+      const deviceTokenService = new DeviceTokenService(apiClient);
+
+      await deviceTokenService.link({
+        installationId,
+        deviceName: `Chrome Extension - ${new Date().toLocaleDateString()}`,
+        userEmail: user?.primaryEmailAddress?.emailAddress || "",
+        userName: user?.fullName || user?.firstName || "",
+        userImage: user?.imageUrl
+      });
 
       setStatus("success");
     } catch (error) {
@@ -66,7 +72,7 @@ export default function LinkExtensionPage() {
       setStatus("error");
       setErrorMessage(error instanceof Error ? error.message : "Failed to link extension");
     }
-  };
+  }, [installationId, getToken, user]);
 
   if (!isLoaded || status === "loading") {
     return (

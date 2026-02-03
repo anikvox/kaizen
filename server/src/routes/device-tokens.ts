@@ -133,12 +133,41 @@ router.get("/status/:installationId", async (req, res) => {
   }
 });
 
-// DELETE /device-tokens/unlink - Unlink extension from current user
-// Called from website or extension when user wants to unlink
-router.delete("/unlink", requireAuth, async (req: AuthRequest, res: Response) => {
+// POST /device-tokens/unlink - Unlink extension from current user
+// Called from extension when user wants to unlink
+// When authenticated with device token, deletes that specific device
+// When authenticated with Clerk JWT, requires installationId in body
+router.post("/unlink", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    const { installationId } = req.body;
     const userId = req.auth!.userId;
+    const authType = req.auth!.authType;
+
+    // If authenticated via device token, find and delete by that token
+    if (authType === "device") {
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.split(" ")[1];
+
+      if (!token) {
+        return res.status(400).json({ error: "No token provided" });
+      }
+
+      const deviceToken = await prisma.deviceToken.findUnique({
+        where: { token },
+      });
+
+      if (!deviceToken) {
+        return res.status(404).json({ error: "Device not found" });
+      }
+
+      await prisma.deviceToken.delete({
+        where: { token },
+      });
+
+      return res.json({ success: true, message: "Extension unlinked successfully" });
+    }
+
+    // If authenticated via Clerk JWT (website), require installationId
+    const { installationId } = req.body;
 
     if (!installationId) {
       return res.status(400).json({ error: "installationId is required" });

@@ -1,67 +1,43 @@
-// AI utilities for dashboard
+/**
+ * Dashboard AI Service
+ *
+ * Uses the shared @kaizen/api with Clerk JWT authentication.
+ */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL 
-    ? `${process.env.NEXT_PUBLIC_API_URL}/api`
-    : "http://localhost:60092/api";
+import {
+  ApiClient,
+  AIService as BaseAIService,
+  createStaticAuthProvider
+} from "@kaizen/api"
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
+  ? `${process.env.NEXT_PUBLIC_API_URL}/api`
+  : "http://localhost:60092/api"
+
+/**
+ * AI Service for the dashboard.
+ * Uses Clerk JWT token for authentication.
+ */
 export class AIService {
-    private token: string;
+  private service: BaseAIService
 
-    constructor(token: string) {
-        this.token = token;
-    }
+  constructor(token: string) {
+    const client = new ApiClient({
+      baseUrl: API_BASE_URL,
+      authProvider: createStaticAuthProvider(token)
+    })
+    this.service = new BaseAIService(client)
+  }
 
-    async write(prompt: string): Promise<string> {
-        const response = await fetch(`${API_BASE_URL}/ai/write`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${this.token}`,
-            },
-            body: JSON.stringify({ prompt }),
-        });
+  async write(prompt: string): Promise<string> {
+    return this.service.write(prompt)
+  }
 
-        if (!response.ok) {
-            throw new Error("Failed to generate text");
-        }
+  async rewrite(text: string, context?: string): Promise<string> {
+    return this.service.rewrite(text, context)
+  }
 
-        const data = await response.json();
-        return data.text;
-    }
-
-    async rewrite(text: string, context?: string): Promise<string> {
-        const response = await fetch(`${API_BASE_URL}/ai/rewrite`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${this.token}`,
-            },
-            body: JSON.stringify({ text, context }),
-        });
-
-        if (!response.ok) {
-            throw new Error("Failed to rewrite text");
-        }
-
-        const data = await response.json();
-        return data.text;
-    }
-
-    async summarize(text: string): Promise<string> {
-        const response = await fetch(`${API_BASE_URL}/ai/summarize`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${this.token}`,
-            },
-            body: JSON.stringify({ text }),
-        });
-
-        if (!response.ok) {
-            throw new Error("Failed to summarize text");
-        }
-
-        const data = await response.json();
-        return data.text;
-    }
+  async summarize(text: string): Promise<string> {
+    return this.service.summarize(text)
+  }
 }

@@ -18,9 +18,14 @@ import {
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 
 import { Storage } from "@plasmohq/storage"
+import {
+  ApiClient,
+  DeviceTokenService,
+  createAuthProvider
+} from "@kaizen/api"
 
 import db, { type Focus, type PomodoroState } from "~db"
-import { INTENT_QUEUE_NOTIFY, SERVER_URL } from "~default-settings"
+import { INTENT_QUEUE_NOTIFY } from "~default-settings"
 
 import { parseFocus, type FocusWithParsedData } from "./sidepanel-api/focus"
 import { getPomodoroState, togglePomodoro } from "./sidepanel-api/pomodoro"
@@ -45,6 +50,25 @@ const storage = new Storage()
 const DEVICE_TOKEN_KEY = "kaizen_device_token"
 const USER_DATA_KEY = "kaizen_user_data"
 const INSTALLATION_ID_KEY = "kaizen_installation_id"
+const API_BASE_URL = process.env.PLASMO_PUBLIC_SERVER_URL || "http://localhost:60092"
+
+// Auth provider for authenticated requests (device token)
+const extensionAuthProvider = createAuthProvider(async () => {
+  try {
+    const result = await chrome.storage.local.get(DEVICE_TOKEN_KEY)
+    return result[DEVICE_TOKEN_KEY] || null
+  } catch {
+    return null
+  }
+})
+
+// API client for device token operations
+const apiClient = new ApiClient({
+  baseUrl: `${API_BASE_URL}/api`,
+  authProvider: extensionAuthProvider
+})
+
+const deviceTokenService = new DeviceTokenService(apiClient)
 
 // Frontend dashboard URL (separate from backend API)
 const DASHBOARD_URL = process.env.PLASMO_PUBLIC_DASHBOARD_URL || "http://localhost:60091/dashboard"
@@ -326,21 +350,13 @@ const Popup = () => {
     }
 
     try {
-      // Get the current device token and installation ID
-      const cached = await chrome.storage.local.get([DEVICE_TOKEN_KEY, INSTALLATION_ID_KEY])
+      // Get the current device token
+      const cached = await chrome.storage.local.get([DEVICE_TOKEN_KEY])
       const token = cached[DEVICE_TOKEN_KEY]
-      const installationId = cached[INSTALLATION_ID_KEY]
 
-      if (token && installationId) {
+      if (token) {
         // Call server to delete the device token
-        await fetch(`${SERVER_URL}/device-tokens/unlink`, {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
-          body: JSON.stringify({ installationId }),
-        })
+        await deviceTokenService.unlink()
       }
     } catch (error) {
       console.error("Error revoking device token:", error)
@@ -349,9 +365,10 @@ const Popup = () => {
     // Always clear local storage regardless of server response
     await chrome.storage.local.remove([DEVICE_TOKEN_KEY, USER_DATA_KEY])
     chrome.runtime.sendMessage({ type: "CLEAR_AUTH_TOKEN" })
+    chrome.runtime.sendMessage({ type: "AUTH_STATE_CHANGED", isAuthenticated: false })
 
-    // Update state to show device not linked page
-    setIsDeviceLinked(false)
+    // Close the sidepanel
+    window.close()
   }, [])
 
   const renderFocusTab = () => {

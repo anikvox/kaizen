@@ -4,11 +4,17 @@ import { useEffect, useMemo, useState } from "react"
 import type { Intent } from "~background/messages/intent"
 import { CODE_TO_LANGUAGE } from "~background/messages/intent"
 import db, { type ProcessedIntent } from "~db"
-import { SERVER_URL } from "~default-settings"
+import {
+  ApiClient,
+  AIService,
+  createAuthProvider
+} from "@kaizen/api"
 
 const DEVICE_TOKEN_KEY = "kaizen_device_token"
+const API_BASE_URL = process.env.PLASMO_PUBLIC_SERVER_URL || "http://localhost:60092"
 
-const getAuthToken = async (): Promise<string | null> => {
+// Create auth provider and AI service
+const extensionAuthProvider = createAuthProvider(async () => {
   try {
     const result = await chrome.storage.local.get(DEVICE_TOKEN_KEY)
     return result[DEVICE_TOKEN_KEY] || null
@@ -16,7 +22,14 @@ const getAuthToken = async (): Promise<string | null> => {
     console.error("Error getting device token:", error)
     return null
   }
-}
+})
+
+const apiClient = new ApiClient({
+  baseUrl: `${API_BASE_URL}/api`,
+  authProvider: extensionAuthProvider
+})
+
+const aiService = new AIService(apiClient)
 
 const getIntentIcon = (type: string) => {
   switch (type) {
@@ -40,29 +53,11 @@ const processProofread = async (
   onChunk?: (chunk: string) => void
 ): Promise<string> => {
   try {
-    const token = await getAuthToken()
-    if (!token) {
-      throw new Error("Not authenticated")
-    }
-
-    const response = await fetch(`${SERVER_URL}/ai/write`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify({ prompt: `Proofread and correct any errors in this text: ${text}` })
-    })
-
-    if (!response.ok) {
-      throw new Error(`Server error: ${response.statusText}`)
-    }
-
-    const data = await response.json()
+    const result = await aiService.write(`Proofread and correct any errors in this text: ${text}`)
     if (onChunk) {
-      onChunk(data.text)
+      onChunk(result)
     }
-    return data.text
+    return result
   } catch (error) {
     console.error("Error in processProofread:", error)
     throw new Error(
@@ -77,32 +72,14 @@ const processTranslate = async (
   onChunk?: (chunk: string) => void
 ): Promise<string> => {
   try {
-    const token = await getAuthToken()
-    if (!token) {
-      throw new Error("Not authenticated")
-    }
-
     const targetLanguage = CODE_TO_LANGUAGE[language]
-    const prompt = `Translate the following text to ${targetLanguage}. Only provide the translation, no explanations:\n\n${text}`
-
-    const response = await fetch(`${SERVER_URL}/ai/prompt`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify({ prompt })
-    })
-
-    if (!response.ok) {
-      throw new Error(`Server error: ${response.statusText}`)
-    }
-
-    const data = await response.json()
+    const result = await aiService.prompt(
+      `Translate the following text to ${targetLanguage}. Only provide the translation, no explanations:\n\n${text}`
+    )
     if (onChunk) {
-      onChunk(data.text)
+      onChunk(result)
     }
-    return data.text
+    return result
   } catch (error) {
     console.error("Error in processTranslate:", error)
     throw new Error(
@@ -116,29 +93,11 @@ const processRephrase = async (
   onChunk?: (chunk: string) => void
 ): Promise<string> => {
   try {
-    const token = await getAuthToken()
-    if (!token) {
-      throw new Error("Not authenticated")
-    }
-
-    const response = await fetch(`${SERVER_URL}/ai/rewrite`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify({ text })
-    })
-
-    if (!response.ok) {
-      throw new Error(`Server error: ${response.statusText}`)
-    }
-
-    const data = await response.json()
+    const result = await aiService.rewrite(text)
     if (onChunk) {
-      onChunk(data.text)
+      onChunk(result)
     }
-    return data.text
+    return result
   } catch (error) {
     console.error("Error in processRephrase:", error)
     throw new Error(
@@ -152,29 +111,11 @@ const processSummarize = async (
   onChunk?: (chunk: string) => void
 ): Promise<string> => {
   try {
-    const token = await getAuthToken()
-    if (!token) {
-      throw new Error("Not authenticated")
-    }
-
-    const response = await fetch(`${SERVER_URL}/ai/summarize`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify({ text })
-    })
-
-    if (!response.ok) {
-      throw new Error(`Server error: ${response.statusText}`)
-    }
-
-    const data = await response.json()
+    const result = await aiService.summarize(text)
     if (onChunk) {
-      onChunk(data.text)
+      onChunk(result)
     }
-    return data.text
+    return result
   } catch (error) {
     console.error("Error in processSummarize:", error)
     throw new Error(

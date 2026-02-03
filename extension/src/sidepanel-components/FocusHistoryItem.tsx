@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
-import { formatDuration } from '../utils/time';
-import { getOpacityForIndex } from '../utils/opacity';
+import { formatDuration } from '~sidepanel-utils/time';
+import { getOpacityForIndex } from '~sidepanel-utils/opacity';
 import type { FocusWithParsedData } from '~sidepanel/api/focus';
 
 interface FocusHistoryItemProps {

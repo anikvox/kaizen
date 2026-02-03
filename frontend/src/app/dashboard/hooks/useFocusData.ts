@@ -25,8 +25,7 @@ export function useFocusData(): UseFocusDataReturn {
                 keywords: ["bitcoin", "design", "crypto"],
                 time_spent: [{ start: Date.now() - 3600000, end: null }],
                 last_updated: Date.now(),
-                duration: 3600000,
-                total_time_spent: 3600000
+                duration: 3600000
             },
             {
                 id: 2,
@@ -35,8 +34,7 @@ export function useFocusData(): UseFocusDataReturn {
                 keywords: ["math", "calculus"],
                 time_spent: [{ start: Date.now() - 7200000, end: Date.now() - 5400000 }],
                 last_updated: Date.now() - 5400000,
-                duration: 1800000,
-                total_time_spent: 1800000
+                duration: 1800000
             }
         ];
 

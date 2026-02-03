@@ -38,7 +38,7 @@ export const FOCUS_INACTIVITY_THRESHOLD = {
   defaultValue: 5 * 60 * 1000
 }
 
-export const SERVER_URL = process.env.PLASMO_PUBLIC_SERVER_URL || "http://localhost:60092/api"
+export const SERVER_URL = process.env.PLASMO_PUBLIC_SERVER_URL || "http://localhost:60092"
 
 export const INTENT_QUEUE_NOTIFY = {
   key: "setting-intent-queue-notify",

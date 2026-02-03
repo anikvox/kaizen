@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import type { FocusWithParsedData } from 'neuropilot-api';
-import { formatTime } from '../utils/time';
+import { formatTime } from '~sidepanel-utils/time';
 
 interface CurrentFocusSectionProps {
   focusData: FocusWithParsedData | null;

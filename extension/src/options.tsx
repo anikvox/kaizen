@@ -1,10 +1,15 @@
 import { useEffect, useState, useCallback } from "react"
 import { ChevronRight, Terminal, ExternalLink, Link2, LogOut, User, Loader2 } from "lucide-react"
-import { SERVER_URL } from "./default-settings"
+import {
+  ApiClient,
+  DeviceTokenService,
+  createAuthProvider
+} from "@kaizen/api"
 
 import "./style.css"
 
 const DASHBOARD_URL = process.env.PLASMO_PUBLIC_DASHBOARD_URL?.replace('/dashboard', '') || 'http://localhost:60091'
+const API_BASE_URL = process.env.PLASMO_PUBLIC_SERVER_URL || "http://localhost:60092"
 const INSTALLATION_ID_KEY = "kaizen_installation_id"
 const DEVICE_TOKEN_KEY = "kaizen_device_token"
 const USER_DATA_KEY = "kaizen_user_data"
@@ -14,6 +19,24 @@ interface UserData {
   name: string | null
   image: string | null
 }
+
+// Auth provider for authenticated requests (device token)
+const extensionAuthProvider = createAuthProvider(async () => {
+  try {
+    const result = await chrome.storage.local.get(DEVICE_TOKEN_KEY)
+    return result[DEVICE_TOKEN_KEY] || null
+  } catch {
+    return null
+  }
+})
+
+// API client for device token operations
+const apiClient = new ApiClient({
+  baseUrl: `${API_BASE_URL}/api`,
+  authProvider: extensionAuthProvider
+})
+
+const deviceTokenService = new DeviceTokenService(apiClient)
 
 // Generate a unique installation ID for this extension install
 async function getOrCreateInstallationId(): Promise<string> {
@@ -33,9 +56,16 @@ async function checkDeviceStatus(installationId: string): Promise<{
   user: UserData | null
 }> {
   try {
-    const response = await fetch(`${SERVER_URL}/device-tokens/status/${installationId}`)
-    if (!response.ok) throw new Error("Failed to check status")
-    return await response.json()
+    const status = await deviceTokenService.getStatus(installationId)
+    return {
+      linked: status.linked,
+      token: null, // Token is fetched separately after linking
+      user: status.user ? {
+        email: status.user.email,
+        name: status.user.name,
+        image: status.user.image || null
+      } : null
+    }
   } catch (error) {
     console.error("Error checking device status:", error)
     return { linked: false, token: null, user: null }
