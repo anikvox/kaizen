@@ -4,12 +4,12 @@ import React, { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { BentoGrid, BentoGridItem } from "@/components/ui/bento-grid";
 import {
-    Activity,
-    Cpu,
-    Settings2,
+    Shield,
+    Target,
     Brain,
-    Volume2,
-    Box
+    Eye,
+    Activity,
+    Sparkles
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -52,28 +52,28 @@ const SkeletonOne = () => {
         <motion.div
             initial="initial"
             whileHover="animate"
-            className="flex flex-1 w-full h-full min-h-[6rem] flex-col space-y-2 p-4"
+            className="flex flex-1 w-full h-full min-h-[6rem] dark:bg-dot-white/[0.2] bg-dot-black/[0.2] flex-col space-y-2 p-4 mb-4"
         >
             <motion.div
                 variants={variants}
-                className="flex flex-row rounded-full border border-neutral-100 dark:border-white/[0.2] p-2 items-center space-x-2 bg-white dark:bg-black"
+                className="flex flex-row rounded-2xl border border-blue-200 dark:border-blue-800/50 p-3 items-center space-x-2 bg-blue-50 dark:bg-blue-950/30"
             >
                 <div className="h-6 w-6 rounded-full bg-gradient-to-r from-blue-500 to-indigo-400 flex-shrink-0" />
-                <div className="w-full bg-gray-100 h-4 rounded-full dark:bg-neutral-900" />
+                <div className="w-full bg-blue-100 dark:bg-blue-900/50 h-4 rounded-full" />
             </motion.div>
             <motion.div
                 variants={variantsSecond}
-                className="flex flex-row rounded-full border border-neutral-100 dark:border-white/[0.2] p-2 items-center space-x-2 w-3/4 ml-auto bg-white dark:bg-black"
+                className="flex flex-row rounded-2xl border border-blue-200 dark:border-blue-800/50 p-3 items-center space-x-2 w-3/4 ml-auto bg-blue-50 dark:bg-blue-950/30"
             >
-                <div className="w-full bg-gray-100 h-4 rounded-full dark:bg-neutral-900" />
+                <div className="w-full bg-blue-100 dark:bg-blue-900/50 h-4 rounded-full" />
                 <div className="h-6 w-6 rounded-full bg-gradient-to-r from-blue-500 to-indigo-400 flex-shrink-0" />
             </motion.div>
             <motion.div
                 variants={variants}
-                className="flex flex-row rounded-full border border-neutral-100 dark:border-white/[0.2] p-2 items-center space-x-2 bg-white dark:bg-black"
+                className="flex flex-row rounded-2xl border border-blue-200 dark:border-blue-800/50 p-3 items-center space-x-2 bg-blue-50 dark:bg-blue-950/30"
             >
                 <div className="h-6 w-6 rounded-full bg-gradient-to-r from-blue-500 to-indigo-400 flex-shrink-0" />
-                <div className="w-full bg-gray-100 h-4 rounded-full dark:bg-neutral-900" />
+                <div className="w-full bg-blue-100 dark:bg-blue-900/50 h-4 rounded-full" />
             </motion.div>
         </motion.div>
     );
@@ -97,7 +97,7 @@ const SkeletonTwo = () => {
             initial="initial"
             animate="animate"
             whileHover="hover"
-            className="flex flex-1 w-full h-full min-h-[6rem] flex-col space-y-2 p-4"
+            className="flex flex-1 w-full h-full min-h-[6rem] dark:bg-dot-white/[0.2] bg-dot-black/[0.2] flex-col space-y-2 p-4 mb-4"
         >
             {widths.length > 0 ? (
                 widths.map((w, i) => (
@@ -105,7 +105,7 @@ const SkeletonTwo = () => {
                         key={"skelenton-two" + i}
                         variants={variants}
                         style={{ maxWidth: w }}
-                        className="flex flex-row rounded-full border border-neutral-100 dark:border-white/[0.2] p-2 items-center space-x-2 bg-neutral-100 dark:bg-black w-full h-4"
+                        className="flex flex-row rounded-full border border-emerald-200 dark:border-emerald-800/50 p-2 items-center space-x-2 bg-emerald-50 dark:bg-emerald-950/30 w-full h-4"
                     />
                 ))
             ) : (
@@ -134,7 +134,7 @@ const SkeletonThree = () => {
             }}
             className="flex flex-1 w-full h-full min-h-[6rem] rounded-lg flex-col space-y-2"
             style={{
-                background: "linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab)",
+                background: "linear-gradient(-45deg, #ec4899, #8b5cf6, #3b82f6, #06b6d4)",
                 backgroundSize: "400% 400%",
             }}
         >
@@ -143,34 +143,98 @@ const SkeletonThree = () => {
     );
 };
 
+const SkeletonFour = () => {
+    return (
+        <motion.div
+            initial="initial"
+            animate="animate"
+            whileHover="hover"
+            className="flex flex-1 w-full h-full min-h-[6rem] dark:bg-dot-white/[0.2] bg-dot-black/[0.2] flex-row space-x-2 p-4"
+        >
+            <div className="flex-1 rounded-2xl bg-gradient-to-br from-purple-100 to-blue-100 dark:from-purple-950/50 dark:to-blue-950/50 border border-purple-200 dark:border-purple-800/50 p-4 flex flex-col items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center mb-3">
+                    <Sparkles className="w-6 h-6 text-white" />
+                </div>
+                <p className="text-xs text-center text-gray-700 dark:text-gray-300 font-medium">
+                    AI-powered insights from your browsing
+                </p>
+            </div>
+        </motion.div>
+    );
+};
+
+const SkeletonFive = () => {
+    const variants = {
+        initial: { x: 0 },
+        animate: {
+            x: 10,
+            rotate: 5,
+            transition: { duration: 0.2 },
+        },
+    };
+    const variantsSecond = {
+        initial: { x: 0 },
+        animate: {
+            x: -10,
+            rotate: -5,
+            transition: { duration: 0.2 },
+        },
+    };
+
+    return (
+        <motion.div
+            initial="initial"
+            whileHover="animate"
+            className="flex flex-1 w-full h-full min-h-[6rem] dark:bg-dot-white/[0.2] bg-dot-black/[0.2] flex-col space-y-2 p-4 mb-4"
+        >
+            <motion.div
+                variants={variants}
+                className="flex flex-row rounded-2xl border border-teal-200 dark:border-teal-800/50 p-3 items-start space-x-2 bg-teal-50 dark:bg-teal-950/30"
+            >
+                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-teal-500 to-cyan-400 flex-shrink-0 flex items-center justify-center">
+                    <Activity className="w-4 h-4 text-white" />
+                </div>
+                <p className="text-xs text-gray-700 dark:text-gray-300">Track your focus patterns</p>
+            </motion.div>
+            <motion.div
+                variants={variantsSecond}
+                className="flex flex-row rounded-2xl border border-teal-200 dark:border-teal-800/50 p-3 items-center justify-end space-x-2 w-3/4 ml-auto bg-teal-50 dark:bg-teal-950/30"
+            >
+                <p className="text-xs text-gray-700 dark:text-gray-300">2.5 hours today</p>
+                <div className="h-6 w-6 rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 flex-shrink-0" />
+            </motion.div>
+        </motion.div>
+    );
+};
+
 const items = [
     {
-        title: "Deterministic Inference",
+        title: "Smart Focus Sessions",
         description: (
-            <span className="text-xs">
-                AI workloads are orchestrated via a prioritized message queue to prevent contention.
+            <span className="text-sm">
+                Track your attention patterns without disruption. Understand what helps you focus and what breaks your flow.
             </span>
         ),
         header: <SkeletonOne />,
         className: "md:col-span-1",
-        icon: <Cpu className="h-4 w-4 text-neutral-500" />,
+        icon: <Target className="h-4 w-4 text-neutral-500" />,
     },
     {
-        title: "Latent Agency",
+        title: "AI-Powered Insights",
         description: (
-            <span className="text-xs">
-                Direct control over Top-K and Temperature. Tune the model's creative output.
+            <span className="text-sm">
+                Gemini Flash analyzes your browsing to generate actionable summaries and learning insights.
             </span>
         ),
         header: <SkeletonTwo />,
         className: "md:col-span-1",
-        icon: <Settings2 className="h-4 w-4 text-neutral-500" />,
+        icon: <Brain className="h-4 w-4 text-neutral-500" />,
     },
     {
-        title: "Knowledge Persistence",
+        title: "Knowledge Retention",
         description: (
-            <span className="text-xs">
-                Active recall as a service. Auto-generated quizzes derived from your history.
+            <span className="text-sm">
+                Auto-generated quizzes from your browsing history. Active recall to help you remember what matters.
             </span>
         ),
         header: <SkeletonThree />,
@@ -178,25 +242,25 @@ const items = [
         icon: <Brain className="h-4 w-4 text-neutral-500" />,
     },
     {
-        title: "Sonic Perception",
+        title: "Privacy by Design",
         description: (
-            <span className="text-xs">
-                Sustained audio attention monitoring. Distill signals from noise at the edge.
+            <span className="text-sm">
+                Optional local LLM inference keeps your data on-device. GDPR compliant with full control over your information.
             </span>
         ),
-        header: <SkeletonOne />,
+        header: <SkeletonFour />,
         className: "md:col-span-2",
-        icon: <Volume2 className="h-4 w-4 text-neutral-500" />,
+        icon: <Shield className="h-4 w-4 text-neutral-500" />,
     },
     {
-        title: "Edge Cognition",
+        title: "Real-Time Tracking",
         description: (
-            <span className="text-xs">
-                Native image understanding and autonomous captioning via WebAI.
+            <span className="text-sm">
+                Monitor your focus sessions as they happen. Get instant feedback on your productivity patterns.
             </span>
         ),
-        header: <SkeletonTwo />,
+        header: <SkeletonFive />,
         className: "md:col-span-1",
-        icon: <Box className="h-4 w-4 text-neutral-500" />,
+        icon: <Eye className="h-4 w-4 text-neutral-500" />,
     },
 ];

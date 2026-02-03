@@ -11,7 +11,7 @@ export default function Faq() {
             <h1 className="text-3xl font-bold font-heading text-center mb-8 md:mb-12">
                 Frequently Asked Questions
             </h1>
-            <div className="w-full max-w-4xl mx-auto space-y-2">
+            <div className="w-full max-w-4xl mx-auto space-y-2 no-underline">
                 {faqs.map((faq, index) => (
                     <FaqItem key={index} question={faq.question} answer={faq.answer} />
                 ))}
@@ -24,13 +24,13 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
     const [isOpen, setIsOpen] = useState(false);
 
     return (
-        <div className="border-b border-border transition-all duration-300">
+        <div className="border-b border-border transition-all duration-300 no-underline">
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between py-6 text-left hover:underline group"
+                className="w-full flex items-center justify-between py-6 text-left group"
             >
                 <span className={cn(
-                    "font-semibold text-base md:text-lg transition-colors",
+                    "font-semibold text-base md:text-lg transition-colors no-underline",
                     isOpen ? "text-blue-500" : "text-foreground group-hover:text-blue-500"
                 )}>{question}</span>
                 <ChevronDown
@@ -64,26 +64,26 @@ const faqs = [
     {
         question: "What is Kaizen?",
         answer:
-            "Kaizen is a local-first browser extension that uses Gemini Nano (on-device AI) to build a semantic index of your browsing attention. It transforms your raw activity into actionable insights without ever sending data to the cloud.",
+            "Kaizen is a privacy-first Chrome extension for personal growth and learning, designed for people who spend most of their time in the browser. Built by CS students who understand the challenges of focus and retention, Kaizen helps you stay on track without blocking content or enforcing rigid workflows.",
     },
     {
         question: "Is it really private?",
         answer:
-            "Yes. All inference happens locally in your browser kernel. We have no backend that stores your browsing history or screenshots. Your data lives and dies on your silicon.",
+            "Yes. Privacy is a core principle of Kaizen. We offer an option to run AI inference on a local LLM, so your data stays on your device and remains GDPR compliant. Your browsing data never leaves your machine unless you choose otherwise.",
     },
     {
-        question: "Does it slow down my browser?",
+        question: "What AI technology does Kaizen use?",
         answer:
-            "Kaizen uses a deterministic concurrency model that locks AI workloads to a priority queue. It monitors system resources to prevent thermal throttling and memory spikes, ensuring your primary browser experience remains fluid.",
+            "Kaizen uses Gemini Flash for fast reasoning and intelligent insights. We've integrated Comet Opik for observability and evaluation, allowing us to continuously improve prompt quality and model behavior while maintaining your privacy.",
     },
     {
         question: "Can I export my data?",
         answer:
-            "Currently, we provide a dashboard to view your insights. We are working on full data portability support so you can own your cognitive history in open formats.",
+            "We provide a dashboard to view your insights and track your progress. As we continue development, we're working on additional data portability features to give you full control over your information.",
     },
     {
-        question: "Which OS are supported?",
+        question: "Which browsers are supported?",
         answer:
-            "Kaizen works anywhere Chrome (or Chromium-based browsers) supports the Window AI API and Gemini Nano. This currently includes latest versions of Windows, macOS, and Linux with the appropriate flags enabled.",
+            "Kaizen is currently available as a Chrome extension and works on any Chromium-based browser including Chrome, Edge, Brave, and Arc. Support for other browsers may be added in the future.",
     },
 ];
