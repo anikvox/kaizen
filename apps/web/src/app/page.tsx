@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth, SignInButton, SignOutButton, useUser } from "@clerk/nextjs";
 import { createApiClient, type User } from "@kaizen/api-client";
+import Link from "next/link";
 
 const apiUrl =
   process.env.NEXT_PUBLIC_KAIZEN_API_URL || "http://localhost:60092";
@@ -89,7 +90,10 @@ export default function Home() {
           <p>Authenticated: {user ? `Hello ${user.name || user.email}` : "loading..."}</p>
           <p>SSE: {time || "connecting..."}</p>
           {error && <p style={{ color: "red" }}>{error}</p>}
-          <SignOutButton />
+          <div style={{ marginTop: "1rem", display: "flex", gap: "1rem" }}>
+            <Link href="/extensions">Manage Extensions</Link>
+            <SignOutButton />
+          </div>
         </>
       ) : (
         <SignInButton mode="modal" />

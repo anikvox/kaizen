@@ -2,14 +2,19 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { env } from "./lib/index.js";
-import { healthRoutes, usersRoutes, sseRoutes } from "./routes/index.js";
+import { healthRoutes, usersRoutes, sseRoutes, deviceTokenRoutes } from "./routes/index.js";
 
 const app = new Hono();
 
 app.use(
   "/*",
   cors({
-    origin: env.corsOrigins,
+    origin: (origin) => {
+      if (!origin) return env.corsOrigins[0];
+      if (env.corsOrigins.includes(origin)) return origin;
+      if (origin.startsWith("chrome-extension://")) return origin;
+      return null;
+    },
     credentials: true,
   })
 );
@@ -21,6 +26,7 @@ app.get("/", (c) => {
 app.route("/health", healthRoutes);
 app.route("/users", usersRoutes);
 app.route("/sse", sseRoutes);
+app.route("/device-tokens", deviceTokenRoutes);
 
 console.log(`Server running on http://localhost:${env.port}`);
 
