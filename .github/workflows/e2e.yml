@@ -44,7 +44,7 @@ jobs:
         id: setup-test-data
         run: |
           # Create test user and device token directly in database
-          DEVICE_TOKEN=$(docker compose -f .devcontainer/docker-compose.yml exec -T postgres psql -U kaizen -d kaizen -t -A -c "
+          TOKEN_VALUE=$(docker compose -f .devcontainer/docker-compose.yml exec -T postgres psql -U kaizen -d kaizen -t -A -c "
             -- Create test user if not exists
             INSERT INTO users (id, \"clerkId\", email, name, \"createdAt\", \"updatedAt\")
             VALUES ('test-user-id', 'test-clerk-id', 'test@example.com', 'Test User', NOW(), NOW())
@@ -56,13 +56,13 @@ jobs:
             ON CONFLICT (id) DO UPDATE SET token = EXCLUDED.token
             RETURNING token;
           ")
-          echo "DEVICE_TOKEN=${DEVICE_TOKEN}" >> $GITHUB_OUTPUT
+          echo "device_token=${TOKEN_VALUE}" >> $GITHUB_OUTPUT
           echo "Created test device token"
 
       - name: Run E2E tests
         run: |
           docker compose -f .devcontainer/docker-compose.yml exec -T \
-            -e DEVICE_TOKEN=${{ steps.setup-test-data.outputs.DEVICE_TOKEN }} \
+            -e DEVICE_TOKEN=${{ steps.setup-test-data.outputs.device_token }} \
             app pnpm --filter @kaizen/api-client test:e2e
 
       - name: Stop services
