@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { createApiClient, ApiClient } from "../src/index.js";
 
 const API_URL = process.env.API_URL || "http://localhost:60092";
@@ -8,18 +8,20 @@ describe("Attention Data E2E Tests", () => {
   let client: ApiClient;
 
   beforeAll(() => {
+    client = createApiClient(API_URL, async () => DEVICE_TOKEN || null);
+  });
+
+  beforeEach(() => {
     if (!DEVICE_TOKEN) {
-      console.warn(
-        "DEVICE_TOKEN not set. Skipping attention tests that require authentication."
+      throw new Error(
+        "DEVICE_TOKEN environment variable is required. " +
+        "Set it to a valid device token to run attention tests."
       );
     }
-    client = createApiClient(API_URL, async () => DEVICE_TOKEN || null);
   });
 
   describe("Text Attention", () => {
     it("should create and retrieve text attention data", async () => {
-      if (!DEVICE_TOKEN) return;
-
       const timestamp = Date.now();
       const testData = {
         url: "https://example.com/article",
@@ -49,8 +51,6 @@ describe("Attention Data E2E Tests", () => {
 
   describe("Image Attention", () => {
     it("should create and retrieve image attention data", async () => {
-      if (!DEVICE_TOKEN) return;
-
       const timestamp = Date.now();
       const testData = {
         url: "https://example.com/gallery",
@@ -85,8 +85,6 @@ describe("Attention Data E2E Tests", () => {
 
   describe("Audio Attention", () => {
     it("should create and retrieve audio attention data", async () => {
-      if (!DEVICE_TOKEN) return;
-
       const timestamp = Date.now();
       const testData = {
         url: "https://example.com/podcast",
@@ -120,8 +118,6 @@ describe("Attention Data E2E Tests", () => {
 
   describe("YouTube Attention", () => {
     it("should create and retrieve YouTube attention data", async () => {
-      if (!DEVICE_TOKEN) return;
-
       const timestamp = Date.now();
       const videoId = "dQw4w9WgXcQ";
 
@@ -177,8 +173,6 @@ describe("Attention Data E2E Tests", () => {
 
   describe("Export Attention", () => {
     it("should export attention data in clean format", async () => {
-      if (!DEVICE_TOKEN) return;
-
       // First, create some test data across all types
       const timestamp = Date.now();
       const testUrl = `https://test-export-${timestamp}.example.com/page`;
@@ -238,8 +232,6 @@ describe("Attention Data E2E Tests", () => {
 
   describe("Attention Data Structure Validation", () => {
     it("should have consistent data structure across all attention types", async () => {
-      if (!DEVICE_TOKEN) return;
-
       const textList = await client.attention.listText();
       const imageList = await client.attention.listImage();
       const audioList = await client.attention.listAudio();
