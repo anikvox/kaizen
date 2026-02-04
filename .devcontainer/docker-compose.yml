@@ -1,0 +1,48 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ..:/src:ro
+      - workspace:/workspace
+    working_dir: /workspace
+    command: /src/.devcontainer/post-start.sh
+    env_file:
+      - ../.env.production
+    environment:
+      - DATABASE_URL=postgresql://kaizen:kaizen_password@postgres:5432/kaizen
+    ports:
+      - "60091:60091"
+      - "60092:60092"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kaizen-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: kaizen-devcontainer-postgres
+    environment:
+      POSTGRES_USER: kaizen
+      POSTGRES_PASSWORD: kaizen_password
+      POSTGRES_DB: kaizen
+    ports:
+      - "60093:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kaizen -d kaizen"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kaizen-network
+
+volumes:
+  postgres_data:
+  workspace:
+
+networks:
+  kaizen-network:

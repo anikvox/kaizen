@@ -1,0 +1,36 @@
+{
+  "name": "Kaizen Dev",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "prisma.prisma",
+        "bradlc.vscode-tailwindcss"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+      }
+    }
+  },
+  "forwardPorts": [60091, 60092, 60093],
+  "portsAttributes": {
+    "60091": { "label": "Web", "onAutoForward": "notify" },
+    "60092": { "label": "API", "onAutoForward": "notify" },
+    "60093": { "label": "PostgreSQL", "onAutoForward": "silent" }
+  },
+  "postCreateCommand": ".devcontainer/post-create.sh",
+  "postStartCommand": ".devcontainer/post-start.sh",
+  "remoteEnv": {
+    "NODE_ENV": "production"
+  }
+}

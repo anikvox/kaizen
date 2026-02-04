@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev --port ${FRONTEND_PORT:-60091}",
     "build": "next build",
-    "start": "next start",
+    "start": "next start --port ${FRONTEND_PORT:-60091}",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
   },

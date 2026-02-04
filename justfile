@@ -27,3 +27,12 @@ db-migrate name:
 
 db-studio:
     pnpm --filter @kaizen/api db:studio
+
+prod-up:
+    cd .devcontainer && docker compose up --build
+
+prod-down:
+    cd .devcontainer && docker compose down
+
+prod-clean:
+    cd .devcontainer && docker compose down -v
