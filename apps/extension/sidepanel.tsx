@@ -44,6 +44,12 @@ function SidePanel() {
     setUser(null)
   }
 
+  // Connect to background script to track sidepanel open/close state
+  useEffect(() => {
+    const port = chrome.runtime.connect({ name: "sidepanel" })
+    return () => port.disconnect()
+  }, [])
+
   useEffect(() => {
     const checkAuth = async () => {
       const token = await storage.get<string>("deviceToken")

@@ -2,6 +2,9 @@ import { Storage } from "@plasmohq/storage"
 
 const storage = new Storage()
 
+// Track sidepanel connections per window
+const sidepanelPorts = new Map<number, chrome.runtime.Port>()
+
 // Update the action behavior based on auth state
 async function updateActionBehavior() {
   const token = await storage.get<string>("deviceToken")
@@ -15,11 +18,42 @@ async function updateActionBehavior() {
   }
 }
 
-// Handle extension icon click - open sidepanel when logged in
+// Close sidepanel by disabling and re-enabling it
+async function closeSidepanel() {
+  await chrome.sidePanel.setOptions({ enabled: false })
+  await chrome.sidePanel.setOptions({ enabled: true, path: "sidepanel.html" })
+}
+
+// Handle extension icon click - toggle sidepanel when logged in
 chrome.action.onClicked.addListener(async (tab) => {
   // This only fires when popup is disabled (user is logged in)
-  if (tab.id) {
+  if (!tab.id || !tab.windowId) return
+
+  if (sidepanelPorts.has(tab.windowId)) {
+    // Sidepanel is open - close it
+    await closeSidepanel()
+  } else {
+    // Sidepanel is closed - open it
     await chrome.sidePanel.open({ tabId: tab.id })
+  }
+})
+
+// Listen for sidepanel connections
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name === "sidepanel") {
+    // Get the window ID from the sender
+    chrome.windows.getCurrent().then((window) => {
+      if (window.id) {
+        sidepanelPorts.set(window.id, port)
+
+        // Clean up when sidepanel disconnects (closes)
+        port.onDisconnect.addListener(() => {
+          if (window.id) {
+            sidepanelPorts.delete(window.id)
+          }
+        })
+      }
+    })
   }
 })
 
@@ -30,19 +64,8 @@ storage.watch({
 
     // Close sidepanel when user logs out
     if (!change.newValue) {
-      const windows = await chrome.windows.getAll()
-      for (const window of windows) {
-        if (window.id) {
-          await chrome.sidePanel.setOptions({
-            enabled: false
-          })
-          // Re-enable for future use
-          await chrome.sidePanel.setOptions({
-            enabled: true,
-            path: "sidepanel.html"
-          })
-        }
-      }
+      await closeSidepanel()
+      sidepanelPorts.clear()
     }
   }
 })
