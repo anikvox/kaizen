@@ -3,12 +3,7 @@ import type { PlasmoCSConfig } from "plasmo"
 import { sendToBackground } from "@plasmohq/messaging"
 
 export const config: PlasmoCSConfig = {
-  matches: ["<all_urls>"],
-  exclude_matches: [
-    // Exclude kaizen website
-    "https://*.kaizen.*/*",
-    "http://localhost:60091/*"
-  ]
+  matches: ["<all_urls>"]
 }
 
 const WEBSITE_VISIT_MESSAGE_NAME = "website-visit"

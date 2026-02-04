@@ -10,9 +10,7 @@ import CognitiveAttentionAudioTracker from "../cognitive-attention/monitor-audio
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
   exclude_matches: [
-    "*://*.youtube.com/*",
-    "https://*.kaizen.*/*",
-    "http://localhost:60091/*"
+    "*://*.youtube.com/*"
   ],
   all_frames: false
 }

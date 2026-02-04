@@ -16,9 +16,7 @@ import CognitiveAttentionTextTracker from "../cognitive-attention/monitor-text"
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
   exclude_matches: [
-    "*://*.youtube.com/*",
-    "https://*.kaizen.*/*",
-    "http://localhost:60091/*"
+    "*://*.youtube.com/*"
   ],
   all_frames: false
 }
