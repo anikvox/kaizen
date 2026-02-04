@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { db } from "../lib/index.js";
+import { db, events } from "../lib/index.js";
 import { authMiddleware, type AuthVariables } from "../middleware/index.js";
 import { randomBytes } from "crypto";
 
@@ -90,6 +90,12 @@ app.delete("/:id", authMiddleware, async (c) => {
 
   await db.deviceToken.delete({
     where: { id: tokenId },
+  });
+
+  // Emit event for SSE subscribers
+  events.emitDeviceTokenRevoked({
+    token: deviceToken.token,
+    userId: user.id,
   });
 
   return c.json({ success: true });

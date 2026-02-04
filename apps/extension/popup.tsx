@@ -7,14 +7,7 @@ const webUrl = process.env.PLASMO_PUBLIC_KAIZEN_WEB_URL || "http://localhost:600
 
 const storage = new Storage()
 
-interface UserInfo {
-  id: string
-  email: string
-  name: string | null
-}
-
 function IndexPopup() {
-  const [user, setUser] = useState<UserInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [linkWindow, setLinkWindow] = useState<Window | null>(null)
@@ -22,14 +15,11 @@ function IndexPopup() {
   const verifyToken = useCallback(async (token: string) => {
     const api = createApiClient(apiUrl)
     try {
-      const result = await api.deviceTokens.verify(token)
-      setUser(result.user)
-      setError("")
+      await api.deviceTokens.verify(token)
       return true
     } catch {
       // Token invalid, clear it
       await storage.remove("deviceToken")
-      setUser(null)
       return false
     }
   }, [])
@@ -39,7 +29,12 @@ function IndexPopup() {
     const checkAuth = async () => {
       const token = await storage.get<string>("deviceToken")
       if (token) {
-        await verifyToken(token)
+        const valid = await verifyToken(token)
+        if (valid) {
+          // User is logged in, close popup - sidepanel should be used
+          window.close()
+          return
+        }
       }
       setLoading(false)
     }
@@ -56,6 +51,10 @@ function IndexPopup() {
         if (valid && linkWindow) {
           linkWindow.close()
           setLinkWindow(null)
+          // Close popup after successful link
+          window.close()
+        } else if (!valid) {
+          setError("Invalid token received")
         }
       }
     }
@@ -78,31 +77,6 @@ function IndexPopup() {
     setLinkWindow(popup)
   }
 
-  const handleUnlink = async () => {
-    const token = await storage.get<string>("deviceToken")
-    if (token) {
-      const api = createApiClient(apiUrl)
-      try {
-        await api.deviceTokens.revoke(token)
-      } catch {
-        // Ignore errors - token may already be invalid
-      }
-    }
-    await storage.remove("deviceToken")
-    setUser(null)
-  }
-
-  const handleManualToken = async () => {
-    const token = prompt("Paste your device token:")
-    if (token) {
-      await storage.set("deviceToken", token.trim())
-      const valid = await verifyToken(token.trim())
-      if (!valid) {
-        setError("Invalid token")
-      }
-    }
-  }
-
   if (loading) {
     return (
       <div style={{ padding: 16, minWidth: 300 }}>
@@ -112,80 +86,26 @@ function IndexPopup() {
     )
   }
 
-  if (!user) {
-    return (
-      <div style={{ padding: 16, minWidth: 300 }}>
-        <h2>Kaizen</h2>
-        <p style={{ marginBottom: 16 }}>Link this extension to your Kaizen account to get started.</p>
-        {error && <p style={{ color: "red", marginBottom: 8 }}>{error}</p>}
-        <button
-          onClick={handleLinkExtension}
-          style={{
-            width: "100%",
-            padding: "10px 16px",
-            background: "#0070f3",
-            color: "white",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontSize: 14,
-            fontWeight: 500
-          }}
-        >
-          Link Extension
-        </button>
-        <button
-          onClick={handleManualToken}
-          style={{
-            width: "100%",
-            padding: "8px 16px",
-            background: "transparent",
-            color: "#666",
-            border: "1px solid #ddd",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontSize: 12,
-            marginTop: 8
-          }}
-        >
-          Enter Token Manually
-        </button>
-      </div>
-    )
-  }
-
   return (
     <div style={{ padding: 16, minWidth: 300 }}>
       <h2>Kaizen</h2>
-      <div style={{
-        padding: 12,
-        background: "#f5f5f5",
-        borderRadius: 8,
-        marginBottom: 16
-      }}>
-        <p style={{ margin: 0, fontWeight: 500 }}>
-          {user.name || user.email}
-        </p>
-        {user.name && (
-          <p style={{ margin: "4px 0 0", fontSize: 12, color: "#666" }}>
-            {user.email}
-          </p>
-        )}
-      </div>
+      <p style={{ marginBottom: 16 }}>Link this extension to your Kaizen account to get started.</p>
+      {error && <p style={{ color: "red", marginBottom: 8 }}>{error}</p>}
       <button
-        onClick={handleUnlink}
+        onClick={handleLinkExtension}
         style={{
           width: "100%",
-          padding: "8px 16px",
-          background: "transparent",
-          color: "#dc3545",
-          border: "1px solid #dc3545",
+          padding: "10px 16px",
+          background: "#0070f3",
+          color: "white",
+          border: "none",
           borderRadius: 6,
           cursor: "pointer",
-          fontSize: 12
+          fontSize: 14,
+          fontWeight: 500
         }}
       >
-        Unlink Extension
+        Link Extension
       </button>
     </div>
   )

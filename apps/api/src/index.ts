@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { env } from "./lib/index.js";
-import { healthRoutes, usersRoutes, sseRoutes, deviceTokenRoutes } from "./routes/index.js";
+import { healthRoutes, usersRoutes, sseRoutes, deviceTokenSSERoutes, deviceTokenRoutes } from "./routes/index.js";
 
 const app = new Hono();
 
@@ -26,6 +26,7 @@ app.get("/", (c) => {
 app.route("/health", healthRoutes);
 app.route("/users", usersRoutes);
 app.route("/sse", sseRoutes);
+app.route("/sse/device-token", deviceTokenSSERoutes);
 app.route("/device-tokens", deviceTokenRoutes);
 
 console.log(`Server running on http://localhost:${env.port}`);

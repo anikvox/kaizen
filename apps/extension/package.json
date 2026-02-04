@@ -24,6 +24,12 @@
   "manifest": {
     "host_permissions": [
       "https://*/*"
-    ]
+    ],
+    "permissions": [
+      "sidePanel"
+    ],
+    "side_panel": {
+      "default_path": "sidepanel.html"
+    }
   }
 }
