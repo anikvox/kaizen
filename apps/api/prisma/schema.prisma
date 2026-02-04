@@ -8,12 +8,25 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  clerkId   String   @unique
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String        @id @default(cuid())
+  clerkId      String        @unique
+  email        String        @unique
+  name         String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deviceTokens DeviceToken[]
 
   @@map("users")
+}
+
+model DeviceToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  name      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  lastUsedAt DateTime?
+
+  @@map("device_tokens")
 }

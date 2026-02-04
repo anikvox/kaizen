@@ -28,3 +28,25 @@ export interface SSETickData {
 export interface ApiError {
   error: string;
 }
+
+export interface DeviceToken {
+  id: string;
+  name: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
+export interface DeviceTokenCreated {
+  id: string;
+  token: string;
+  name: string;
+  createdAt: string;
+}
+
+export interface DeviceTokenVerifyResponse {
+  user: {
+    id: string;
+    email: string;
+    name: string | null;
+  };
+}
