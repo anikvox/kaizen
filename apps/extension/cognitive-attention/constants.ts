@@ -1,0 +1,53 @@
+export const UPDATE_INTERVAL = 500
+export const MOUSE_HOVER_THRESHOLD = 1000
+export const SCROLL_VELOCITY_THRESHOLD = 500
+export const MIN_TEXT_LENGTH = 20
+export const READING_PROGRESS_INTERVAL = 1000
+export const IMAGE_HOVER_THRESHOLD = 2000
+export const IGNORE_SELECTORS = [
+  "nav",
+  "header",
+  "footer",
+  "aside",
+  "button",
+  ".nav",
+  ".navigation",
+  ".navbar",
+  ".menu",
+  ".menubar",
+  ".header",
+  ".footer",
+  ".sidebar",
+  ".side-bar",
+  ".side_bar",
+  ".advertisement",
+  ".ad",
+  ".ads",
+  ".promo",
+  ".cookie-banner",
+  ".cookie-notice",
+  ".popup",
+  ".modal",
+  ".overlay",
+  ".toolbar",
+  ".chrome",
+  ".controls",
+  ".dropdown",
+  ".dropdown-menu",
+  ".vector-header",
+  ".vector-menu",
+  ".vector-dropdown",
+  ".mw-header",
+  ".mw-footer",
+  ".mw-navigation",
+  ".vector-sticky-header",
+  ".vector-page-toolbar",
+  '[role="navigation"]',
+  '[role="banner"]',
+  '[role="complementary"]',
+  '[role="search"]',
+  '[role="toolbar"]',
+  '[role="menu"]',
+  '[aria-label*="navigation" i]',
+  '[aria-label*="menu" i]'
+]

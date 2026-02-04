@@ -59,3 +59,131 @@ export interface DeviceTokenVerifyResponse {
     name: string | null;
   };
 }
+
+// Website Visit Types
+export interface WebsiteVisit {
+  id: string;
+  url: string;
+  title: string;
+  metadata: Record<string, string>;
+  openedAt: string;
+  closedAt: string | null;
+  activeTime: number;
+  referrer: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WebsiteVisitOpenedRequest {
+  url: string;
+  title: string;
+  metadata: Record<string, string>;
+  referrer: string | null;
+  timestamp: number;
+}
+
+export interface WebsiteVisitActiveTimeRequest {
+  url: string;
+  activeTime: number;
+  timestamp: number;
+}
+
+export interface WebsiteVisitClosedRequest {
+  url: string;
+  activeTime: number;
+  timestamp: number;
+}
+
+// Text Attention Types
+export interface TextAttention {
+  id: string;
+  url: string;
+  text: string;
+  wordsRead: number;
+  timestamp: string;
+  createdAt: string;
+}
+
+export interface TextAttentionRequest {
+  url: string;
+  text: string;
+  wordsRead: number;
+  timestamp: number;
+}
+
+// Image Attention Types
+export interface ImageAttention {
+  id: string;
+  url: string;
+  src: string;
+  alt: string;
+  title: string;
+  width: number;
+  height: number;
+  hoverDuration: number;
+  confidence: number;
+  timestamp: string;
+  createdAt: string;
+}
+
+export interface ImageAttentionRequest {
+  url: string;
+  src: string;
+  alt: string;
+  title: string;
+  width: number;
+  height: number;
+  hoverDuration: number;
+  confidence: number;
+  timestamp: number;
+}
+
+// Audio Attention Types
+export interface AudioAttention {
+  id: string;
+  url: string;
+  src: string;
+  title: string;
+  duration: number;
+  playbackDuration: number;
+  currentTime: number;
+  confidence: number;
+  timestamp: string;
+  createdAt: string;
+}
+
+export interface AudioAttentionRequest {
+  url: string;
+  src: string;
+  title: string;
+  duration: number;
+  playbackDuration: number;
+  currentTime: number;
+  confidence: number;
+  timestamp: number;
+}
+
+// YouTube Attention Types
+export interface YoutubeAttention {
+  id: string;
+  videoId: string;
+  event: "opened" | "caption" | "active-watch-time-update";
+  title: string | null;
+  channelName: string | null;
+  url: string | null;
+  caption: string | null;
+  activeWatchTime: number | null;
+  timestamp: string;
+  createdAt: string;
+}
+
+export interface YoutubeAttentionRequest {
+  event: "opened" | "caption" | "active-watch-time-update";
+  videoId: string | null;
+  title?: string;
+  channelName?: string;
+  url?: string;
+  caption?: string;
+  activeWatchTime?: number;
+  timestamp: number;
+}

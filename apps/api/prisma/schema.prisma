@@ -8,13 +8,18 @@ datasource db {
 }
 
 model User {
-  id           String        @id @default(cuid())
-  clerkId      String        @unique
-  email        String        @unique
-  name         String?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  deviceTokens DeviceToken[]
+  id              String            @id @default(cuid())
+  clerkId         String            @unique
+  email           String            @unique
+  name            String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deviceTokens    DeviceToken[]
+  websiteVisits   WebsiteVisit[]
+  textAttentions  TextAttention[]
+  imageAttentions ImageAttention[]
+  audioAttentions AudioAttention[]
+  youtubeAttentions YoutubeAttention[]
 
   @@map("users")
 }
@@ -29,4 +34,101 @@ model DeviceToken {
   lastUsedAt DateTime?
 
   @@map("device_tokens")
+}
+
+model WebsiteVisit {
+  id        String   @id @default(cuid())
+  url       String
+  title     String
+  metadata  Json     @default("{}")
+  openedAt  DateTime
+  closedAt  DateTime?
+  activeTime Int     @default(0) // in milliseconds
+  referrer  String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, url, openedAt])
+  @@index([userId])
+  @@index([url])
+  @@map("website_visits")
+}
+
+model TextAttention {
+  id        String   @id @default(cuid())
+  url       String
+  text      String   @db.Text
+  wordsRead Int
+  timestamp DateTime
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([url])
+  @@index([timestamp])
+  @@map("text_attentions")
+}
+
+model ImageAttention {
+  id            String   @id @default(cuid())
+  url           String
+  src           String
+  alt           String
+  title         String
+  width         Int
+  height        Int
+  hoverDuration Int      // in milliseconds
+  confidence    Int      // 0-100
+  timestamp     DateTime
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+  @@index([url])
+  @@index([timestamp])
+  @@map("image_attentions")
+}
+
+model AudioAttention {
+  id               String   @id @default(cuid())
+  url              String
+  src              String
+  title            String
+  duration         Float    // in seconds
+  playbackDuration Int      // in milliseconds
+  currentTime      Float    // in seconds
+  confidence       Int      // 0-100
+  timestamp        DateTime
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt        DateTime @default(now())
+
+  @@index([userId])
+  @@index([url])
+  @@index([timestamp])
+  @@map("audio_attentions")
+}
+
+model YoutubeAttention {
+  id              String   @id @default(cuid())
+  videoId         String?
+  event           String   // "opened" | "caption" | "active-watch-time-update"
+  title           String?
+  channelName     String?
+  url             String?
+  caption         String?  @db.Text
+  activeWatchTime Int?     // in milliseconds
+  timestamp       DateTime
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([videoId])
+  @@index([timestamp])
+  @@map("youtube_attentions")
 }
