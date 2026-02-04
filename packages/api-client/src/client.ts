@@ -1,0 +1,25 @@
+import { HttpClient } from "./http.js";
+import { HealthEndpoint, UsersEndpoint, SSEEndpoint } from "./endpoints/index.js";
+import type { ApiClientOptions } from "./types/index.js";
+
+export class ApiClient {
+  private http: HttpClient;
+
+  public health: HealthEndpoint;
+  public users: UsersEndpoint;
+  public sse: SSEEndpoint;
+
+  constructor(options: ApiClientOptions) {
+    this.http = new HttpClient(options);
+    this.health = new HealthEndpoint(this.http);
+    this.users = new UsersEndpoint(this.http);
+    this.sse = new SSEEndpoint(this.http);
+  }
+}
+
+export function createApiClient(
+  baseUrl: string,
+  getToken?: () => Promise<string | null>
+): ApiClient {
+  return new ApiClient({ baseUrl, getToken });
+}

@@ -1,0 +1,17 @@
+{
+  "name": "kaizen",
+  "private": true,
+  "scripts": {
+    "dev": "overmind start",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=22"
+  }
+}

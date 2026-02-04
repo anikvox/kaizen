@@ -1,0 +1,43 @@
+# dependencies
+node_modules
+
+# build outputs
+dist
+build
+out
+.next
+.plasmo
+.turbo
+
+# environment and local config
+.env
+.env.*
+!.env.example
+.direnv
+
+# debug logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# misc
+.DS_Store
+*.pem
+
+# typescript
+*.tsbuildinfo
+
+# overmind
+.overmind.sock
+
+# plasmo
+keys.json
+
+# testing
+coverage
+
+# prisma
+*.db
+*.db-journal
