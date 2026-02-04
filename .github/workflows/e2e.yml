@@ -40,10 +40,28 @@ jobs:
           timeout 120 bash -c 'until curl -sf http://localhost:60092/health; do sleep 2; done'
           echo "API is ready!"
 
+      - name: Create test user and device token
+        id: setup-test-data
+        run: |
+          # Create test user and device token directly in database
+          docker compose -f .devcontainer/docker-compose.yml exec -T postgres psql -U kaizen -d kaizen -c "
+            -- Create test user if not exists
+            INSERT INTO users (id, \"clerkId\", email, name, \"createdAt\", \"updatedAt\")
+            VALUES ('test-user-id', 'test-clerk-id', 'test@example.com', 'Test User', NOW(), NOW())
+            ON CONFLICT (id) DO NOTHING;
+
+            -- Create device token with fixed value
+            INSERT INTO device_tokens (id, token, name, \"userId\", \"createdAt\")
+            VALUES ('test-token-id', 'e2e-test-device-token', 'Test Device', 'test-user-id', NOW())
+            ON CONFLICT (id) DO UPDATE SET token = 'e2e-test-device-token';
+          "
+          echo "Created test device token"
+
       - name: Run E2E tests
         run: |
-          docker compose -f .devcontainer/docker-compose.yml exec -T app \
-            pnpm --filter @kaizen/api-client test:e2e
+          docker compose -f .devcontainer/docker-compose.yml exec -T \
+            -e DEVICE_TOKEN=e2e-test-device-token \
+            app pnpm --filter @kaizen/api-client test:e2e
 
       - name: Stop services
         if: always()

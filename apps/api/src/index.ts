@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { env } from "./lib/index.js";
-import { healthRoutes, usersRoutes, sseRoutes, deviceTokenSSERoutes, deviceTokenRoutes, websiteVisitsRoutes, attentionRoutes } from "./routes/index.js";
+import { healthRoutes, usersRoutes, sseRoutes, deviceTokenSSERoutes, deviceTokenRoutes, websiteVisitsRoutes, attentionRoutes, exportRoutes } from "./routes/index.js";
 
 const app = new Hono();
 
@@ -30,6 +30,7 @@ app.route("/sse/device-token", deviceTokenSSERoutes);
 app.route("/device-tokens", deviceTokenRoutes);
 app.route("/website-visits", websiteVisitsRoutes);
 app.route("/attention", attentionRoutes);
+app.route("/export", exportRoutes);
 
 console.log(`Server running on http://localhost:${env.port}`);
 

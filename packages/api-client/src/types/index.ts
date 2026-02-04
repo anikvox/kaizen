@@ -187,3 +187,115 @@ export interface YoutubeAttentionRequest {
   activeWatchTime?: number;
   timestamp: number;
 }
+
+// Adapter Types - Clean, LLM-friendly data structures
+
+export interface TimeRange {
+  from: string;
+  to: string;
+}
+
+// Website Activity Adapter Types
+export interface WebsiteActivityPage {
+  url: string;
+  title: string;
+  visitCount: number;
+  totalActiveTime: number;
+  totalActiveTimeFormatted: string;
+  firstVisit: string;
+  lastVisit: string;
+}
+
+export interface WebsiteActivitySummary {
+  domain: string;
+  totalVisits: number;
+  totalActiveTime: number;
+  totalActiveTimeFormatted: string;
+  pages: WebsiteActivityPage[];
+}
+
+export interface WebsiteActivityResponse {
+  timeRange: TimeRange;
+  summary: {
+    totalWebsites: number;
+    totalVisits: number;
+    totalActiveTime: number;
+    totalActiveTimeFormatted: string;
+  };
+  websites: WebsiteActivitySummary[];
+}
+
+// Attention Adapter Types
+export interface TextAttentionExcerpt {
+  text: string;
+  wordsRead: number;
+  timestamp: string;
+}
+
+export interface ImageAttentionItem {
+  src: string;
+  alt: string;
+  hoverDuration: number;
+  hoverDurationFormatted: string;
+  timestamp: string;
+}
+
+export interface AudioAttentionItem {
+  src: string;
+  title: string;
+  playbackDuration: number;
+  playbackDurationFormatted: string;
+  timestamp: string;
+}
+
+export interface YoutubeVideoAttention {
+  videoId: string | null;
+  title: string | null;
+  channelName: string | null;
+  activeWatchTime: number | null;
+  activeWatchTimeFormatted: string | null;
+  captions: string[];
+  timestamp: string;
+}
+
+export interface PageAttention {
+  text: {
+    totalWordsRead: number;
+    excerpts: TextAttentionExcerpt[];
+  };
+  images: {
+    count: number;
+    items: ImageAttentionItem[];
+  };
+  audio: {
+    count: number;
+    items: AudioAttentionItem[];
+  };
+  youtube: {
+    videos: YoutubeVideoAttention[];
+  };
+}
+
+export interface AttentionPageSummary {
+  url: string;
+  domain: string;
+  title: string | null;
+  visitedAt: string;
+  activeTime: number;
+  activeTimeFormatted: string;
+  attention: PageAttention;
+}
+
+export interface AttentionResponse {
+  timeRange: TimeRange;
+  summary: {
+    totalPages: number;
+    totalActiveTime: number;
+    totalActiveTimeFormatted: string;
+    totalWordsRead: number;
+    totalImagesViewed: number;
+    totalAudioListened: number;
+    totalYoutubeVideos: number;
+  };
+  pages: AttentionPageSummary[];
+}

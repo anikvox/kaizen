@@ -91,6 +91,7 @@ export default function Home() {
           <p>SSE: {time || "connecting..."}</p>
           {error && <p style={{ color: "red" }}>{error}</p>}
           <div style={{ marginTop: "1rem", display: "flex", gap: "1rem" }}>
+            <Link href="/attention">Attention Dashboard</Link>
             <Link href="/extensions">Manage Extensions</Link>
             <SignOutButton />
           </div>
