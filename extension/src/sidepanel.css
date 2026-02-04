@@ -130,6 +130,21 @@ body {
     animation: fade-out 0.15s ease-in forwards;
   }
 
+  @keyframes twinkle {
+    0%, 100% {
+      opacity: 0.2;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.4;
+      transform: scale(1.02);
+    }
+  }
+
+  .animate-twinkle {
+    animation: twinkle 12s ease-in-out infinite;
+  }
+
   /* Hide scrollbar but keep scroll functionality */
   .scrollbar-hide {
     -ms-overflow-style: none; /* IE and Edge */

@@ -42,6 +42,7 @@ import type { Intent } from "~background/messages/intent"
 
 import { Chat } from "./sidepanel-chat"
 import { chatService } from "~chat"
+import { themeManager, type Theme } from "~theme-manager"
 
 type TabType = "focus" | "insights" | "explore" | "intents"
 
@@ -84,6 +85,8 @@ const Popup = () => {
   const [isDeviceLinked, setIsDeviceLinked] = useState<boolean | null>(null)
   const [showRevokeModal, setShowRevokeModal] = useState(false)
   const [isPomodoroExpanded, setIsPomodoroExpanded] = useState(true)
+  const [theme, setTheme] = useState<Theme>("system")
+  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light")
 
   // Notify background script that sidepanel has opened
   useEffect(() => {
@@ -92,6 +95,70 @@ const Popup = () => {
       console.log("[Sidepanel] Could not notify background:", err)
     })
   }, [])
+
+  // Initialize and sync theme (listen-only, no toggle button)
+  useEffect(() => {
+    const initTheme = async () => {
+      const currentTheme = await themeManager.getTheme()
+      console.log("[Sidepanel] Initial theme:", currentTheme)
+      setTheme(currentTheme)
+      const resolved = themeManager.getResolvedTheme(currentTheme)
+      console.log("[Sidepanel] Resolved theme:", resolved)
+      setResolvedTheme(resolved)
+      
+      // Apply theme class to document
+      if (resolved === "dark") {
+        document.documentElement.classList.add("dark")
+        console.log("[Sidepanel] Applied dark class")
+      } else {
+        document.documentElement.classList.remove("dark")
+        console.log("[Sidepanel] Removed dark class")
+      }
+    }
+
+    initTheme()
+
+    // Subscribe to theme changes from frontend
+    const unsubscribe = themeManager.subscribe((newTheme) => {
+      console.log("[Sidepanel] Theme changed to:", newTheme)
+      setTheme(newTheme)
+      const resolved = themeManager.getResolvedTheme(newTheme)
+      console.log("[Sidepanel] New resolved theme:", resolved)
+      setResolvedTheme(resolved)
+      
+      // Apply theme class to document
+      if (resolved === "dark") {
+        document.documentElement.classList.add("dark")
+        console.log("[Sidepanel] Applied dark class")
+      } else {
+        document.documentElement.classList.remove("dark")
+        console.log("[Sidepanel] Removed dark class")
+      }
+    })
+
+    // Listen for system theme changes
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
+    const handleSystemThemeChange = () => {
+      if (theme === "system") {
+        const resolved = themeManager.getResolvedTheme("system")
+        console.log("[Sidepanel] System theme changed, resolved:", resolved)
+        setResolvedTheme(resolved)
+        
+        if (resolved === "dark") {
+          document.documentElement.classList.add("dark")
+        } else {
+          document.documentElement.classList.remove("dark")
+        }
+      }
+    }
+
+    mediaQuery.addEventListener("change", handleSystemThemeChange)
+
+    return () => {
+      unsubscribe()
+      mediaQuery.removeEventListener("change", handleSystemThemeChange)
+    }
+  }, [theme])
 
   const focusDataDex = useLiveQuery(() => {
     return db.table<Focus>("focus").toArray()
@@ -905,18 +972,47 @@ const Popup = () => {
   }
 
   return (
-    <div className="min-h-screen w-full bg-white relative">
-      {/* Emerald Glow Background */}
+    <div className="min-h-screen w-full bg-white dark:bg-slate-800 relative transition-colors duration-500">
+      {/* Sky Background - Light mode: white to light blue, Dark mode: slate to dawn yellow */}
       <div
-        className="absolute inset-0 z-0"
+        className="absolute inset-0 z-0 transition-all duration-500"
         style={{
-          backgroundImage: `
-        radial-gradient(125% 125% at 50% 90%, #ffffff 50%, #10b981 100%)
-      `,
-          backgroundSize: "100% 100%",
-          filter: "hue-rotate(60deg)"
+          backgroundImage: resolvedTheme === "dark"
+            ? `linear-gradient(to bottom, #334155 0%, #475569 40%, #f59e0b 100%)`
+            : `linear-gradient(to bottom, #e0f2fe 0%, #ffffff 100%)`,
+          backgroundSize: "100% 100%"
         }}
       />
+
+      {/* Subtle stars for dawn mode - very smooth twinkling */}
+      {resolvedTheme === "dark" && (
+        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+          {[...Array(20)].map((_, i) => {
+            const size = Math.random() * 1.5 + 0.8
+            const left = Math.random() * 100
+            const top = Math.random() * 40 // Only in upper 40% (sky area)
+            const delay = Math.random() * 12 // 0-12 seconds stagger
+            const duration = Math.random() * 8 + 10 // 10-18 seconds for ultra-smooth, natural twinkling
+            
+            return (
+              <div
+                key={i}
+                className="absolute rounded-full bg-amber-50 animate-twinkle"
+                style={{
+                  width: `${size}px`,
+                  height: `${size}px`,
+                  left: `${left}%`,
+                  top: `${top}%`,
+                  opacity: Math.random() * 0.2 + 0.2,
+                  animationDelay: `${delay}s`,
+                  animationDuration: `${duration}s`,
+                  boxShadow: `0 0 ${size * 2}px rgba(255, 251, 235, 0.3)`
+                }}
+              />
+            )
+          })}
+        </div>
+      )}
 
       <div
         className="relative h-screen overflow-hidden flex flex-col"
@@ -992,7 +1088,7 @@ const Popup = () => {
                 >
                   {isPomodoroExpanded ? (
                     // Expanded State
-                    <div className="flex items-center gap-2 bg-gradient-to-r from-emerald-100/70 via-emerald-50/40 to-white/20 dark:from-emerald-900/50 dark:via-emerald-950/30 dark:to-slate-900/30 backdrop-blur-md px-4 py-2 rounded-xl border border-white/30 dark:border-slate-600/40 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
+                    <div className="flex items-center gap-2 bg-gradient-to-r from-emerald-100/70 via-emerald-50/40 to-white/20 dark:from-emerald-900/50 dark:via-emerald-950/30 dark:to-slate-900/30 backdrop-blur-md px-4 py-2 rounded-xl border border-white/30 dark:border-emerald-400/40 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
                       {/* Progress indicator background - Subtle fill */}
                       <div
                         className={`absolute inset-0 rounded-xl transition-all duration-1000 ease-in-out ${pomodoroState.isActive
@@ -1067,7 +1163,7 @@ const Popup = () => {
                     // Collapsed State - Icon Button Only with Fill Progress
                     <button
                       onClick={() => setIsPomodoroExpanded(true)}
-                      className="relative h-10 w-10 bg-gradient-to-r from-emerald-100/70 via-emerald-50/40 to-white/20 dark:from-emerald-900/50 dark:via-emerald-950/30 dark:to-slate-900/30 backdrop-blur-md rounded-xl border border-white/30 dark:border-slate-600/40 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 flex items-center justify-center overflow-hidden"
+                      className="relative h-10 scale-110 w-10 bg-gradient-to-r from-emerald-100/70 via-emerald-50/40 to-white/20 dark:from-emerald-900/50 dark:via-emerald-950/30 dark:to-slate-900/30 backdrop-blur-md rounded-xl border border-white/30 dark:border-emerald-400/40 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 flex items-center justify-center overflow-hidden"
                       aria-label="Expand Pomodoro Timer"
                     >
                       {/* Progress Fill Overlay */}
@@ -1208,7 +1304,7 @@ const Popup = () => {
 
               {/* Tree Nurturing Message */}
               <p
-                className="text-green-900 text-center"
+                className="text-green-900 dark:text-green-300 text-center"
                 style={{ fontSize: "10px" }}>
                 🌱 Your tree thrives as your focus grows, keep nurturing it!
               </p>

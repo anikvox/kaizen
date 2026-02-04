@@ -40,6 +40,18 @@ export function DashboardContent() {
         setMounted(true);
     }, []);
 
+    // Sync theme with extension via postMessage to content script
+    useEffect(() => {
+        if (!mounted || !theme) return;
+
+        console.log("[Dashboard] Posting theme change:", theme);
+        // Post message to content script which will save to chrome.storage
+        window.postMessage({
+            type: "KAIZEN_THEME_CHANGE",
+            theme: theme
+        }, window.location.origin);
+    }, [theme, mounted]);
+
     const handleThemeToggle = () => {
         setTheme(theme === "dark" ? "light" : "dark");
     };
