@@ -21,6 +21,55 @@ app.get("/", async (c) => {
   });
 });
 
+// SSE endpoint for device list changes (requires Clerk auth)
+app.get("/devices", async (c) => {
+  const clerkUserId = c.get("clerkUserId");
+
+  const user = await db.user.findUnique({
+    where: { clerkId: clerkUserId },
+  });
+
+  if (!user) {
+    return c.json({ error: "User not found" }, 404);
+  }
+
+  return streamSSE(c, async (stream) => {
+    let id = 0;
+
+    // Send initial connection confirmation
+    await stream.writeSSE({
+      data: JSON.stringify({ connected: true }),
+      event: "connected",
+      id: String(id++),
+    });
+
+    // Listen for device list change events
+    const cleanup = events.onDeviceListChanged(async (data) => {
+      if (data.userId === user.id) {
+        await stream.writeSSE({
+          data: JSON.stringify({ action: data.action, deviceId: data.deviceId }),
+          event: "device-list-changed",
+          id: String(id++),
+        });
+      }
+    });
+
+    // Keep connection alive with periodic pings
+    try {
+      while (true) {
+        await stream.writeSSE({
+          data: JSON.stringify({ time: new Date().toISOString() }),
+          event: "ping",
+          id: String(id++),
+        });
+        await stream.sleep(30000);
+      }
+    } finally {
+      cleanup();
+    }
+  });
+});
+
 export default app;
 
 // Separate app for device token SSE (uses device token auth instead of Clerk)

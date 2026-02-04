@@ -5,6 +5,12 @@ export interface DeviceTokenRevokedEvent {
   userId: string;
 }
 
+export interface DeviceListChangedEvent {
+  userId: string;
+  action: "created" | "deleted";
+  deviceId: string;
+}
+
 class AppEvents extends EventEmitter {
   emitDeviceTokenRevoked(data: DeviceTokenRevokedEvent) {
     this.emit("deviceTokenRevoked", data);
@@ -13,6 +19,15 @@ class AppEvents extends EventEmitter {
   onDeviceTokenRevoked(callback: (data: DeviceTokenRevokedEvent) => void) {
     this.on("deviceTokenRevoked", callback);
     return () => this.off("deviceTokenRevoked", callback);
+  }
+
+  emitDeviceListChanged(data: DeviceListChangedEvent) {
+    this.emit("deviceListChanged", data);
+  }
+
+  onDeviceListChanged(callback: (data: DeviceListChangedEvent) => void) {
+    this.on("deviceListChanged", callback);
+    return () => this.off("deviceListChanged", callback);
   }
 }
 

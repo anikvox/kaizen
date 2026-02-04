@@ -1,5 +1,5 @@
 import type { HttpClient } from "../http.js";
-import type { SSETickData, SSEDeviceTokenRevokedData } from "../types/index.js";
+import type { SSETickData, SSEDeviceTokenRevokedData, SSEDeviceListChangedData } from "../types/index.js";
 
 export class SSEEndpoint {
   constructor(private http: HttpClient) {}
@@ -23,6 +23,18 @@ export class SSEEndpoint {
       onMessage,
       onError,
       deviceToken
+    );
+  }
+
+  async subscribeDeviceListChanged(
+    onMessage: (data: SSEDeviceListChangedData) => void,
+    onError?: (error: Event) => void
+  ): Promise<EventSource | null> {
+    return this.http.createAuthenticatedSSE<SSEDeviceListChangedData>(
+      "/sse/devices",
+      "device-list-changed",
+      onMessage,
+      onError
     );
   }
 }

@@ -29,6 +29,11 @@ export interface SSEDeviceTokenRevokedData {
   token: string;
 }
 
+export interface SSEDeviceListChangedData {
+  action: "created" | "deleted";
+  deviceId: string;
+}
+
 export interface ApiError {
   error: string;
 }

@@ -97,6 +97,36 @@ export class HttpClient {
     return eventSource;
   }
 
+  async createAuthenticatedSSE<T>(
+    path: string,
+    event: string,
+    onMessage: (data: T) => void,
+    onError?: (error: Event) => void
+  ): Promise<EventSource | null> {
+    const url = new URL(`${this.baseUrl}${path}`);
+
+    // Get auth token and pass via query param (EventSource doesn't support headers)
+    if (this.getToken) {
+      const authToken = await this.getToken();
+      if (authToken) {
+        url.searchParams.set("token", authToken);
+      }
+    }
+
+    const eventSource = new EventSource(url.toString());
+
+    eventSource.addEventListener(event, (e) => {
+      const data = JSON.parse(e.data);
+      onMessage(data);
+    });
+
+    if (onError) {
+      eventSource.onerror = onError;
+    }
+
+    return eventSource;
+  }
+
   getBaseUrl(): string {
     return this.baseUrl;
   }
