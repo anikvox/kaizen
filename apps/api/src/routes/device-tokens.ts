@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { db } from "../lib/index.js";
+import { db, events } from "../lib/index.js";
 import { authMiddleware, type AuthVariables } from "../middleware/index.js";
 import { randomBytes } from "crypto";
 
@@ -31,6 +31,13 @@ app.post("/", authMiddleware, async (c) => {
       name: body.name || "Chrome Extension",
       userId: user.id,
     },
+  });
+
+  // Emit event for SSE subscribers
+  events.emitDeviceListChanged({
+    userId: user.id,
+    action: "created",
+    deviceId: deviceToken.id,
   });
 
   return c.json({
@@ -92,6 +99,17 @@ app.delete("/:id", authMiddleware, async (c) => {
     where: { id: tokenId },
   });
 
+  // Emit events for SSE subscribers
+  events.emitDeviceTokenRevoked({
+    token: deviceToken.token,
+    userId: user.id,
+  });
+  events.emitDeviceListChanged({
+    userId: user.id,
+    action: "deleted",
+    deviceId: tokenId,
+  });
+
   return c.json({ success: true });
 });
 
@@ -113,6 +131,17 @@ app.post("/revoke", async (c) => {
 
   await db.deviceToken.delete({
     where: { id: deviceToken.id },
+  });
+
+  // Emit events for SSE subscribers
+  events.emitDeviceTokenRevoked({
+    token: deviceToken.token,
+    userId: deviceToken.userId,
+  });
+  events.emitDeviceListChanged({
+    userId: deviceToken.userId,
+    action: "deleted",
+    deviceId: deviceToken.id,
   });
 
   return c.json({ success: true });

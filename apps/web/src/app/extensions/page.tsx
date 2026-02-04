@@ -54,6 +54,37 @@ export default function Extensions() {
     fetchTokens();
   }, [isLoaded, isSignedIn, fetchTokens]);
 
+  // Subscribe to device list changes via SSE
+  useEffect(() => {
+    if (!isSignedIn || !clerkUser) return;
+
+    let eventSource: EventSource | null = null;
+
+    const setupSSE = async () => {
+      const api = createApiClient(apiUrl, getTokenFn);
+      eventSource = await api.sse.subscribeDeviceListChanged(
+        (data) => {
+          if (data.action === "created") {
+            // Refetch to get the new device
+            fetchTokens();
+          } else if (data.action === "deleted") {
+            // Remove the device locally
+            setTokens((prev) => prev.filter((t) => t.id !== data.deviceId));
+          }
+        },
+        (error) => {
+          console.error("SSE error:", error);
+        }
+      );
+    };
+
+    setupSSE();
+
+    return () => {
+      eventSource?.close();
+    };
+  }, [isSignedIn, clerkUser, getTokenFn, fetchTokens]);
+
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to unlink this extension? It will no longer be able to access your account.")) {
       return;
