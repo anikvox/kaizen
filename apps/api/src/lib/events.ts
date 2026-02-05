@@ -11,6 +11,14 @@ export interface DeviceListChangedEvent {
   deviceId: string;
 }
 
+export interface SettingsChangedEvent {
+  userId: string;
+  settings: {
+    cognitiveAttentionDebugMode: boolean;
+    cognitiveAttentionShowOverlay: boolean;
+  };
+}
+
 class AppEvents extends EventEmitter {
   emitDeviceTokenRevoked(data: DeviceTokenRevokedEvent) {
     this.emit("deviceTokenRevoked", data);
@@ -28,6 +36,15 @@ class AppEvents extends EventEmitter {
   onDeviceListChanged(callback: (data: DeviceListChangedEvent) => void) {
     this.on("deviceListChanged", callback);
     return () => this.off("deviceListChanged", callback);
+  }
+
+  emitSettingsChanged(data: SettingsChangedEvent) {
+    this.emit("settingsChanged", data);
+  }
+
+  onSettingsChanged(callback: (data: SettingsChangedEvent) => void) {
+    this.on("settingsChanged", callback);
+    return () => this.off("settingsChanged", callback);
   }
 }
 

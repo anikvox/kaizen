@@ -1,4 +1,5 @@
 import { Storage } from "@plasmohq/storage"
+import { startSettingsSync, stopSettingsSync } from "./settings-sync"
 
 const storage = new Storage()
 
@@ -12,9 +13,13 @@ async function updateActionBehavior() {
   if (token) {
     // User is logged in - disable popup so clicking opens sidepanel
     await chrome.action.setPopup({ popup: "" })
+    // Start settings sync when logged in
+    startSettingsSync()
   } else {
     // User is not logged in - enable popup for login
     await chrome.action.setPopup({ popup: "popup.html" })
+    // Stop settings sync when logged out
+    stopSettingsSync()
   }
 }
 
@@ -60,7 +65,7 @@ chrome.runtime.onConnect.addListener((port) => {
 // Watch for storage changes to update behavior
 storage.watch({
   deviceToken: async (change) => {
-    updateActionBehavior()
+    await updateActionBehavior()
 
     // Close sidepanel when user logs out
     if (!change.newValue) {

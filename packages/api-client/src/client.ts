@@ -1,5 +1,5 @@
 import { HttpClient } from "./http.js";
-import { HealthEndpoint, UsersEndpoint, SSEEndpoint, DeviceTokensEndpoint, WebsiteVisitsEndpoint, AttentionEndpoint, ExportEndpoint } from "./endpoints/index.js";
+import { HealthEndpoint, UsersEndpoint, SSEEndpoint, DeviceTokensEndpoint, WebsiteVisitsEndpoint, AttentionEndpoint, ExportEndpoint, SettingsEndpoint } from "./endpoints/index.js";
 import type { ApiClientOptions } from "./types/index.js";
 
 export class ApiClient {
@@ -12,6 +12,7 @@ export class ApiClient {
   public websiteVisits: WebsiteVisitsEndpoint;
   public attention: AttentionEndpoint;
   public export: ExportEndpoint;
+  public settings: SettingsEndpoint;
 
   constructor(options: ApiClientOptions) {
     this.http = new HttpClient(options);
@@ -22,6 +23,7 @@ export class ApiClient {
     this.websiteVisits = new WebsiteVisitsEndpoint(this.http);
     this.attention = new AttentionEndpoint(this.http);
     this.export = new ExportEndpoint(this.http);
+    this.settings = new SettingsEndpoint(this.http);
   }
 }
 
