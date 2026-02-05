@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
-import { db, events, fakeBot } from "../lib/index.js";
+import { db, events, bot, generateChatTitle } from "../lib/index.js";
 import type { BotMessage } from "../lib/index.js";
 
 // Timeout for bot typing state (1 minute)
@@ -292,7 +292,9 @@ app.post("/", dualAuthMiddleware, async (c) => {
     }));
 
   // Start bot response generation (non-blocking)
-  generateBotResponse(userId, sessionId, botMessage.id, botMessages);
+  // Pass first user message for title generation if this is a new session
+  const firstUserMessage = isNewSession ? body.content.trim() : undefined;
+  generateBotResponse(userId, sessionId, botMessage.id, botMessages, firstUserMessage);
 
   // Update session updatedAt
   await db.chatSession.update({
@@ -357,10 +359,11 @@ async function generateBotResponse(
   userId: string,
   sessionId: string,
   botMessageId: string,
-  conversationHistory: BotMessage[]
+  conversationHistory: BotMessage[],
+  firstUserMessage?: string // If provided, generate title after bot response
 ) {
   try {
-    await fakeBot.generateResponse(conversationHistory, {
+    await bot.generateResponse(conversationHistory, {
       onTyping: async () => {
         // Already in typing state, update to streaming when first chunk arrives
       },
@@ -422,11 +425,33 @@ async function generateBotResponse(
           },
         });
 
-        // Update session updatedAt
-        await db.chatSession.update({
-          where: { id: sessionId },
-          data: { updatedAt: new Date() },
-        });
+        // Generate and update chat title if this is the first message
+        if (firstUserMessage) {
+          try {
+            const title = await generateChatTitle(firstUserMessage);
+
+            // Update session with new title
+            await db.chatSession.update({
+              where: { id: sessionId },
+              data: { title, updatedAt: new Date() },
+            });
+
+            // Emit session updated event for title change
+            events.emitChatSessionUpdated({
+              userId,
+              sessionId,
+              updates: { title },
+            });
+          } catch (error) {
+            console.error("Failed to generate chat title:", error);
+          }
+        } else {
+          // Just update session updatedAt
+          await db.chatSession.update({
+            where: { id: sessionId },
+            data: { updatedAt: new Date() },
+          });
+        }
       },
 
       onError: async (error: Error) => {
