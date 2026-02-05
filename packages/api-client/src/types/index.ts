@@ -302,15 +302,40 @@ export interface AttentionResponse {
   pages: AttentionPageSummary[];
 }
 
+// LLM Types
+export type LLMProviderType = "gemini" | "anthropic" | "openai";
+
+export interface ModelInfo {
+  id: string;
+  name: string;
+  description: string;
+  contextWindow: number;
+  maxOutputTokens: number;
+}
+
+export type LLMModels = Record<LLMProviderType, ModelInfo[]>;
+
 // Settings Types
 export interface UserSettings {
   cognitiveAttentionDebugMode: boolean;
   cognitiveAttentionShowOverlay: boolean;
+  // LLM settings
+  llmProvider?: LLMProviderType | null;
+  llmModel?: string | null;
+  hasGeminiApiKey?: boolean;
+  hasAnthropicApiKey?: boolean;
+  hasOpenaiApiKey?: boolean;
 }
 
 export interface UserSettingsUpdateRequest {
   cognitiveAttentionDebugMode?: boolean;
   cognitiveAttentionShowOverlay?: boolean;
+  // LLM settings
+  llmProvider?: LLMProviderType | null;
+  llmModel?: string | null;
+  geminiApiKey?: string | null;
+  anthropicApiKey?: string | null;
+  openaiApiKey?: string | null;
 }
 
 export interface SSESettingsConnectedData {
@@ -321,6 +346,12 @@ export interface SSESettingsConnectedData {
 export interface SSESettingsChangedData {
   cognitiveAttentionDebugMode: boolean;
   cognitiveAttentionShowOverlay: boolean;
+  // LLM settings (optional for backward compatibility)
+  llmProvider?: LLMProviderType | null;
+  llmModel?: string | null;
+  hasGeminiApiKey?: boolean;
+  hasAnthropicApiKey?: boolean;
+  hasOpenaiApiKey?: boolean;
 }
 
 // Chat Types

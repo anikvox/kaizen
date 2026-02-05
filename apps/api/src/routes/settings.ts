@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
-import { db, events } from "../lib/index.js";
+import { db, events, encrypt, ALL_MODELS, decryptApiKey, fetchModelsForProvider } from "../lib/index.js";
+import type { LLMProviderType } from "../lib/index.js";
+import { env } from "../lib/env.js";
 import { authMiddleware, deviceAuthMiddleware, type AuthVariables, type DeviceAuthVariables } from "../middleware/index.js";
 
 // Combined variables type for routes that support both auth methods
@@ -80,25 +82,83 @@ app.get("/", dualAuthMiddleware, async (c) => {
     return c.json({ error: "User not found" }, 404);
   }
 
-  let settings = await db.userSettings.findUnique({
+  // Use upsert to avoid race condition when multiple requests try to create settings
+  const settings = await db.userSettings.upsert({
     where: { userId },
+    update: {}, // No updates on GET, just ensure it exists
+    create: {
+      userId,
+      cognitiveAttentionDebugMode: false,
+      cognitiveAttentionShowOverlay: false,
+    },
   });
-
-  // Create default settings if they don't exist
-  if (!settings) {
-    settings = await db.userSettings.create({
-      data: {
-        userId,
-        cognitiveAttentionDebugMode: false,
-        cognitiveAttentionShowOverlay: false,
-      },
-    });
-  }
 
   return c.json({
     cognitiveAttentionDebugMode: settings.cognitiveAttentionDebugMode,
     cognitiveAttentionShowOverlay: settings.cognitiveAttentionShowOverlay,
+    // LLM settings (don't expose actual API keys, just whether they're set)
+    llmProvider: settings.llmProvider,
+    llmModel: settings.llmModel,
+    hasGeminiApiKey: !!settings.geminiApiKeyEncrypted,
+    hasAnthropicApiKey: !!settings.anthropicApiKeyEncrypted,
+    hasOpenaiApiKey: !!settings.openaiApiKeyEncrypted,
   });
+});
+
+// Get available LLM models (static fallback)
+app.get("/llm/models", dualAuthMiddleware, async (c) => {
+  return c.json(ALL_MODELS);
+});
+
+// Fetch models dynamically for a specific provider using user's API key
+app.get("/llm/models/:provider", dualAuthMiddleware, async (c) => {
+  const userId = await getUserIdFromContext(c);
+  if (!userId) {
+    return c.json({ error: "User not found" }, 404);
+  }
+
+  const provider = c.req.param("provider") as LLMProviderType;
+  if (!["gemini", "anthropic", "openai"].includes(provider)) {
+    return c.json({ error: "Invalid provider" }, 400);
+  }
+
+  // Get user settings to retrieve their API key
+  const settings = await db.userSettings.findUnique({
+    where: { userId },
+  });
+
+  // Determine which API key to use
+  let apiKey: string | null = null;
+
+  switch (provider) {
+    case "gemini":
+      apiKey = decryptApiKey(settings?.geminiApiKeyEncrypted) || env.geminiApiKey || null;
+      break;
+    case "anthropic":
+      apiKey = decryptApiKey(settings?.anthropicApiKeyEncrypted);
+      break;
+    case "openai":
+      apiKey = decryptApiKey(settings?.openaiApiKeyEncrypted);
+      break;
+  }
+
+  if (!apiKey) {
+    // Return static models if no API key (for gemini system default)
+    if (provider === "gemini" && env.geminiApiKey) {
+      apiKey = env.geminiApiKey;
+    } else {
+      return c.json({ error: "No API key configured for this provider" }, 400);
+    }
+  }
+
+  try {
+    const models = await fetchModelsForProvider(provider, apiKey);
+    return c.json(models);
+  } catch (error) {
+    console.error(`Failed to fetch models for ${provider}:`, error);
+    // Fall back to static models on error
+    return c.json(ALL_MODELS[provider] || []);
+  }
 });
 
 // Update user settings (supports both Clerk and device token auth)
@@ -112,23 +172,65 @@ app.post("/", dualAuthMiddleware, async (c) => {
   const body = await c.req.json<{
     cognitiveAttentionDebugMode?: boolean;
     cognitiveAttentionShowOverlay?: boolean;
+    // LLM settings
+    llmProvider?: LLMProviderType | null;
+    llmModel?: string | null;
+    geminiApiKey?: string | null;
+    anthropicApiKey?: string | null;
+    openaiApiKey?: string | null;
   }>();
+
+  // Build update data - using Prisma's unchecked types for direct field assignment
+  const updateData: Parameters<typeof db.userSettings.update>[0]["data"] = {};
+  const createData = {
+    userId,
+    cognitiveAttentionDebugMode: false as boolean,
+    cognitiveAttentionShowOverlay: false as boolean,
+    llmProvider: null as string | null,
+    llmModel: null as string | null,
+    geminiApiKeyEncrypted: null as string | null,
+    anthropicApiKeyEncrypted: null as string | null,
+    openaiApiKeyEncrypted: null as string | null,
+  };
+
+  // Cognitive attention settings
+  if (body.cognitiveAttentionDebugMode !== undefined) {
+    updateData.cognitiveAttentionDebugMode = body.cognitiveAttentionDebugMode;
+    createData.cognitiveAttentionDebugMode = body.cognitiveAttentionDebugMode;
+  }
+  if (body.cognitiveAttentionShowOverlay !== undefined) {
+    updateData.cognitiveAttentionShowOverlay = body.cognitiveAttentionShowOverlay;
+    createData.cognitiveAttentionShowOverlay = body.cognitiveAttentionShowOverlay;
+  }
+
+  // LLM settings
+  if (body.llmProvider !== undefined) {
+    updateData.llmProvider = body.llmProvider;
+    createData.llmProvider = body.llmProvider;
+  }
+  if (body.llmModel !== undefined) {
+    updateData.llmModel = body.llmModel;
+    createData.llmModel = body.llmModel;
+  }
+
+  // API keys - encrypt before storing, null clears the key
+  if (body.geminiApiKey !== undefined) {
+    updateData.geminiApiKeyEncrypted = body.geminiApiKey ? encrypt(body.geminiApiKey) : null;
+    createData.geminiApiKeyEncrypted = body.geminiApiKey ? encrypt(body.geminiApiKey) : null;
+  }
+  if (body.anthropicApiKey !== undefined) {
+    updateData.anthropicApiKeyEncrypted = body.anthropicApiKey ? encrypt(body.anthropicApiKey) : null;
+    createData.anthropicApiKeyEncrypted = body.anthropicApiKey ? encrypt(body.anthropicApiKey) : null;
+  }
+  if (body.openaiApiKey !== undefined) {
+    updateData.openaiApiKeyEncrypted = body.openaiApiKey ? encrypt(body.openaiApiKey) : null;
+    createData.openaiApiKeyEncrypted = body.openaiApiKey ? encrypt(body.openaiApiKey) : null;
+  }
 
   const settings = await db.userSettings.upsert({
     where: { userId },
-    update: {
-      ...(body.cognitiveAttentionDebugMode !== undefined && {
-        cognitiveAttentionDebugMode: body.cognitiveAttentionDebugMode,
-      }),
-      ...(body.cognitiveAttentionShowOverlay !== undefined && {
-        cognitiveAttentionShowOverlay: body.cognitiveAttentionShowOverlay,
-      }),
-    },
-    create: {
-      userId,
-      cognitiveAttentionDebugMode: body.cognitiveAttentionDebugMode ?? false,
-      cognitiveAttentionShowOverlay: body.cognitiveAttentionShowOverlay ?? false,
-    },
+    update: updateData,
+    create: createData,
   });
 
   // Emit settings changed event for SSE subscribers
@@ -137,12 +239,22 @@ app.post("/", dualAuthMiddleware, async (c) => {
     settings: {
       cognitiveAttentionDebugMode: settings.cognitiveAttentionDebugMode,
       cognitiveAttentionShowOverlay: settings.cognitiveAttentionShowOverlay,
+      llmProvider: settings.llmProvider,
+      llmModel: settings.llmModel,
+      hasGeminiApiKey: !!settings.geminiApiKeyEncrypted,
+      hasAnthropicApiKey: !!settings.anthropicApiKeyEncrypted,
+      hasOpenaiApiKey: !!settings.openaiApiKeyEncrypted,
     },
   });
 
   return c.json({
     cognitiveAttentionDebugMode: settings.cognitiveAttentionDebugMode,
     cognitiveAttentionShowOverlay: settings.cognitiveAttentionShowOverlay,
+    llmProvider: settings.llmProvider,
+    llmModel: settings.llmModel,
+    hasGeminiApiKey: !!settings.geminiApiKeyEncrypted,
+    hasAnthropicApiKey: !!settings.anthropicApiKeyEncrypted,
+    hasOpenaiApiKey: !!settings.openaiApiKeyEncrypted,
   });
 });
 
@@ -196,20 +308,16 @@ settingsSSE.get("/", async (c) => {
   return streamSSE(c, async (stream) => {
     let id = 0;
 
-    // Get or create settings
-    let settings = await db.userSettings.findUnique({
+    // Get or create settings using upsert to avoid race condition
+    const settings = await db.userSettings.upsert({
       where: { userId },
+      update: {},
+      create: {
+        userId,
+        cognitiveAttentionDebugMode: false,
+        cognitiveAttentionShowOverlay: false,
+      },
     });
-
-    if (!settings) {
-      settings = await db.userSettings.create({
-        data: {
-          userId,
-          cognitiveAttentionDebugMode: false,
-          cognitiveAttentionShowOverlay: false,
-        },
-      });
-    }
 
     // Send initial connection with current settings
     await stream.writeSSE({
@@ -218,6 +326,11 @@ settingsSSE.get("/", async (c) => {
         settings: {
           cognitiveAttentionDebugMode: settings.cognitiveAttentionDebugMode,
           cognitiveAttentionShowOverlay: settings.cognitiveAttentionShowOverlay,
+          llmProvider: settings.llmProvider,
+          llmModel: settings.llmModel,
+          hasGeminiApiKey: !!settings.geminiApiKeyEncrypted,
+          hasAnthropicApiKey: !!settings.anthropicApiKeyEncrypted,
+          hasOpenaiApiKey: !!settings.openaiApiKeyEncrypted,
         },
       }),
       event: "connected",

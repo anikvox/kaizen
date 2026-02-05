@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
-import { db, events, bot, generateChatTitle } from "../lib/index.js";
+import type { UserSettings } from "@prisma/client";
+import { db, events, createLLMBot, generateChatTitle } from "../lib/index.js";
 import type { BotMessage } from "../lib/index.js";
 
 // Timeout for bot typing state (1 minute)
@@ -291,10 +292,15 @@ app.post("/", dualAuthMiddleware, async (c) => {
       content: m.content,
     }));
 
+  // Fetch user settings for LLM configuration
+  const userSettings = await db.userSettings.findUnique({
+    where: { userId },
+  });
+
   // Start bot response generation (non-blocking)
   // Pass first user message for title generation if this is a new session
   const firstUserMessage = isNewSession ? body.content.trim() : undefined;
-  generateBotResponse(userId, sessionId, botMessage.id, botMessages, firstUserMessage);
+  generateBotResponse(userId, sessionId, botMessage.id, botMessages, firstUserMessage, userSettings);
 
   // Update session updatedAt
   await db.chatSession.update({
@@ -360,8 +366,12 @@ async function generateBotResponse(
   sessionId: string,
   botMessageId: string,
   conversationHistory: BotMessage[],
-  firstUserMessage?: string // If provided, generate title after bot response
+  firstUserMessage?: string, // If provided, generate title after bot response
+  userSettings?: UserSettings | null
 ) {
+  // Create bot with user's LLM settings (or system default)
+  const bot = createLLMBot(userSettings);
+
   try {
     await bot.generateResponse(conversationHistory, {
       onTyping: async () => {

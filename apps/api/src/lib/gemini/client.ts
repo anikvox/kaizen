@@ -2,6 +2,9 @@ import { GoogleGenAI } from "@google/genai";
 import { trackGemini } from "opik-gemini";
 import { env } from "../env.js";
 
+// Type for the tracked client with Opik extension
+type TrackedGoogleGenAI = GoogleGenAI & { flush(): Promise<void> };
+
 // Gemini model configuration
 export const GEMINI_MODELS = {
   flash: "gemini-2.5-flash-lite",
@@ -14,9 +17,9 @@ export type GeminiModel = (typeof GEMINI_MODELS)[keyof typeof GEMINI_MODELS];
 export const DEFAULT_CHAT_MODEL = GEMINI_MODELS.flash;
 
 // Create tracked Gemini client (lazy initialization)
-let _gemini: ReturnType<typeof trackGemini> | null = null;
+let _gemini: TrackedGoogleGenAI | null = null;
 
-function createGeminiClient() {
+function createGeminiClient(): TrackedGoogleGenAI {
   if (!env.geminiApiKey) {
     throw new Error("GEMINI_API_KEY is not set");
   }
@@ -30,7 +33,7 @@ function createGeminiClient() {
       tags: ["kaizen"],
       project: env.opikProjectName,
     },
-  });
+  }) as TrackedGoogleGenAI;
 }
 
 // Get or create the Gemini client

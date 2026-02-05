@@ -4,6 +4,9 @@ import type {
   UserSettingsUpdateRequest,
   SSESettingsConnectedData,
   SSESettingsChangedData,
+  LLMModels,
+  LLMProviderType,
+  ModelInfo,
 } from "../types/index.js";
 
 export class SettingsEndpoint {
@@ -43,6 +46,38 @@ export class SettingsEndpoint {
       return response.json();
     }
     return this.http.post<UserSettings>("/settings", settings, true);
+  }
+
+  async getLLMModels(deviceToken?: string): Promise<LLMModels> {
+    if (deviceToken) {
+      // Use device token auth
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${deviceToken}`,
+      };
+      const response = await fetch(`${this.http.getBaseUrl()}/settings/llm/models`, { headers });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    }
+    return this.http.get<LLMModels>("/settings/llm/models", true);
+  }
+
+  async getModelsForProvider(provider: LLMProviderType, deviceToken?: string): Promise<ModelInfo[]> {
+    if (deviceToken) {
+      // Use device token auth
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${deviceToken}`,
+      };
+      const response = await fetch(`${this.http.getBaseUrl()}/settings/llm/models/${provider}`, { headers });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    }
+    return this.http.get<ModelInfo[]>(`/settings/llm/models/${provider}`, true);
   }
 
   subscribeSettings(

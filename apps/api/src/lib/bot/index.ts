@@ -1,21 +1,22 @@
 export type { BotInterface, BotMessage, BotCallbacks } from "./interface.js";
 export { FakeBot, fakeBot } from "./fake-bot.js";
 export { GeminiBot, geminiBot } from "./gemini-bot.js";
+export { LLMBot, createLLMBot } from "./llm-bot.js";
 
 import { env } from "../env.js";
 import { fakeBot } from "./fake-bot.js";
-import { geminiBot } from "./gemini-bot.js";
+import { LLMBot } from "./llm-bot.js";
 import type { BotInterface } from "./interface.js";
 
-// Select bot based on environment
-// Use Gemini if API key is available, otherwise fall back to fake bot
-function selectBot(): BotInterface {
+// Select default bot based on environment
+// Use LLMBot (with system Gemini) if API key is available, otherwise fall back to fake bot
+function selectDefaultBot(): BotInterface {
   if (env.geminiApiKey) {
-    return geminiBot;
+    return new LLMBot(); // Uses system default (Gemini)
   }
   console.warn("GEMINI_API_KEY not set, using fake bot");
   return fakeBot;
 }
 
-// Default bot to use in the application
-export const bot = selectBot();
+// Default bot for simple use cases (no user settings)
+export const bot = selectDefaultBot();

@@ -16,6 +16,12 @@ export interface SettingsChangedEvent {
   settings: {
     cognitiveAttentionDebugMode: boolean;
     cognitiveAttentionShowOverlay: boolean;
+    // LLM settings
+    llmProvider?: string | null;
+    llmModel?: string | null;
+    hasGeminiApiKey?: boolean;
+    hasAnthropicApiKey?: boolean;
+    hasOpenaiApiKey?: boolean;
   };
 }
 
