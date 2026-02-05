@@ -95,11 +95,24 @@ deviceTokenSSE.get("/", async (c) => {
   return streamSSE(c, async (stream) => {
     let id = 0;
 
-    // Send initial connection confirmation
+    // Send initial connection confirmation with user info
     await stream.writeSSE({
-      data: JSON.stringify({ connected: true }),
+      data: JSON.stringify({
+        connected: true,
+        user: {
+          id: deviceToken.user.id,
+          email: deviceToken.user.email,
+          name: deviceToken.user.name,
+        },
+      }),
       event: "connected",
       id: String(id++),
+    });
+
+    // Update last used timestamp
+    await db.deviceToken.update({
+      where: { id: deviceToken.id },
+      data: { lastUsedAt: new Date() },
     });
 
     // Listen for device token revocation events

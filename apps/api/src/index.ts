@@ -25,8 +25,9 @@ app.get("/", (c) => {
 
 app.route("/health", healthRoutes);
 app.route("/users", usersRoutes);
-app.route("/sse", sseRoutes);
+// Mount device-token SSE before general SSE to avoid auth middleware conflict
 app.route("/sse/device-token", deviceTokenSSERoutes);
+app.route("/sse", sseRoutes);
 app.route("/device-tokens", deviceTokenRoutes);
 app.route("/website-visits", websiteVisitsRoutes);
 app.route("/attention", attentionRoutes);

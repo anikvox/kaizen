@@ -147,36 +147,4 @@ app.post("/revoke", async (c) => {
   return c.json({ success: true });
 });
 
-// Verify a device token and get user info (used by extension)
-app.post("/verify", async (c) => {
-  const body = await c.req.json<{ token: string }>();
-
-  if (!body.token) {
-    return c.json({ error: "Token required" }, 400);
-  }
-
-  const deviceToken = await db.deviceToken.findUnique({
-    where: { token: body.token },
-    include: { user: true },
-  });
-
-  if (!deviceToken) {
-    return c.json({ error: "Invalid token" }, 401);
-  }
-
-  // Update last used timestamp
-  await db.deviceToken.update({
-    where: { id: deviceToken.id },
-    data: { lastUsedAt: new Date() },
-  });
-
-  return c.json({
-    user: {
-      id: deviceToken.user.id,
-      email: deviceToken.user.email,
-      name: deviceToken.user.name,
-    },
-  });
-});
-
 export default app;

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useRef } from "react"
 import { Storage } from "@plasmohq/storage"
 import { createApiClient } from "@kaizen/api-client"
 
@@ -15,20 +15,7 @@ interface UserInfo {
 function SidePanel() {
   const [user, setUser] = useState<UserInfo | null>(null)
   const [loading, setLoading] = useState(true)
-
-  const verifyToken = useCallback(async (token: string) => {
-    const api = createApiClient(apiUrl)
-    try {
-      const result = await api.deviceTokens.verify(token)
-      setUser(result.user)
-      return true
-    } catch {
-      // Token invalid, clear it
-      await storage.remove("deviceToken")
-      setUser(null)
-      return false
-    }
-  }, [])
+  const eventSourceRef = useRef<EventSource | null>(null)
 
   const handleUnlink = async () => {
     const token = await storage.get<string>("deviceToken")
@@ -50,23 +37,97 @@ function SidePanel() {
     return () => port.disconnect()
   }, [])
 
+  // Setup SSE connection for authentication and revocation events
   useEffect(() => {
-    const checkAuth = async () => {
-      const token = await storage.get<string>("deviceToken")
-      if (token) {
-        await verifyToken(token)
-      }
-      setLoading(false)
-    }
-    checkAuth()
-  }, [verifyToken])
+    let cancelled = false
 
-  // Listen for storage changes
+    const setupSSE = async () => {
+      // Close existing connection
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close()
+        eventSourceRef.current = null
+      }
+
+      const token = await storage.get<string>("deviceToken")
+      if (!token) {
+        setUser(null)
+        setLoading(false)
+        return
+      }
+
+      const api = createApiClient(apiUrl)
+      const eventSource = api.sse.subscribeDeviceToken(
+        (data) => {
+          // Connected successfully, set user from SSE response
+          if (!cancelled) {
+            setUser(data.user)
+            setLoading(false)
+          }
+        },
+        async (data) => {
+          // Token was revoked remotely, clear local state
+          if (data.token === token) {
+            await storage.remove("deviceToken")
+            if (!cancelled) {
+              setUser(null)
+            }
+          }
+        },
+        async () => {
+          // On error, token is likely invalid - clear it
+          await storage.remove("deviceToken")
+          if (!cancelled) {
+            setUser(null)
+            setLoading(false)
+          }
+        },
+        token
+      )
+
+      eventSourceRef.current = eventSource
+    }
+
+    setupSSE()
+
+    return () => {
+      cancelled = true
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close()
+        eventSourceRef.current = null
+      }
+    }
+  }, [])
+
+  // Listen for storage changes to reconnect SSE
   useEffect(() => {
     const callbackMap = {
       deviceToken: async (change: { newValue?: string }) => {
+        // Close existing connection
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close()
+          eventSourceRef.current = null
+        }
+
         if (change.newValue) {
-          await verifyToken(change.newValue)
+          // New token, setup new SSE connection
+          const api = createApiClient(apiUrl)
+          const eventSource = api.sse.subscribeDeviceToken(
+            (data) => {
+              setUser(data.user)
+            },
+            async (data) => {
+              if (data.token === change.newValue) {
+                await storage.remove("deviceToken")
+                setUser(null)
+              }
+            },
+            async () => {
+              await storage.remove("deviceToken")
+              setUser(null)
+            },
+            change.newValue
+          )
+          eventSourceRef.current = eventSource
         } else {
           setUser(null)
         }
@@ -78,41 +139,7 @@ function SidePanel() {
     return () => {
       storage.unwatch(callbackMap)
     }
-  }, [verifyToken])
-
-  // Subscribe to SSE for remote unlink events
-  useEffect(() => {
-    let eventSource: EventSource | null = null
-
-    const setupSSE = async () => {
-      const token = await storage.get<string>("deviceToken")
-      if (!token || !user) return
-
-      const api = createApiClient(apiUrl)
-      eventSource = api.sse.subscribeDeviceTokenRevoked(
-        async (data) => {
-          // Token was revoked remotely, clear local state
-          if (data.token === token) {
-            await storage.remove("deviceToken")
-            setUser(null)
-          }
-        },
-        () => {
-          // On error, verify token is still valid
-          if (token) {
-            verifyToken(token)
-          }
-        },
-        token
-      )
-    }
-
-    setupSSE()
-
-    return () => {
-      eventSource?.close()
-    }
-  }, [user, verifyToken])
+  }, [])
 
   if (loading) {
     return (

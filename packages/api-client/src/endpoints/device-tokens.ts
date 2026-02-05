@@ -2,7 +2,6 @@ import type { HttpClient } from "../http.js";
 import type {
   DeviceToken,
   DeviceTokenCreated,
-  DeviceTokenVerifyResponse,
 } from "../types/index.js";
 
 export class DeviceTokensEndpoint {
@@ -22,14 +21,6 @@ export class DeviceTokensEndpoint {
 
   async delete(id: string): Promise<{ success: boolean }> {
     return this.http.delete<{ success: boolean }>(`/device-tokens/${id}`, true);
-  }
-
-  async verify(token: string): Promise<DeviceTokenVerifyResponse> {
-    return this.http.post<DeviceTokenVerifyResponse>(
-      "/device-tokens/verify",
-      { token },
-      false
-    );
   }
 
   async revoke(token: string): Promise<{ success: boolean }> {

@@ -29,6 +29,15 @@ export interface SSEDeviceTokenRevokedData {
   token: string;
 }
 
+export interface SSEDeviceTokenConnectedData {
+  connected: true;
+  user: {
+    id: string;
+    email: string;
+    name: string | null;
+  };
+}
+
 export interface SSEDeviceListChangedData {
   action: "created" | "deleted";
   deviceId: string;
@@ -52,13 +61,6 @@ export interface DeviceTokenCreated {
   createdAt: string;
 }
 
-export interface DeviceTokenVerifyResponse {
-  user: {
-    id: string;
-    email: string;
-    name: string | null;
-  };
-}
 
 // Website Visit Types
 export interface WebsiteVisit {

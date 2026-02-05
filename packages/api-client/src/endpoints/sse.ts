@@ -1,5 +1,5 @@
 import type { HttpClient } from "../http.js";
-import type { SSETickData, SSEDeviceTokenRevokedData, SSEDeviceListChangedData } from "../types/index.js";
+import type { SSETickData, SSEDeviceTokenRevokedData, SSEDeviceListChangedData, SSEDeviceTokenConnectedData } from "../types/index.js";
 
 export class SSEEndpoint {
   constructor(private http: HttpClient) {}
@@ -12,18 +12,34 @@ export class SSEEndpoint {
     return this.http.createSSE<SSETickData>("/sse", "tick", onMessage, onError, token);
   }
 
-  subscribeDeviceTokenRevoked(
-    onMessage: (data: SSEDeviceTokenRevokedData) => void,
+  subscribeDeviceToken(
+    onConnected: (data: SSEDeviceTokenConnectedData) => void,
+    onRevoked: (data: SSEDeviceTokenRevokedData) => void,
     onError?: (error: Event) => void,
     deviceToken?: string
   ): EventSource {
-    return this.http.createSSE<SSEDeviceTokenRevokedData>(
-      "/sse/device-token",
-      "device-token-revoked",
-      onMessage,
-      onError,
-      deviceToken
-    );
+    const url = new URL(`${this.http.getBaseUrl()}/sse/device-token`);
+    if (deviceToken) {
+      url.searchParams.set("token", deviceToken);
+    }
+
+    const eventSource = new EventSource(url.toString());
+
+    eventSource.addEventListener("connected", (e) => {
+      const data = JSON.parse((e as MessageEvent).data);
+      onConnected(data);
+    });
+
+    eventSource.addEventListener("device-token-revoked", (e) => {
+      const data = JSON.parse((e as MessageEvent).data);
+      onRevoked(data);
+    });
+
+    if (onError) {
+      eventSource.onerror = onError;
+    }
+
+    return eventSource;
   }
 
   async subscribeDeviceListChanged(
