@@ -358,6 +358,15 @@ export interface SSESettingsChangedData {
 export type ChatMessageRole = "user" | "bot";
 export type ChatMessageStatus = "sending" | "sent" | "typing" | "streaming" | "finished" | "error";
 
+/**
+ * Attention time range options for chat context.
+ * - "30m": Last 30 minutes
+ * - "2h": Last 2 hours
+ * - "1d": Last 24 hours
+ * - "all": All available data
+ */
+export type ChatAttentionRange = "30m" | "2h" | "1d" | "all";
+
 export interface ChatMessage {
   id: string;
   role: ChatMessageRole;
@@ -371,6 +380,7 @@ export interface ChatMessage {
 export interface ChatSession {
   id: string;
   title: string | null;
+  attentionRange: ChatAttentionRange;
   createdAt: string;
   updatedAt: string;
 }
@@ -382,6 +392,7 @@ export interface ChatSessionWithMessages extends ChatSession {
 export interface ChatSessionListItem {
   id: string;
   title: string | null;
+  attentionRange: ChatAttentionRange;
   messageCount: number;
   createdAt: string;
   updatedAt: string;
@@ -390,6 +401,11 @@ export interface ChatSessionListItem {
 export interface SendMessageRequest {
   sessionId?: string;
   content: string;
+  /**
+   * Required attention time range for chat context.
+   * Determines how much of the user's recent activity data is included as context.
+   */
+  attentionRange: ChatAttentionRange;
 }
 
 export interface SendMessageResponse {

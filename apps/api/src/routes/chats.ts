@@ -1,8 +1,41 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { UserSettings } from "@prisma/client";
-import { db, events, createLLMBot, generateChatTitle } from "../lib/index.js";
+import {
+  db,
+  events,
+  createLLMBot,
+  generateChatTitle,
+  getAttentionData,
+  serializeAttentionForLLM,
+  SYSTEM_PROMPTS,
+} from "../lib/index.js";
 import type { BotMessage, BotMediaPart } from "../lib/index.js";
+
+// Valid attention range values
+type ChatAttentionRange = "30m" | "2h" | "1d" | "all";
+
+const ATTENTION_RANGE_MS: Record<ChatAttentionRange, number> = {
+  "30m": 30 * 60 * 1000,
+  "2h": 2 * 60 * 60 * 1000,
+  "1d": 24 * 60 * 60 * 1000,
+  "all": 10 * 365 * 24 * 60 * 60 * 1000, // 10 years
+};
+
+function isValidAttentionRange(range: string): range is ChatAttentionRange {
+  return ["30m", "2h", "1d", "all"].includes(range);
+}
+
+/**
+ * Build a system prompt that includes the user's attention context.
+ */
+function buildSystemPromptWithAttention(attentionContext: string): string {
+  return `${SYSTEM_PROMPTS.chat}
+
+You have access to the user's recent browsing activity and attention data. Use this context to provide more personalized and relevant responses. The user may ask questions about what they were reading, watching, or doing online.
+
+${attentionContext}`;
+}
 
 // Timeout for bot typing state (1 minute)
 const BOT_TYPING_TIMEOUT_MS = 60 * 1000;
@@ -83,25 +116,26 @@ app.get("/", dualAuthMiddleware, async (c) => {
     return c.json({ error: "User not found" }, 404);
   }
 
+  // Note: attentionRange field requires Prisma client regeneration after schema update
   const sessions = await db.chatSession.findMany({
     where: { userId },
     orderBy: { updatedAt: "desc" },
-    select: {
-      id: true,
-      title: true,
-      createdAt: true,
-      updatedAt: true,
-      _count: {
-        select: { messages: true },
-      },
-    },
   });
+
+  const sessionCounts = await db.chatMessage.groupBy({
+    by: ["sessionId"],
+    where: { sessionId: { in: sessions.map((s) => s.id) } },
+    _count: true,
+  });
+
+  const countMap = new Map(sessionCounts.map((c) => [c.sessionId, c._count]));
 
   return c.json(
     sessions.map((s) => ({
       id: s.id,
       title: s.title,
-      messageCount: s._count.messages,
+      attentionRange: (s as any).attentionRange || "2h",
+      messageCount: countMap.get(s.id) || 0,
       createdAt: s.createdAt.toISOString(),
       updatedAt: s.updatedAt.toISOString(),
     }))
@@ -133,6 +167,7 @@ app.get("/:sessionId", dualAuthMiddleware, async (c) => {
   return c.json({
     id: session.id,
     title: session.title,
+    attentionRange: (session as any).attentionRange || "2h",
     createdAt: session.createdAt.toISOString(),
     updatedAt: session.updatedAt.toISOString(),
     messages: session.messages.map((m) => ({
@@ -157,22 +192,32 @@ app.post("/", dualAuthMiddleware, async (c) => {
   const body = await c.req.json<{
     sessionId?: string;
     content: string;
+    attentionRange: string;
   }>();
 
   if (!body.content?.trim()) {
     return c.json({ error: "Message content is required" }, 400);
   }
 
+  if (!body.attentionRange || !isValidAttentionRange(body.attentionRange)) {
+    return c.json({ error: "Valid attentionRange is required (30m, 2h, 1d, or all)" }, 400);
+  }
+
+  const attentionRange = body.attentionRange as ChatAttentionRange;
+
   let sessionId = body.sessionId;
   let isNewSession = false;
+  let sessionAttentionRange: ChatAttentionRange = attentionRange;
 
   // Create new session if not provided
   if (!sessionId) {
+    // Note: attentionRange field requires Prisma client regeneration after schema update
     const session = await db.chatSession.create({
       data: {
         userId,
         title: "New Chat", // Hardcoded for now, bot will update later
-      },
+        attentionRange,
+      } as any,
     });
     sessionId = session.id;
     isNewSession = true;
@@ -184,12 +229,13 @@ app.post("/", dualAuthMiddleware, async (c) => {
       session: {
         id: session.id,
         title: session.title,
+        attentionRange,
         createdAt: session.createdAt.toISOString(),
         updatedAt: session.updatedAt.toISOString(),
       },
     });
   } else {
-    // Verify session belongs to user
+    // Verify session belongs to user and get its attention range
     const existingSession = await db.chatSession.findFirst({
       where: { id: sessionId, userId },
     });
@@ -197,6 +243,27 @@ app.post("/", dualAuthMiddleware, async (c) => {
     if (!existingSession) {
       return c.json({ error: "Chat session not found" }, 404);
     }
+
+    // Use the session's stored attention range
+    sessionAttentionRange = ((existingSession as any).attentionRange || "2h") as ChatAttentionRange;
+  }
+
+  // Fetch attention data for the system prompt
+  const now = new Date();
+  const attentionTimeRange = {
+    from: new Date(now.getTime() - ATTENTION_RANGE_MS[sessionAttentionRange]),
+    to: now,
+  };
+
+  let attentionContext = "";
+  try {
+    const attentionData = await getAttentionData(userId, attentionTimeRange);
+    if (attentionData.pages.length > 0) {
+      attentionContext = serializeAttentionForLLM(attentionData);
+    }
+  } catch (error) {
+    console.error("Failed to fetch attention data:", error);
+    // Continue without attention context if fetch fails
   }
 
   // Create user message
@@ -297,10 +364,15 @@ app.post("/", dualAuthMiddleware, async (c) => {
     where: { userId },
   });
 
+  // Build system prompt with attention context
+  const systemPrompt = attentionContext
+    ? buildSystemPromptWithAttention(attentionContext)
+    : SYSTEM_PROMPTS.chat;
+
   // Start bot response generation (non-blocking)
   // Pass first user message for title generation if this is a new session
   const firstUserMessage = isNewSession ? body.content.trim() : undefined;
-  generateBotResponse(userId, sessionId, botMessage.id, botMessages, firstUserMessage, userSettings);
+  generateBotResponse(userId, sessionId, botMessage.id, botMessages, firstUserMessage, userSettings, systemPrompt);
 
   // Update session updatedAt
   await db.chatSession.update({
@@ -367,10 +439,14 @@ async function generateBotResponse(
   botMessageId: string,
   conversationHistory: BotMessage[],
   firstUserMessage?: string, // If provided, generate title after bot response
-  userSettings?: UserSettings | null
+  userSettings?: UserSettings | null,
+  systemPrompt?: string
 ) {
-  // Create bot with user's LLM settings (or system default)
-  const bot = createLLMBot(userSettings);
+  // Create bot with user's LLM settings and custom system prompt
+  const bot = createLLMBot({
+    settings: userSettings,
+    systemPrompt,
+  });
 
   try {
     await bot.generateResponse(conversationHistory, {

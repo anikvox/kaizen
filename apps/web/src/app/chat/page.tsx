@@ -7,12 +7,20 @@ import {
   type ChatSessionListItem,
   type ChatMessage,
   type ChatMessageStatus,
+  type ChatAttentionRange,
 } from "@kaizen/api-client";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 
 const apiUrl =
   process.env.NEXT_PUBLIC_KAIZEN_API_URL || "http://localhost:60092";
+
+const ATTENTION_RANGE_LABELS: Record<ChatAttentionRange, string> = {
+  "30m": "Last 30 min",
+  "2h": "Last 2 hours",
+  "1d": "Last 24 hours",
+  "all": "All time",
+};
 
 export default function ChatPage() {
   const { isSignedIn, isLoaded, getToken } = useAuth();
@@ -24,6 +32,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [selectedAttentionRange, setSelectedAttentionRange] = useState<ChatAttentionRange>("2h");
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -120,6 +129,7 @@ export default function ChatPage() {
               {
                 id: data.session.id,
                 title: data.session.title,
+                attentionRange: data.session.attentionRange as ChatAttentionRange,
                 messageCount: 0,
                 createdAt: data.session.createdAt,
                 updatedAt: data.session.updatedAt,
@@ -186,6 +196,15 @@ export default function ChatPage() {
     };
   }, [isSignedIn, clerkUser, getToken, getTokenFn, activeSessionId]);
 
+  // Get the current session's attention range (or selected range for new chats)
+  const getCurrentAttentionRange = (): ChatAttentionRange => {
+    if (activeSessionId) {
+      const session = sessions.find((s) => s.id === activeSessionId);
+      return (session?.attentionRange as ChatAttentionRange) || selectedAttentionRange;
+    }
+    return selectedAttentionRange;
+  };
+
   // Send message
   const handleSend = async () => {
     if (!inputValue.trim() || sending) return;
@@ -197,6 +216,7 @@ export default function ChatPage() {
       const result = await api.chats.sendMessage({
         sessionId: activeSessionId || undefined,
         content: inputValue.trim(),
+        attentionRange: getCurrentAttentionRange(),
       });
 
       setInputValue("");
@@ -292,7 +312,7 @@ export default function ChatPage() {
                     {session.title || "New Chat"}
                   </p>
                   <p style={styles.sessionMeta}>
-                    {session.messageCount} messages
+                    {session.messageCount} messages · {ATTENTION_RANGE_LABELS[session.attentionRange as ChatAttentionRange] || session.attentionRange}
                   </p>
                 </div>
                 <button
@@ -309,6 +329,15 @@ export default function ChatPage() {
 
       {/* Main Chat Area */}
       <main style={styles.main}>
+        {/* Chat Header - shows context info for active session */}
+        {activeSessionId && (
+          <div style={styles.chatHeader}>
+            <span style={styles.chatHeaderText}>
+              Context: {ATTENTION_RANGE_LABELS[getCurrentAttentionRange()]}
+            </span>
+          </div>
+        )}
+
         {error && (
           <div style={styles.error}>{error}</div>
         )}
@@ -319,7 +348,25 @@ export default function ChatPage() {
             <div style={styles.emptyState}>
               <p style={styles.emptyTitle}>Start a conversation</p>
               <p style={styles.emptySubtitle}>
-                Send a message to begin chatting
+                Select the time range of activity context for your chat
+              </p>
+              <div style={styles.rangeSelector}>
+                {(["30m", "2h", "1d", "all"] as ChatAttentionRange[]).map((range) => (
+                  <button
+                    key={range}
+                    onClick={() => setSelectedAttentionRange(range)}
+                    style={{
+                      ...styles.rangeButton,
+                      background: selectedAttentionRange === range ? "#007bff" : "#f0f0f0",
+                      color: selectedAttentionRange === range ? "#fff" : "#333",
+                    }}
+                  >
+                    {ATTENTION_RANGE_LABELS[range]}
+                  </button>
+                ))}
+              </div>
+              <p style={styles.rangeHint}>
+                The AI will have context about your recent browsing activity
               </p>
             </div>
           ) : (
@@ -623,6 +670,15 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: "column",
     minWidth: 0,
   },
+  chatHeader: {
+    padding: "0.5rem 1rem",
+    borderBottom: "1px solid #e0e0e0",
+    background: "#f8f9fa",
+  },
+  chatHeaderText: {
+    fontSize: "0.8rem",
+    color: "#666",
+  },
   error: {
     padding: "0.75rem 1rem",
     background: "#fee",
@@ -653,6 +709,27 @@ const styles: Record<string, React.CSSProperties> = {
   emptySubtitle: {
     margin: "0.5rem 0 0",
     fontSize: "0.9rem",
+  },
+  rangeSelector: {
+    display: "flex",
+    gap: "0.5rem",
+    marginTop: "1.5rem",
+    flexWrap: "wrap",
+    justifyContent: "center",
+  },
+  rangeButton: {
+    padding: "0.5rem 1rem",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontSize: "0.85rem",
+    fontWeight: 500,
+    transition: "all 0.2s",
+  },
+  rangeHint: {
+    marginTop: "1rem",
+    fontSize: "0.8rem",
+    color: "#888",
   },
   messageBubble: {
     maxWidth: "80%",

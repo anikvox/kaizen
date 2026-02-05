@@ -44,4 +44,4 @@ export {
 } from "./model-fetcher.js";
 
 // Prompts
-export { SYSTEM_PROMPTS, generateChatTitle } from "./prompts.js";
+export { SYSTEM_PROMPTS, generateChatTitle, serializeAttentionForLLM } from "./prompts.js";

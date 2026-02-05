@@ -155,13 +155,14 @@ model UserSettings {
 }
 
 model ChatSession {
-  id        String        @id @default(cuid())
-  title     String?
-  userId    String
-  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages  ChatMessage[]
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id             String        @id @default(cuid())
+  title          String?
+  attentionRange String        @default("2h") // "30m" | "2h" | "1d" | "all"
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages       ChatMessage[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   @@index([userId])
   @@map("chat_sessions")

@@ -2,9 +2,24 @@ export { db } from "./db.js";
 export { env } from "./env.js";
 export { events } from "./events.js";
 
+// Attention data exports
+export {
+  formatDuration,
+  extractDomain,
+  fetchRawAttentionData,
+  aggregateAttentionData,
+  getAttentionData,
+} from "./attention.js";
+export type {
+  AttentionTimeRange,
+  RawAttentionData,
+  AttentionSummary,
+  AttentionDataResponse,
+} from "./attention.js";
+
 // Bot exports
 export { bot, fakeBot, geminiBot, GeminiBot, FakeBot, LLMBot, createLLMBot } from "./bot/index.js";
-export type { BotInterface, BotMessage, BotMediaPart, BotCallbacks } from "./bot/index.js";
+export type { BotInterface, BotMessage, BotMediaPart, BotCallbacks, LLMBotOptions } from "./bot/index.js";
 
 // LLM exports
 export {
@@ -39,6 +54,7 @@ export {
   // Prompts
   SYSTEM_PROMPTS,
   generateChatTitle,
+  serializeAttentionForLLM,
 } from "./llm/index.js";
 
 export type {

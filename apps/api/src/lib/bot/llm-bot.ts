@@ -3,15 +3,22 @@ import type { BotInterface, BotMessage, BotCallbacks, BotMediaPart } from "./int
 import { createLLMService, SYSTEM_PROMPTS } from "../llm/index.js";
 import type { LLMMediaPart } from "../llm/index.js";
 
+export interface LLMBotOptions {
+  settings?: UserSettings | null;
+  systemPrompt?: string;
+}
+
 /**
  * LLM-powered bot that uses the unified LLM service.
  * Supports Gemini, Anthropic, and OpenAI based on user settings.
  */
 export class LLMBot implements BotInterface {
   private settings: UserSettings | null;
+  private systemPrompt: string;
 
-  constructor(settings?: UserSettings | null) {
-    this.settings = settings || null;
+  constructor(options?: LLMBotOptions) {
+    this.settings = options?.settings || null;
+    this.systemPrompt = options?.systemPrompt || SYSTEM_PROMPTS.chat;
   }
 
   async generateResponse(
@@ -34,7 +41,7 @@ export class LLMBot implements BotInterface {
       // Stream the response
       await provider.stream({
         messages: llmMessages,
-        systemPrompt: SYSTEM_PROMPTS.chat,
+        systemPrompt: this.systemPrompt,
         callbacks: {
           onToken: async (token, fullContent) => {
             await callbacks.onChunk(token, fullContent);
@@ -73,8 +80,8 @@ export class LLMBot implements BotInterface {
 }
 
 /**
- * Create an LLM bot for a user with their settings.
+ * Create an LLM bot for a user with their settings and optional custom system prompt.
  */
-export function createLLMBot(settings?: UserSettings | null): LLMBot {
-  return new LLMBot(settings);
+export function createLLMBot(options?: LLMBotOptions): LLMBot {
+  return new LLMBot(options);
 }

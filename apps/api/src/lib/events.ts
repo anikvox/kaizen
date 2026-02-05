@@ -32,6 +32,7 @@ export interface ChatSessionEvent {
   session: {
     id: string;
     title: string | null;
+    attentionRange: string;
     createdAt: string;
     updatedAt: string;
   };
