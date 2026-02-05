@@ -2,11 +2,17 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth, SignInButton, useUser } from "@clerk/nextjs";
-import { createApiClient, type UserSettings } from "@kaizen/api-client";
+import { createApiClient, type UserSettings, type LLMModels, type LLMProviderType, type ModelInfo } from "@kaizen/api-client";
 import Link from "next/link";
 
 const apiUrl =
   process.env.NEXT_PUBLIC_KAIZEN_API_URL || "http://localhost:60092";
+
+const PROVIDER_LABELS: Record<LLMProviderType, string> = {
+  gemini: "Google Gemini",
+  anthropic: "Anthropic Claude",
+  openai: "OpenAI",
+};
 
 export default function Settings() {
   const { isSignedIn, isLoaded, getToken } = useAuth();
@@ -17,9 +23,41 @@ export default function Settings() {
   const [error, setError] = useState("");
   const eventSourceRef = useRef<EventSource | null>(null);
 
+  // LLM settings state - models are fetched dynamically per provider
+  const [providerModels, setProviderModels] = useState<Partial<Record<LLMProviderType, ModelInfo[]>>>({});
+  const [loadingModels, setLoadingModels] = useState<Partial<Record<LLMProviderType, boolean>>>({});
+  const [apiKeyInputs, setApiKeyInputs] = useState<Record<LLMProviderType, string>>({
+    gemini: "",
+    anthropic: "",
+    openai: "",
+  });
+
+  // Keep llmModels for backward compatibility (static fallback)
+  const [llmModels, setLlmModels] = useState<LLMModels | null>(null);
+
   const getTokenFn = useCallback(async () => {
     return getToken();
   }, [getToken]);
+
+  // Fetch models for a specific provider dynamically
+  const fetchModelsForProvider = useCallback(async (provider: LLMProviderType) => {
+    const api = createApiClient(apiUrl, getTokenFn);
+
+    setLoadingModels((prev) => ({ ...prev, [provider]: true }));
+
+    try {
+      const models = await api.settings.getModelsForProvider(provider);
+      setProviderModels((prev) => ({ ...prev, [provider]: models }));
+    } catch (err) {
+      console.error(`Failed to fetch models for ${provider}:`, err);
+      // Fall back to static models if available
+      if (llmModels?.[provider]) {
+        setProviderModels((prev) => ({ ...prev, [provider]: llmModels[provider] }));
+      }
+    } finally {
+      setLoadingModels((prev) => ({ ...prev, [provider]: false }));
+    }
+  }, [getTokenFn, llmModels]);
 
   const fetchSettings = useCallback(async () => {
     if (!isSignedIn || !clerkUser) return;
@@ -35,9 +73,33 @@ export default function Settings() {
         name: clerkUser.fullName || undefined,
       });
 
-      const result = await api.settings.get();
-      setSettings(result);
+      // Fetch settings and static models (fallback)
+      const [settingsResult, modelsResult] = await Promise.all([
+        api.settings.get(),
+        api.settings.getLLMModels(),
+      ]);
+      setSettings(settingsResult);
+      setLlmModels(modelsResult);
       setError("");
+
+      // Fetch dynamic models for providers with API keys
+      const providers: LLMProviderType[] = ["gemini", "anthropic", "openai"];
+      for (const provider of providers) {
+        const hasKey =
+          (provider === "gemini" && settingsResult.hasGeminiApiKey) ||
+          (provider === "anthropic" && settingsResult.hasAnthropicApiKey) ||
+          (provider === "openai" && settingsResult.hasOpenaiApiKey);
+
+        if (hasKey) {
+          // Fetch in background, don't block
+          api.settings.getModelsForProvider(provider)
+            .then((models) => setProviderModels((prev) => ({ ...prev, [provider]: models })))
+            .catch(() => {
+              // Use static fallback
+              setProviderModels((prev) => ({ ...prev, [provider]: modelsResult[provider] }));
+            });
+        }
+      }
     } catch (err) {
       console.error("Fetch settings error:", err);
       setError("Failed to fetch settings");
@@ -108,6 +170,121 @@ export default function Settings() {
       setError("Failed to update settings");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleProviderChange = async (provider: LLMProviderType | "") => {
+    if (!settings) return;
+
+    setSaving(true);
+    const api = createApiClient(apiUrl, getTokenFn);
+
+    try {
+      // When changing provider, also reset model to the first available for that provider
+      const newProvider = provider || null;
+      const models = newProvider ? (providerModels[newProvider] || llmModels?.[newProvider]) : null;
+      const newModel = models?.[0]?.id || null;
+
+      const result = await api.settings.update({
+        llmProvider: newProvider,
+        llmModel: newModel,
+      });
+      setSettings(result);
+      setError("");
+    } catch (err) {
+      console.error("Update provider error:", err);
+      setError("Failed to update provider");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleModelChange = async (model: string) => {
+    if (!settings) return;
+
+    setSaving(true);
+    const api = createApiClient(apiUrl, getTokenFn);
+
+    try {
+      const result = await api.settings.update({
+        llmModel: model || null,
+      });
+      setSettings(result);
+      setError("");
+    } catch (err) {
+      console.error("Update model error:", err);
+      setError("Failed to update model");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleApiKeySave = async (provider: LLMProviderType) => {
+    const key = apiKeyInputs[provider];
+    if (!key.trim()) return;
+
+    setSaving(true);
+    const api = createApiClient(apiUrl, getTokenFn);
+
+    try {
+      const keyField = `${provider}ApiKey` as const;
+      const result = await api.settings.update({
+        [keyField]: key,
+      });
+      setSettings(result);
+      setApiKeyInputs((prev) => ({ ...prev, [provider]: "" }));
+      setError("");
+
+      // Fetch models for this provider now that we have an API key
+      fetchModelsForProvider(provider);
+    } catch (err) {
+      console.error("Save API key error:", err);
+      setError("Failed to save API key");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleApiKeyClear = async (provider: LLMProviderType) => {
+    setSaving(true);
+    const api = createApiClient(apiUrl, getTokenFn);
+
+    try {
+      const keyField = `${provider}ApiKey` as const;
+      // If clearing the key for the currently selected provider, reset to system default
+      const updates: Record<string, unknown> = { [keyField]: null };
+      if (settings?.llmProvider === provider) {
+        updates.llmProvider = null;
+        updates.llmModel = null;
+      }
+      const result = await api.settings.update(updates);
+      setSettings(result);
+      // Clear the cached models for this provider
+      setProviderModels((prev) => {
+        const next = { ...prev };
+        delete next[provider];
+        return next;
+      });
+      setError("");
+    } catch (err) {
+      console.error("Clear API key error:", err);
+      setError("Failed to clear API key");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const hasApiKey = (provider: LLMProviderType): boolean => {
+    if (!settings) return false;
+    switch (provider) {
+      case "gemini":
+        return !!settings.hasGeminiApiKey;
+      case "anthropic":
+        return !!settings.hasAnthropicApiKey;
+      case "openai":
+        return !!settings.hasOpenaiApiKey;
+      default:
+        return false;
     }
   };
 
@@ -219,6 +396,188 @@ export default function Settings() {
                 {settings.cognitiveAttentionShowOverlay ? "ON" : "OFF"}
               </button>
             </div>
+          </div>
+        )}
+      </section>
+
+      {/* LLM Settings Section */}
+      <section style={{ marginBottom: "2rem" }}>
+        <h2 style={{ fontSize: "1.25rem", marginBottom: "1rem" }}>AI Chat Settings</h2>
+        <p style={{ color: "#666", fontSize: "0.9rem", marginBottom: "1rem" }}>
+          Configure which AI provider and model to use for chat. Add your API keys first,
+          then select a provider and model.
+        </p>
+
+        {settings && llmModels && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {/* API Keys Section - First */}
+            <div
+              style={{
+                padding: "1rem",
+                border: "1px solid #ddd",
+                borderRadius: "8px",
+              }}
+            >
+              <p style={{ margin: "0 0 0.5rem", fontWeight: "bold" }}>API Keys</p>
+              <p style={{ margin: "0 0 1rem", fontSize: "0.85rem", color: "#666" }}>
+                Add your API keys to enable different providers. Keys are encrypted and stored securely.
+              </p>
+
+              {(Object.keys(PROVIDER_LABELS) as LLMProviderType[]).map((provider) => (
+                <div key={provider} style={{ marginBottom: "1rem" }}>
+                  <label style={{ display: "block", marginBottom: "0.25rem", fontWeight: "500", fontSize: "0.9rem" }}>
+                    {PROVIDER_LABELS[provider]}
+                    {hasApiKey(provider) && (
+                      <span style={{ color: "#28a745", marginLeft: "0.5rem", fontWeight: "normal" }}>
+                        (configured)
+                      </span>
+                    )}
+                  </label>
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <input
+                      type="password"
+                      placeholder={hasApiKey(provider) ? "••••••••••••••••" : `Enter ${PROVIDER_LABELS[provider]} API key`}
+                      value={apiKeyInputs[provider]}
+                      onChange={(e) => setApiKeyInputs((prev) => ({ ...prev, [provider]: e.target.value }))}
+                      disabled={saving}
+                      style={{
+                        flex: 1,
+                        padding: "0.5rem",
+                        borderRadius: "4px",
+                        border: "1px solid #ccc",
+                        fontSize: "0.9rem",
+                      }}
+                    />
+                    <button
+                      onClick={() => handleApiKeySave(provider)}
+                      disabled={saving || !apiKeyInputs[provider].trim()}
+                      style={{
+                        background: "#007bff",
+                        color: "white",
+                        border: "none",
+                        padding: "0.5rem 1rem",
+                        borderRadius: "4px",
+                        cursor: saving || !apiKeyInputs[provider].trim() ? "not-allowed" : "pointer",
+                        opacity: saving || !apiKeyInputs[provider].trim() ? 0.6 : 1,
+                      }}
+                    >
+                      Save
+                    </button>
+                    {hasApiKey(provider) && (
+                      <button
+                        onClick={() => handleApiKeyClear(provider)}
+                        disabled={saving}
+                        style={{
+                          background: "#dc3545",
+                          color: "white",
+                          border: "none",
+                          padding: "0.5rem 1rem",
+                          borderRadius: "4px",
+                          cursor: saving ? "not-allowed" : "pointer",
+                          opacity: saving ? 0.6 : 1,
+                        }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Provider Selection - Only show providers with API keys */}
+            <div
+              style={{
+                padding: "1rem",
+                border: "1px solid #ddd",
+                borderRadius: "8px",
+              }}
+            >
+              <p style={{ margin: "0 0 0.5rem", fontWeight: "bold" }}>Active Provider</p>
+              <p style={{ margin: "0 0 0.75rem", fontSize: "0.85rem", color: "#666" }}>
+                Select which provider to use for chat. Only providers with configured API keys are available.
+              </p>
+              <select
+                value={settings.llmProvider || ""}
+                onChange={(e) => handleProviderChange(e.target.value as LLMProviderType | "")}
+                disabled={saving}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem",
+                  borderRadius: "4px",
+                  border: "1px solid #ccc",
+                  fontSize: "1rem",
+                  cursor: saving ? "not-allowed" : "pointer",
+                }}
+              >
+                <option value="">System Default (Gemini)</option>
+                {(Object.keys(PROVIDER_LABELS) as LLMProviderType[])
+                  .filter((provider) => hasApiKey(provider))
+                  .map((provider) => (
+                    <option key={provider} value={provider}>
+                      {PROVIDER_LABELS[provider]}
+                    </option>
+                  ))}
+              </select>
+              {!settings.llmProvider && (
+                <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
+                  Using system Gemini API. Add your own API key above to use a different provider.
+                </p>
+              )}
+            </div>
+
+            {/* Model Selection - Only show when a provider with API key is selected */}
+            {settings.llmProvider && hasApiKey(settings.llmProvider) && (() => {
+              const models = providerModels[settings.llmProvider] || llmModels?.[settings.llmProvider] || [];
+              const isLoadingProviderModels = loadingModels[settings.llmProvider];
+
+              return (
+                <div
+                  style={{
+                    padding: "1rem",
+                    border: "1px solid #ddd",
+                    borderRadius: "8px",
+                  }}
+                >
+                  <p style={{ margin: "0 0 0.5rem", fontWeight: "bold" }}>
+                    Model
+                    {isLoadingProviderModels && (
+                      <span style={{ fontWeight: "normal", color: "#888", marginLeft: "0.5rem" }}>
+                        (loading models...)
+                      </span>
+                    )}
+                  </p>
+                  <p style={{ margin: "0 0 0.75rem", fontSize: "0.85rem", color: "#666" }}>
+                    Select the model to use for {PROVIDER_LABELS[settings.llmProvider]}.
+                    {models.length > 0 && ` ${models.length} models available.`}
+                  </p>
+                  <select
+                    value={settings.llmModel || ""}
+                    onChange={(e) => handleModelChange(e.target.value)}
+                    disabled={saving || isLoadingProviderModels}
+                    style={{
+                      width: "100%",
+                      padding: "0.5rem",
+                      borderRadius: "4px",
+                      border: "1px solid #ccc",
+                      fontSize: "1rem",
+                      cursor: saving || isLoadingProviderModels ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {models.map((model) => (
+                      <option key={model.id} value={model.id}>
+                        {model.name}
+                      </option>
+                    ))}
+                  </select>
+                  {settings.llmModel && models.length > 0 && (
+                    <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
+                      {models.find((m) => m.id === settings.llmModel)?.description}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
       </section>

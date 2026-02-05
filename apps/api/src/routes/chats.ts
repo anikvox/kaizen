@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
-import { db, events, fakeBot } from "../lib/index.js";
-import type { BotMessage } from "../lib/index.js";
+import type { UserSettings } from "@prisma/client";
+import { db, events, createLLMBot, generateChatTitle } from "../lib/index.js";
+import type { BotMessage, BotMediaPart } from "../lib/index.js";
 
 // Timeout for bot typing state (1 minute)
 const BOT_TYPING_TIMEOUT_MS = 60 * 1000;
@@ -291,8 +292,15 @@ app.post("/", dualAuthMiddleware, async (c) => {
       content: m.content,
     }));
 
+  // Fetch user settings for LLM configuration
+  const userSettings = await db.userSettings.findUnique({
+    where: { userId },
+  });
+
   // Start bot response generation (non-blocking)
-  generateBotResponse(userId, sessionId, botMessage.id, botMessages);
+  // Pass first user message for title generation if this is a new session
+  const firstUserMessage = isNewSession ? body.content.trim() : undefined;
+  generateBotResponse(userId, sessionId, botMessage.id, botMessages, firstUserMessage, userSettings);
 
   // Update session updatedAt
   await db.chatSession.update({
@@ -357,10 +365,15 @@ async function generateBotResponse(
   userId: string,
   sessionId: string,
   botMessageId: string,
-  conversationHistory: BotMessage[]
+  conversationHistory: BotMessage[],
+  firstUserMessage?: string, // If provided, generate title after bot response
+  userSettings?: UserSettings | null
 ) {
+  // Create bot with user's LLM settings (or system default)
+  const bot = createLLMBot(userSettings);
+
   try {
-    await fakeBot.generateResponse(conversationHistory, {
+    await bot.generateResponse(conversationHistory, {
       onTyping: async () => {
         // Already in typing state, update to streaming when first chunk arrives
       },
@@ -394,7 +407,14 @@ async function generateBotResponse(
         });
       },
 
-      onFinished: async (fullContent: string) => {
+      onMedia: async (media: BotMediaPart) => {
+        // When media is received during streaming, we'll append it to the content
+        // as a data URL for immediate display
+        // The media will be properly included in onFinished
+        console.log(`Received ${media.type} media: ${media.mimeType}`);
+      },
+
+      onFinished: async (fullContent: string, media?: BotMediaPart[]) => {
         // Clear timeout
         const timeoutId = activeBotResponses.get(botMessageId);
         if (timeoutId) {
@@ -402,11 +422,31 @@ async function generateBotResponse(
           activeBotResponses.delete(botMessageId);
         }
 
+        // Build final content including any media as data URLs
+        let finalContent = fullContent;
+        if (media && media.length > 0) {
+          for (const m of media) {
+            if (m.type === "image") {
+              // Append image as markdown with data URL
+              const dataUrl = `data:${m.mimeType};base64,${m.data}`;
+              finalContent += `\n\n![Generated Image](${dataUrl})`;
+            } else if (m.type === "audio") {
+              // Append audio as HTML audio element
+              const dataUrl = `data:${m.mimeType};base64,${m.data}`;
+              finalContent += `\n\n<audio controls src="${dataUrl}"></audio>`;
+            } else if (m.type === "video") {
+              // Append video as HTML video element
+              const dataUrl = `data:${m.mimeType};base64,${m.data}`;
+              finalContent += `\n\n<video controls src="${dataUrl}"></video>`;
+            }
+          }
+        }
+
         // Update message in database
         await db.chatMessage.update({
           where: { id: botMessageId },
           data: {
-            content: fullContent,
+            content: finalContent,
             status: "finished",
           },
         });
@@ -417,16 +457,38 @@ async function generateBotResponse(
           sessionId,
           messageId: botMessageId,
           updates: {
-            content: fullContent,
+            content: finalContent,
             status: "finished",
           },
         });
 
-        // Update session updatedAt
-        await db.chatSession.update({
-          where: { id: sessionId },
-          data: { updatedAt: new Date() },
-        });
+        // Generate and update chat title if this is the first message
+        if (firstUserMessage) {
+          try {
+            const title = await generateChatTitle(firstUserMessage);
+
+            // Update session with new title
+            await db.chatSession.update({
+              where: { id: sessionId },
+              data: { title, updatedAt: new Date() },
+            });
+
+            // Emit session updated event for title change
+            events.emitChatSessionUpdated({
+              userId,
+              sessionId,
+              updates: { title },
+            });
+          } catch (error) {
+            console.error("Failed to generate chat title:", error);
+          }
+        } else {
+          // Just update session updatedAt
+          await db.chatSession.update({
+            where: { id: sessionId },
+            data: { updatedAt: new Date() },
+          });
+        }
       },
 
       onError: async (error: Error) => {

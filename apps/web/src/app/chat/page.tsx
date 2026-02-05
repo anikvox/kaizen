@@ -9,6 +9,7 @@ import {
   type ChatMessageStatus,
 } from "@kaizen/api-client";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
 
 const apiUrl =
   process.env.NEXT_PUBLIC_KAIZEN_API_URL || "http://localhost:60092";
@@ -378,10 +379,116 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         </span>
       ) : (
         <>
-          <p style={styles.messageContent}>
-            {message.content}
+          <div style={styles.messageContent}>
+            {isBot ? (
+              <ReactMarkdown
+                urlTransform={(url) => {
+                  // Allow data: URLs for base64 images
+                  if (url.startsWith("data:")) {
+                    return url;
+                  }
+                  // Allow http/https URLs
+                  if (url.startsWith("http://") || url.startsWith("https://")) {
+                    return url;
+                  }
+                  // Block other protocols
+                  return "";
+                }}
+                components={{
+                  // Custom rendering for images
+                  img: ({ src, alt }) => (
+                    <img
+                      src={src}
+                      alt={alt || "Generated image"}
+                      style={{
+                        maxWidth: "100%",
+                        borderRadius: "8px",
+                        marginTop: "0.5rem",
+                      }}
+                    />
+                  ),
+                  // Custom rendering for code blocks
+                  pre: ({ children }) => (
+                    <pre
+                      style={{
+                        background: "#1e1e1e",
+                        color: "#d4d4d4",
+                        padding: "1rem",
+                        borderRadius: "8px",
+                        overflow: "auto",
+                        fontSize: "0.85rem",
+                        margin: "0.5rem 0",
+                      }}
+                    >
+                      {children}
+                    </pre>
+                  ),
+                  // Inline code
+                  code: ({ children, className }) => {
+                    const isBlock = className?.includes("language-");
+                    if (isBlock) {
+                      return <code style={{ fontFamily: "monospace" }}>{children}</code>;
+                    }
+                    return (
+                      <code
+                        style={{
+                          background: "rgba(0,0,0,0.1)",
+                          padding: "0.15rem 0.4rem",
+                          borderRadius: "4px",
+                          fontSize: "0.9em",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {children}
+                      </code>
+                    );
+                  },
+                  // Links
+                  a: ({ href, children }) => (
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: "#007bff", textDecoration: "underline" }}
+                    >
+                      {children}
+                    </a>
+                  ),
+                  // Paragraphs
+                  p: ({ children }) => (
+                    <p style={{ margin: "0.5rem 0" }}>{children}</p>
+                  ),
+                  // Lists
+                  ul: ({ children }) => (
+                    <ul style={{ margin: "0.5rem 0", paddingLeft: "1.5rem" }}>{children}</ul>
+                  ),
+                  ol: ({ children }) => (
+                    <ol style={{ margin: "0.5rem 0", paddingLeft: "1.5rem" }}>{children}</ol>
+                  ),
+                  // Blockquotes
+                  blockquote: ({ children }) => (
+                    <blockquote
+                      style={{
+                        borderLeft: "3px solid #ccc",
+                        margin: "0.5rem 0",
+                        paddingLeft: "1rem",
+                        color: "#666",
+                      }}
+                    >
+                      {children}
+                    </blockquote>
+                  ),
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+            ) : (
+              <p style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                {message.content}
+              </p>
+            )}
             {isStreaming && <span style={styles.cursor}>▊</span>}
-          </p>
+          </div>
           {isError && message.errorMessage && (
             <p style={styles.errorMessage}>
               Error: {message.errorMessage}
@@ -548,16 +655,17 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "0.9rem",
   },
   messageBubble: {
-    maxWidth: "70%",
+    maxWidth: "80%",
     padding: "0.75rem 1rem",
     borderRadius: "12px",
     position: "relative",
+    overflow: "hidden",
   },
   messageContent: {
     margin: 0,
-    whiteSpace: "pre-wrap",
     wordBreak: "break-word",
-    lineHeight: 1.4,
+    lineHeight: 1.5,
+    fontSize: "0.95rem",
   },
   cursor: {
     animation: "blink 1s infinite",

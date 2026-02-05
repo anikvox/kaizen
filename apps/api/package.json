@@ -16,10 +16,16 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.73.0",
     "@clerk/backend": "^1.21.4",
+    "@google/genai": "^1.40.0",
     "@hono/node-server": "^1.13.7",
     "@prisma/client": "^6.2.1",
-    "hono": "^4.6.14"
+    "hono": "^4.6.14",
+    "openai": "^6.18.0",
+    "opik": "^1.10.6",
+    "opik-gemini": "^1.10.6",
+    "opik-openai": "^1.10.6"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
