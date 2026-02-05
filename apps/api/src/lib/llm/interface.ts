@@ -5,6 +5,15 @@
 
 export type LLMProviderType = "gemini" | "anthropic" | "openai";
 
+/**
+ * Media part in a multimodal response (e.g., generated images)
+ */
+export interface LLMMediaPart {
+  type: "image" | "audio" | "video";
+  mimeType: string;
+  data: string; // Base64 encoded data
+}
+
 export interface LLMMessage {
   role: "user" | "assistant" | "system";
   content: string;
@@ -12,7 +21,8 @@ export interface LLMMessage {
 
 export interface LLMStreamCallbacks {
   onToken: (token: string, fullContent: string) => Promise<void>;
-  onFinished: (fullContent: string) => Promise<void>;
+  onMedia?: (media: LLMMediaPart) => Promise<void>;
+  onFinished: (fullContent: string, media?: LLMMediaPart[]) => Promise<void>;
   onError: (error: Error) => Promise<void>;
 }
 
@@ -29,6 +39,7 @@ export interface LLMStreamOptions extends LLMGenerateOptions {
 
 export interface LLMResponse {
   content: string;
+  media?: LLMMediaPart[];
   usage?: {
     inputTokens: number;
     outputTokens: number;

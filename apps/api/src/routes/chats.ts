@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { UserSettings } from "@prisma/client";
 import { db, events, createLLMBot, generateChatTitle } from "../lib/index.js";
-import type { BotMessage } from "../lib/index.js";
+import type { BotMessage, BotMediaPart } from "../lib/index.js";
 
 // Timeout for bot typing state (1 minute)
 const BOT_TYPING_TIMEOUT_MS = 60 * 1000;
@@ -407,7 +407,14 @@ async function generateBotResponse(
         });
       },
 
-      onFinished: async (fullContent: string) => {
+      onMedia: async (media: BotMediaPart) => {
+        // When media is received during streaming, we'll append it to the content
+        // as a data URL for immediate display
+        // The media will be properly included in onFinished
+        console.log(`Received ${media.type} media: ${media.mimeType}`);
+      },
+
+      onFinished: async (fullContent: string, media?: BotMediaPart[]) => {
         // Clear timeout
         const timeoutId = activeBotResponses.get(botMessageId);
         if (timeoutId) {
@@ -415,11 +422,31 @@ async function generateBotResponse(
           activeBotResponses.delete(botMessageId);
         }
 
+        // Build final content including any media as data URLs
+        let finalContent = fullContent;
+        if (media && media.length > 0) {
+          for (const m of media) {
+            if (m.type === "image") {
+              // Append image as markdown with data URL
+              const dataUrl = `data:${m.mimeType};base64,${m.data}`;
+              finalContent += `\n\n![Generated Image](${dataUrl})`;
+            } else if (m.type === "audio") {
+              // Append audio as HTML audio element
+              const dataUrl = `data:${m.mimeType};base64,${m.data}`;
+              finalContent += `\n\n<audio controls src="${dataUrl}"></audio>`;
+            } else if (m.type === "video") {
+              // Append video as HTML video element
+              const dataUrl = `data:${m.mimeType};base64,${m.data}`;
+              finalContent += `\n\n<video controls src="${dataUrl}"></video>`;
+            }
+          }
+        }
+
         // Update message in database
         await db.chatMessage.update({
           where: { id: botMessageId },
           data: {
-            content: fullContent,
+            content: finalContent,
             status: "finished",
           },
         });
@@ -430,7 +457,7 @@ async function generateBotResponse(
           sessionId,
           messageId: botMessageId,
           updates: {
-            content: fullContent,
+            content: finalContent,
             status: "finished",
           },
         });

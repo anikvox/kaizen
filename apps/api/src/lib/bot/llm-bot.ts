@@ -1,6 +1,7 @@
 import type { UserSettings } from "@prisma/client";
-import type { BotInterface, BotMessage, BotCallbacks } from "./interface.js";
+import type { BotInterface, BotMessage, BotCallbacks, BotMediaPart } from "./interface.js";
 import { createLLMService, SYSTEM_PROMPTS } from "../llm/index.js";
+import type { LLMMediaPart } from "../llm/index.js";
 
 /**
  * LLM-powered bot that uses the unified LLM service.
@@ -38,8 +39,23 @@ export class LLMBot implements BotInterface {
           onToken: async (token, fullContent) => {
             await callbacks.onChunk(token, fullContent);
           },
-          onFinished: async (fullContent) => {
-            await callbacks.onFinished(fullContent);
+          onMedia: callbacks.onMedia
+            ? async (media: LLMMediaPart) => {
+                const botMedia: BotMediaPart = {
+                  type: media.type,
+                  mimeType: media.mimeType,
+                  data: media.data,
+                };
+                await callbacks.onMedia!(botMedia);
+              }
+            : undefined,
+          onFinished: async (fullContent, media) => {
+            const botMedia = media?.map((m): BotMediaPart => ({
+              type: m.type,
+              mimeType: m.mimeType,
+              data: m.data,
+            }));
+            await callbacks.onFinished(fullContent, botMedia);
           },
           onError: async (error) => {
             await callbacks.onError(error);

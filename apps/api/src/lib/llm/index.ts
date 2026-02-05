@@ -4,6 +4,7 @@ export type {
   LLMProviderType,
   LLMProviderConfig,
   LLMMessage,
+  LLMMediaPart,
   LLMStreamCallbacks,
   LLMGenerateOptions,
   LLMStreamOptions,

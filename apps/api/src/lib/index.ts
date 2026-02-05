@@ -4,7 +4,7 @@ export { events } from "./events.js";
 
 // Bot exports
 export { bot, fakeBot, geminiBot, GeminiBot, FakeBot, LLMBot, createLLMBot } from "./bot/index.js";
-export type { BotInterface, BotMessage, BotCallbacks } from "./bot/index.js";
+export type { BotInterface, BotMessage, BotMediaPart, BotCallbacks } from "./bot/index.js";
 
 // LLM exports
 export {
@@ -46,6 +46,7 @@ export type {
   LLMProviderType,
   LLMProviderConfig,
   LLMMessage,
+  LLMMediaPart,
   LLMStreamCallbacks,
   LLMGenerateOptions,
   LLMStreamOptions,
