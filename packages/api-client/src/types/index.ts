@@ -322,3 +322,90 @@ export interface SSESettingsChangedData {
   cognitiveAttentionDebugMode: boolean;
   cognitiveAttentionShowOverlay: boolean;
 }
+
+// Chat Types
+export type ChatMessageRole = "user" | "bot";
+export type ChatMessageStatus = "sending" | "sent" | "typing" | "streaming" | "finished" | "error";
+
+export interface ChatMessage {
+  id: string;
+  role: ChatMessageRole;
+  content: string;
+  status: ChatMessageStatus;
+  errorMessage?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatSessionWithMessages extends ChatSession {
+  messages: ChatMessage[];
+}
+
+export interface ChatSessionListItem {
+  id: string;
+  title: string | null;
+  messageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SendMessageRequest {
+  sessionId?: string;
+  content: string;
+}
+
+export interface SendMessageResponse {
+  sessionId: string;
+  isNewSession: boolean;
+  userMessage: ChatMessage;
+  botMessage: ChatMessage;
+}
+
+// Chat SSE Types
+export interface SSEChatConnectedData {
+  connected: true;
+  session?: ChatSession;
+}
+
+export interface SSEChatSessionCreatedData {
+  userId: string;
+  sessionId: string;
+  session: ChatSession;
+}
+
+export interface SSEChatSessionUpdatedData {
+  userId: string;
+  sessionId: string;
+  updates: {
+    title?: string | null;
+  };
+}
+
+export interface SSEChatSessionDeletedData {
+  userId: string;
+  sessionId: string;
+}
+
+export interface SSEChatMessageCreatedData {
+  userId: string;
+  sessionId: string;
+  message: ChatMessage;
+}
+
+export interface SSEChatMessageUpdatedData {
+  userId: string;
+  sessionId: string;
+  messageId: string;
+  updates: {
+    content?: string;
+    status?: ChatMessageStatus;
+    errorMessage?: string | null;
+  };
+}

@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { env } from "./lib/index.js";
-import { healthRoutes, usersRoutes, sseRoutes, deviceTokenSSERoutes, deviceTokenRoutes, websiteVisitsRoutes, attentionRoutes, exportRoutes, settingsRoutes, settingsSSERoutes } from "./routes/index.js";
+import { healthRoutes, usersRoutes, sseRoutes, deviceTokenSSERoutes, deviceTokenRoutes, websiteVisitsRoutes, attentionRoutes, exportRoutes, settingsRoutes, settingsSSERoutes, chatsRoutes, chatSSERoutes } from "./routes/index.js";
 
 const app = new Hono();
 
@@ -25,15 +25,17 @@ app.get("/", (c) => {
 
 app.route("/health", healthRoutes);
 app.route("/users", usersRoutes);
-// Mount device-token SSE before general SSE to avoid auth middleware conflict
+// Mount SSE routes before general routes to avoid auth middleware conflicts
 app.route("/sse/device-token", deviceTokenSSERoutes);
 app.route("/sse/settings", settingsSSERoutes);
+app.route("/sse/chats", chatSSERoutes);
 app.route("/sse", sseRoutes);
 app.route("/device-tokens", deviceTokenRoutes);
 app.route("/website-visits", websiteVisitsRoutes);
 app.route("/attention", attentionRoutes);
 app.route("/export", exportRoutes);
 app.route("/settings", settingsRoutes);
+app.route("/chats", chatsRoutes);
 
 console.log(`Server running on http://localhost:${env.port}`);
 
