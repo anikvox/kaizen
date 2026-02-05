@@ -93,6 +93,7 @@ export default function Home() {
           <div style={{ marginTop: "1rem", display: "flex", gap: "1rem" }}>
             <Link href="/attention">Attention Dashboard</Link>
             <Link href="/extensions">Manage Extensions</Link>
+            <Link href="/settings">Settings</Link>
             <SignOutButton />
           </div>
         </>

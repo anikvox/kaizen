@@ -20,6 +20,7 @@ model User {
   imageAttentions ImageAttention[]
   audioAttentions AudioAttention[]
   youtubeAttentions YoutubeAttention[]
+  settings        UserSettings?
 
   @@map("users")
 }
@@ -131,4 +132,17 @@ model YoutubeAttention {
   @@index([videoId])
   @@index([timestamp])
   @@map("youtube_attentions")
+}
+
+model UserSettings {
+  id                            String   @id @default(cuid())
+  userId                        String   @unique
+  user                          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Cognitive Attention Settings
+  cognitiveAttentionDebugMode   Boolean  @default(false)
+  cognitiveAttentionShowOverlay Boolean  @default(false)
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+
+  @@map("user_settings")
 }

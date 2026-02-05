@@ -301,3 +301,24 @@ export interface AttentionResponse {
   };
   pages: AttentionPageSummary[];
 }
+
+// Settings Types
+export interface UserSettings {
+  cognitiveAttentionDebugMode: boolean;
+  cognitiveAttentionShowOverlay: boolean;
+}
+
+export interface UserSettingsUpdateRequest {
+  cognitiveAttentionDebugMode?: boolean;
+  cognitiveAttentionShowOverlay?: boolean;
+}
+
+export interface SSESettingsConnectedData {
+  connected: true;
+  settings: UserSettings;
+}
+
+export interface SSESettingsChangedData {
+  cognitiveAttentionDebugMode: boolean;
+  cognitiveAttentionShowOverlay: boolean;
+}

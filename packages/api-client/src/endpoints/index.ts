@@ -5,3 +5,4 @@ export { DeviceTokensEndpoint } from "./device-tokens.js";
 export { WebsiteVisitsEndpoint } from "./website-visits.js";
 export { AttentionEndpoint } from "./attention.js";
 export { ExportEndpoint } from "./export.js";
+export { SettingsEndpoint } from "./settings.js";

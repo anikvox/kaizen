@@ -1,6 +1,11 @@
 import { useEffect, useState, useRef } from "react"
 import { Storage } from "@plasmohq/storage"
-import { createApiClient } from "@kaizen/api-client"
+import { sendToBackground } from "@plasmohq/messaging"
+import { createApiClient, type UserSettings } from "@kaizen/api-client"
+import {
+  COGNITIVE_ATTENTION_DEBUG_MODE,
+  COGNITIVE_ATTENTION_SHOW_OVERLAY
+} from "./cognitive-attention/default-settings"
 
 const apiUrl = process.env.PLASMO_PUBLIC_KAIZEN_API_URL || "http://localhost:60092"
 
@@ -15,7 +20,10 @@ interface UserInfo {
 function SidePanel() {
   const [user, setUser] = useState<UserInfo | null>(null)
   const [loading, setLoading] = useState(true)
+  const [settings, setSettings] = useState<UserSettings | null>(null)
+  const [savingSettings, setSavingSettings] = useState(false)
   const eventSourceRef = useRef<EventSource | null>(null)
+  const settingsEventSourceRef = useRef<EventSource | null>(null)
 
   const handleUnlink = async () => {
     const token = await storage.get<string>("deviceToken")
@@ -29,6 +37,26 @@ function SidePanel() {
     }
     await storage.remove("deviceToken")
     setUser(null)
+    setSettings(null)
+  }
+
+  const handleToggleSetting = async (key: keyof UserSettings) => {
+    if (!settings) return
+
+    setSavingSettings(true)
+    const newValue = !settings[key]
+
+    try {
+      await sendToBackground({
+        name: "update-settings",
+        body: { [key]: newValue }
+      })
+      setSettings({ ...settings, [key]: newValue })
+    } catch (error) {
+      console.error("Failed to update setting:", error)
+    } finally {
+      setSavingSettings(false)
+    }
   }
 
   // Connect to background script to track sidepanel open/close state
@@ -98,14 +126,70 @@ function SidePanel() {
     }
   }, [])
 
+  // Setup SSE connection for settings changes
+  useEffect(() => {
+    let cancelled = false
+
+    const setupSettingsSSE = async () => {
+      // Close existing connection
+      if (settingsEventSourceRef.current) {
+        settingsEventSourceRef.current.close()
+        settingsEventSourceRef.current = null
+      }
+
+      const token = await storage.get<string>("deviceToken")
+      if (!token) {
+        setSettings(null)
+        return
+      }
+
+      const api = createApiClient(apiUrl)
+      const eventSource = api.settings.subscribeSettings(
+        (data) => {
+          // Connected with initial settings
+          if (!cancelled && data.settings) {
+            setSettings(data.settings)
+          }
+        },
+        (newSettings) => {
+          // Settings changed remotely
+          if (!cancelled) {
+            setSettings(newSettings)
+          }
+        },
+        () => {
+          // On error
+          console.error("Settings SSE error")
+        },
+        token
+      )
+
+      settingsEventSourceRef.current = eventSource
+    }
+
+    setupSettingsSSE()
+
+    return () => {
+      cancelled = true
+      if (settingsEventSourceRef.current) {
+        settingsEventSourceRef.current.close()
+        settingsEventSourceRef.current = null
+      }
+    }
+  }, [user])
+
   // Listen for storage changes to reconnect SSE
   useEffect(() => {
     const callbackMap = {
       deviceToken: async (change: { newValue?: string }) => {
-        // Close existing connection
+        // Close existing connections
         if (eventSourceRef.current) {
           eventSourceRef.current.close()
           eventSourceRef.current = null
+        }
+        if (settingsEventSourceRef.current) {
+          settingsEventSourceRef.current.close()
+          settingsEventSourceRef.current = null
         }
 
         if (change.newValue) {
@@ -119,17 +203,20 @@ function SidePanel() {
               if (data.token === change.newValue) {
                 await storage.remove("deviceToken")
                 setUser(null)
+                setSettings(null)
               }
             },
             async () => {
               await storage.remove("deviceToken")
               setUser(null)
+              setSettings(null)
             },
             change.newValue
           )
           eventSourceRef.current = eventSource
         } else {
           setUser(null)
+          setSettings(null)
         }
       }
     }
@@ -175,7 +262,51 @@ function SidePanel() {
         </div>
       </div>
       <div style={styles.content}>
-        <p style={styles.text}>Side panel is ready. Your browsing context will appear here.</p>
+        <div style={styles.section}>
+          <h3 style={styles.sectionTitle}>Attention Tracking</h3>
+          {settings ? (
+            <div style={styles.settingsList}>
+              <div style={styles.settingItem}>
+                <div style={styles.settingInfo}>
+                  <span style={styles.settingName}>Debug Mode</span>
+                  <span style={styles.settingDesc}>Show debug overlay</span>
+                </div>
+                <button
+                  onClick={() => handleToggleSetting("cognitiveAttentionDebugMode")}
+                  disabled={savingSettings}
+                  style={{
+                    ...styles.toggleButton,
+                    background: settings.cognitiveAttentionDebugMode ? "#28a745" : "#6c757d",
+                    opacity: savingSettings ? 0.6 : 1,
+                    cursor: savingSettings ? "not-allowed" : "pointer"
+                  }}
+                >
+                  {settings.cognitiveAttentionDebugMode ? "ON" : "OFF"}
+                </button>
+              </div>
+              <div style={styles.settingItem}>
+                <div style={styles.settingInfo}>
+                  <span style={styles.settingName}>Show Overlay</span>
+                  <span style={styles.settingDesc}>Highlight tracked elements</span>
+                </div>
+                <button
+                  onClick={() => handleToggleSetting("cognitiveAttentionShowOverlay")}
+                  disabled={savingSettings}
+                  style={{
+                    ...styles.toggleButton,
+                    background: settings.cognitiveAttentionShowOverlay ? "#28a745" : "#6c757d",
+                    opacity: savingSettings ? 0.6 : 1,
+                    cursor: savingSettings ? "not-allowed" : "pointer"
+                  }}
+                >
+                  {settings.cognitiveAttentionShowOverlay ? "ON" : "OFF"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p style={styles.text}>Loading settings...</p>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -237,12 +368,58 @@ const styles: Record<string, React.CSSProperties> = {
   },
   content: {
     flex: 1,
-    padding: 16
+    padding: 16,
+    overflowY: "auto"
   },
   text: {
     margin: 0,
     fontSize: 14,
     color: "#666"
+  },
+  section: {
+    marginBottom: 24
+  },
+  sectionTitle: {
+    margin: "0 0 12px 0",
+    fontSize: 14,
+    fontWeight: 600,
+    color: "#333"
+  },
+  settingsList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 8
+  },
+  settingItem: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 12,
+    background: "#f8f9fa",
+    borderRadius: 6
+  },
+  settingInfo: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 2
+  },
+  settingName: {
+    fontSize: 13,
+    fontWeight: 500,
+    color: "#333"
+  },
+  settingDesc: {
+    fontSize: 11,
+    color: "#666"
+  },
+  toggleButton: {
+    padding: "4px 10px",
+    border: "none",
+    borderRadius: 4,
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: 500,
+    minWidth: 40
   }
 }
 
