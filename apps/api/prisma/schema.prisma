@@ -39,18 +39,20 @@ model DeviceToken {
 }
 
 model WebsiteVisit {
-  id        String   @id @default(cuid())
-  url       String
-  title     String
-  metadata  Json     @default("{}")
-  openedAt  DateTime
-  closedAt  DateTime?
-  activeTime Int     @default(0) // in milliseconds
-  referrer  String?
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String    @id @default(cuid())
+  url         String
+  title       String
+  metadata    Json      @default("{}")
+  openedAt    DateTime
+  closedAt    DateTime?
+  activeTime  Int       @default(0) // in milliseconds
+  referrer    String?
+  summary     String?   @db.Text // AI-generated summary of text attention
+  summarizedAt DateTime? // Last time summary was generated
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@unique([userId, url, openedAt])
   @@index([userId])
@@ -143,6 +145,9 @@ model UserSettings {
   cognitiveAttentionDebugMode   Boolean  @default(false)
   cognitiveAttentionShowOverlay Boolean  @default(false)
   attentionTrackingIgnoreList   String?  @db.Text // Newline-separated list of URL patterns/regexes to ignore
+  // Summarization Settings
+  attentionSummarizationEnabled Boolean  @default(true)
+  attentionSummarizationIntervalMs Int   @default(60000) // Default 1 minute
   // LLM Settings
   llmProvider                   String?  // "gemini" | "anthropic" | "openai" | null (system default)
   llmModel                      String?  // Selected model for the provider

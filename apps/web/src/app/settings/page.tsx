@@ -205,6 +205,47 @@ export default function Settings() {
     }
   };
 
+  const handleSummarizationToggle = async () => {
+    if (!settings) return;
+
+    setSaving(true);
+    const api = createApiClient(apiUrl, getTokenFn);
+
+    try {
+      const currentValue = settings.attentionSummarizationEnabled ?? true;
+      const result = await api.settings.update({
+        attentionSummarizationEnabled: !currentValue,
+      });
+      setSettings(result);
+      setError("");
+    } catch (err) {
+      console.error("Update summarization setting error:", err);
+      setError("Failed to update summarization setting");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSummarizationIntervalChange = async (intervalMs: number) => {
+    if (!settings) return;
+
+    setSaving(true);
+    const api = createApiClient(apiUrl, getTokenFn);
+
+    try {
+      const result = await api.settings.update({
+        attentionSummarizationIntervalMs: intervalMs,
+      });
+      setSettings(result);
+      setError("");
+    } catch (err) {
+      console.error("Update summarization interval error:", err);
+      setError("Failed to update summarization interval");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleProviderChange = async (provider: LLMProviderType | "") => {
     if (!settings) return;
 
@@ -481,6 +522,71 @@ export default function Settings() {
                 >
                   {saving ? "Saving..." : "Save Ignore List"}
                 </button>
+              )}
+            </div>
+
+            {/* Summarization Settings */}
+            <div
+              style={{
+                padding: "1rem",
+                border: "1px solid #ddd",
+                borderRadius: "8px",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1rem" }}>
+                <div>
+                  <p style={{ margin: 0, fontWeight: "bold" }}>Auto-Summarization</p>
+                  <p style={{ margin: "0.25rem 0 0", fontSize: "0.85rem", color: "#666" }}>
+                    Automatically generate summaries of web pages based on the text you read.
+                    Summaries are generated using your configured AI provider.
+                  </p>
+                </div>
+                <button
+                  onClick={handleSummarizationToggle}
+                  disabled={saving}
+                  style={{
+                    background: (settings.attentionSummarizationEnabled ?? true) ? "#28a745" : "#6c757d",
+                    color: "white",
+                    border: "none",
+                    padding: "0.5rem 1rem",
+                    borderRadius: "4px",
+                    cursor: saving ? "not-allowed" : "pointer",
+                    opacity: saving ? 0.6 : 1,
+                    minWidth: "60px",
+                  }}
+                >
+                  {(settings.attentionSummarizationEnabled ?? true) ? "ON" : "OFF"}
+                </button>
+              </div>
+
+              {(settings.attentionSummarizationEnabled ?? true) && (
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: "500" }}>
+                    Summarization Interval
+                  </label>
+                  <select
+                    value={settings.attentionSummarizationIntervalMs ?? 60000}
+                    onChange={(e) => handleSummarizationIntervalChange(Number(e.target.value))}
+                    disabled={saving}
+                    style={{
+                      width: "100%",
+                      padding: "0.5rem",
+                      borderRadius: "4px",
+                      border: "1px solid #ccc",
+                      fontSize: "0.9rem",
+                      cursor: saving ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    <option value={30000}>30 seconds</option>
+                    <option value={60000}>1 minute</option>
+                    <option value={120000}>2 minutes</option>
+                    <option value={300000}>5 minutes</option>
+                    <option value={600000}>10 minutes</option>
+                  </select>
+                  <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
+                    How often to check for new content to summarize.
+                  </p>
+                </div>
               )}
             </div>
           </div>
