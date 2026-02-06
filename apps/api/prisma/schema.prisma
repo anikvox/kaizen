@@ -39,20 +39,21 @@ model DeviceToken {
 }
 
 model WebsiteVisit {
-  id          String    @id @default(cuid())
-  url         String
-  title       String
-  metadata    Json      @default("{}")
-  openedAt    DateTime
-  closedAt    DateTime?
-  activeTime  Int       @default(0) // in milliseconds
-  referrer    String?
-  summary     String?   @db.Text // AI-generated summary of text attention
-  summarizedAt DateTime? // Last time summary was generated
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  url           String
+  title         String
+  metadata      Json      @default("{}")
+  openedAt      DateTime
+  closedAt      DateTime?
+  activeTime    Int       @default(0) // in milliseconds
+  referrer      String?
+  summary       String?   @db.Text // AI-generated summary of text attention
+  imageSummary  String?   @db.Text // AI-generated summary of image attention
+  summarizedAt  DateTime? // Last time summary was generated
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@unique([userId, url, openedAt])
   @@index([userId])
@@ -77,19 +78,21 @@ model TextAttention {
 }
 
 model ImageAttention {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   url           String
   src           String
   alt           String
   title         String
   width         Int
   height        Int
-  hoverDuration Int      // in milliseconds
-  confidence    Int      // 0-100
+  hoverDuration Int       // in milliseconds
+  confidence    Int       // 0-100
   timestamp     DateTime
+  summary       String?   @db.Text // AI-generated description of the image
+  summarizedAt  DateTime? // Last time summary was generated
   userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt     DateTime @default(now())
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
 
   @@index([userId])
   @@index([url])

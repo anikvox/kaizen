@@ -17,8 +17,10 @@ const SUMMARIZATION_CHECK_INTERVAL = 60000; // 1 minute
 async function runSummarizationJob() {
   try {
     const result = await processAllUsersSummarization();
-    if (result.totalSummarized > 0) {
-      console.log(`[Summarization] Processed ${result.usersProcessed} users, summarized ${result.totalSummarized} visits`);
+    if (result.totalVisitsSummarized > 0 || result.totalImagesSummarized > 0) {
+      console.log(
+        `[Summarization] Processed ${result.usersProcessed} users, summarized ${result.totalVisitsSummarized} visits and ${result.totalImagesSummarized} images`
+      );
     }
   } catch (error) {
     console.error("[Summarization] Job failed:", error);

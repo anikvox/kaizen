@@ -125,6 +125,8 @@ export interface ImageAttention {
   hoverDuration: number;
   confidence: number;
   timestamp: string;
+  summary?: string | null; // AI-generated description of the image
+  summarizedAt?: string | null;
   createdAt: string;
 }
 
@@ -240,6 +242,7 @@ export interface ImageAttentionItem {
   hoverDuration: number;
   hoverDurationFormatted: string;
   timestamp: string;
+  summary?: string | null; // AI-generated description of the image
 }
 
 export interface AudioAttentionItem {
@@ -285,6 +288,8 @@ export interface AttentionPageSummary {
   visitedAt: string;
   activeTime: number;
   activeTimeFormatted: string;
+  summary?: string | null; // AI-generated summary of text attention
+  imageSummary?: string | null; // AI-generated summary of image attention
   attention: PageAttention;
 }
 
