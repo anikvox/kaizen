@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { env } from "./lib/index.js";
 import app from "./app.js";
 import { processAllUsersSummarization } from "./lib/summarization.js";
+import { processAllUsersFocus } from "./lib/focus/index.js";
 
 console.log(`Server running on http://localhost:${env.port}`);
 
@@ -30,3 +31,26 @@ async function runSummarizationJob() {
 // Start the summarization job
 setInterval(runSummarizationJob, SUMMARIZATION_CHECK_INTERVAL);
 console.log(`[Summarization] Background job started (interval: ${SUMMARIZATION_CHECK_INTERVAL}ms)`);
+
+// Background job for focus calculation
+// Runs every minute to calculate user focus based on attention data
+const FOCUS_CHECK_INTERVAL = 60000; // 1 minute
+
+async function runFocusJob() {
+  try {
+    const result = await processAllUsersFocus();
+    if (result.focusesCreated > 0 || result.focusesUpdated > 0 || result.focusesEnded > 0) {
+      console.log(
+        `[Focus] Processed ${result.usersProcessed} users: ` +
+        `created ${result.focusesCreated}, updated ${result.focusesUpdated}, ended ${result.focusesEnded}` +
+        (result.errors > 0 ? `, errors ${result.errors}` : "")
+      );
+    }
+  } catch (error) {
+    console.error("[Focus] Job failed:", error);
+  }
+}
+
+// Start the focus calculation job
+setInterval(runFocusJob, FOCUS_CHECK_INTERVAL);
+console.log(`[Focus] Background job started (interval: ${FOCUS_CHECK_INTERVAL}ms)`);

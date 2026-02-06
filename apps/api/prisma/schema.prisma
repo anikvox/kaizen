@@ -22,6 +22,7 @@ model User {
   youtubeAttentions YoutubeAttention[]
   settings        UserSettings?
   chatSessions    ChatSession[]
+  focuses         Focus[]
 
   @@map("users")
 }
@@ -151,6 +152,11 @@ model UserSettings {
   // Summarization Settings
   attentionSummarizationEnabled Boolean  @default(true)
   attentionSummarizationIntervalMs Int   @default(60000) // Default 1 minute
+  // Focus Calculation Settings
+  focusCalculationEnabled       Boolean  @default(true)
+  focusCalculationIntervalMs    Int      @default(60000)   // Default 1 minute
+  focusInactivityThresholdMs    Int      @default(900000)  // Default 15 minutes
+  focusMinDurationMs            Int      @default(120000)  // Default 2 minutes (minimum before drift can create new focus)
   // LLM Settings
   llmProvider                   String?  // "gemini" | "anthropic" | "openai" | null (system default)
   llmModel                      String?  // Selected model for the provider
@@ -190,4 +196,27 @@ model ChatMessage {
 
   @@index([sessionId])
   @@map("chat_messages")
+}
+
+model Focus {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  item             String    // 2-3 word focus description
+  keywords         String[]  // Historical keywords (max 10, then summarize)
+
+  isActive         Boolean   @default(true)
+  startedAt        DateTime  @default(now())
+  endedAt          DateTime? // Set when drift detected or inactivity
+  lastCalculatedAt DateTime  @default(now()) // For incremental processing
+  lastActivityAt   DateTime  @default(now()) // For inactivity detection
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([userId, isActive])
+  @@index([lastCalculatedAt])
+  @@map("focuses")
 }

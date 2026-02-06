@@ -6,7 +6,8 @@ import {
   type UserSettings,
   type ChatSessionListItem,
   type ChatMessage,
-  type ChatMessageStatus
+  type ChatMessageStatus,
+  type Focus
 } from "@kaizen/api-client"
 import {
   COGNITIVE_ATTENTION_DEBUG_MODE,
@@ -35,6 +36,9 @@ function SidePanel() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>("chat")
 
+  // Focus state
+  const [focus, setFocus] = useState<Focus | null>(null)
+
   // Settings state
   const [settings, setSettings] = useState<UserSettings | null>(null)
   const [savingSettings, setSavingSettings] = useState(false)
@@ -51,6 +55,7 @@ function SidePanel() {
   const eventSourceRef = useRef<EventSource | null>(null)
   const settingsEventSourceRef = useRef<EventSource | null>(null)
   const chatEventSourceRef = useRef<EventSource | null>(null)
+  const focusEventSourceRef = useRef<EventSource | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
   // Scroll to bottom when messages change
@@ -71,6 +76,7 @@ function SidePanel() {
     await storage.remove("deviceToken")
     setUser(null)
     setSettings(null)
+    setFocus(null)
     setSessions([])
     setMessages([])
   }
@@ -107,6 +113,24 @@ function SidePanel() {
       setSettings({ ...settings, attentionTrackingIgnoreList: value })
     } catch (error) {
       console.error("Failed to update ignore list:", error)
+    } finally {
+      setSavingSettings(false)
+    }
+  }
+
+  const handleUpdateSetting = async (updates: Partial<UserSettings>) => {
+    if (!settings) return
+
+    setSavingSettings(true)
+
+    try {
+      await sendToBackground({
+        name: "update-settings",
+        body: updates
+      })
+      setSettings({ ...settings, ...updates })
+    } catch (error) {
+      console.error("Failed to update setting:", error)
     } finally {
       setSavingSettings(false)
     }
@@ -316,6 +340,58 @@ function SidePanel() {
     }
   }, [user])
 
+  // Setup focus SSE
+  useEffect(() => {
+    let cancelled = false
+
+    const setupFocusSSE = async () => {
+      if (focusEventSourceRef.current) {
+        focusEventSourceRef.current.close()
+        focusEventSourceRef.current = null
+      }
+
+      const token = await storage.get<string>("deviceToken")
+      if (!token || !user) {
+        setFocus(null)
+        return
+      }
+
+      const api = createApiClient(apiUrl)
+      const eventSource = api.focus.subscribeFocus(
+        (data) => {
+          if (!cancelled) {
+            setFocus(data.focus)
+          }
+        },
+        (data) => {
+          if (!cancelled) {
+            if (data.changeType === "ended") {
+              setFocus(null)
+            } else {
+              setFocus(data.focus)
+            }
+          }
+        },
+        () => {
+          console.error("Focus SSE error")
+        },
+        token
+      )
+
+      focusEventSourceRef.current = eventSource
+    }
+
+    setupFocusSSE()
+
+    return () => {
+      cancelled = true
+      if (focusEventSourceRef.current) {
+        focusEventSourceRef.current.close()
+        focusEventSourceRef.current = null
+      }
+    }
+  }, [user])
+
   // Setup chat SSE
   useEffect(() => {
     let cancelled = false
@@ -436,6 +512,10 @@ function SidePanel() {
           chatEventSourceRef.current.close()
           chatEventSourceRef.current = null
         }
+        if (focusEventSourceRef.current) {
+          focusEventSourceRef.current.close()
+          focusEventSourceRef.current = null
+        }
 
         if (change.newValue) {
           const api = createApiClient(apiUrl)
@@ -448,6 +528,7 @@ function SidePanel() {
                 await storage.remove("deviceToken")
                 setUser(null)
                 setSettings(null)
+                setFocus(null)
                 setSessions([])
                 setMessages([])
               }
@@ -456,6 +537,7 @@ function SidePanel() {
               await storage.remove("deviceToken")
               setUser(null)
               setSettings(null)
+              setFocus(null)
               setSessions([])
               setMessages([])
             },
@@ -465,6 +547,7 @@ function SidePanel() {
         } else {
           setUser(null)
           setSettings(null)
+          setFocus(null)
           setSessions([])
           setMessages([])
         }
@@ -510,6 +593,27 @@ function SidePanel() {
         <div style={styles.userInfo}>
           <span style={styles.userName}>{user.name || user.email}</span>
         </div>
+      </div>
+
+      {/* Focus Display */}
+      <div style={styles.focusContainer}>
+        <div style={styles.focusHeader}>
+          <span style={{
+            ...styles.focusIndicator,
+            background: focus ? "#28a745" : "#6c757d"
+          }} />
+          <span style={styles.focusLabel}>Focus</span>
+        </div>
+        {focus ? (
+          <div style={styles.focusContent}>
+            <span style={styles.focusItem}>{focus.item}</span>
+            <span style={styles.focusMeta}>
+              Since {new Date(focus.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+        ) : (
+          <span style={styles.focusEmpty}>No active focus</span>
+        )}
       </div>
 
       {/* Tabs */}
@@ -560,6 +664,7 @@ function SidePanel() {
           savingSettings={savingSettings}
           onToggleSetting={handleToggleSetting}
           onUpdateIgnoreList={handleUpdateIgnoreList}
+          onUpdateSetting={handleUpdateSetting}
         />
       )}
     </div>
@@ -725,12 +830,14 @@ function SettingsTab({
   settings,
   savingSettings,
   onToggleSetting,
-  onUpdateIgnoreList
+  onUpdateIgnoreList,
+  onUpdateSetting
 }: {
   settings: UserSettings | null
   savingSettings: boolean
   onToggleSetting: (key: keyof UserSettings) => void
   onUpdateIgnoreList: (value: string | null) => void
+  onUpdateSetting: (updates: Partial<UserSettings>) => void
 }) {
   const [ignoreListValue, setIgnoreListValue] = useState("")
   const [ignoreListDirty, setIgnoreListDirty] = useState(false)
@@ -826,6 +933,109 @@ function SettingsTab({
                 </button>
               )}
             </div>
+          </div>
+        ) : (
+          <p style={styles.text}>Loading settings...</p>
+        )}
+      </div>
+
+      {/* Focus Calculation Settings */}
+      <div style={styles.section}>
+        <h3 style={styles.sectionTitle}>Focus Detection</h3>
+        {settings ? (
+          <div style={styles.settingsList}>
+            <div style={styles.settingItem}>
+              <div style={styles.settingInfo}>
+                <span style={styles.settingName}>Focus Detection</span>
+                <span style={styles.settingDesc}>Auto-detect what you&apos;re focused on</span>
+              </div>
+              <button
+                onClick={() => onUpdateSetting({ focusCalculationEnabled: !(settings.focusCalculationEnabled ?? true) })}
+                disabled={savingSettings}
+                style={{
+                  ...styles.toggleButton,
+                  background: (settings.focusCalculationEnabled ?? true) ? "#28a745" : "#6c757d",
+                  opacity: savingSettings ? 0.6 : 1,
+                  cursor: savingSettings ? "not-allowed" : "pointer"
+                }}
+              >
+                {(settings.focusCalculationEnabled ?? true) ? "ON" : "OFF"}
+              </button>
+            </div>
+
+            {(settings.focusCalculationEnabled ?? true) && (
+              <>
+                {/* Calculation Interval */}
+                <div style={styles.selectSection}>
+                  <div style={styles.settingInfo}>
+                    <span style={styles.settingName}>Calculation Interval</span>
+                    <span style={styles.settingDesc}>How often to analyze activity</span>
+                  </div>
+                  <select
+                    value={settings.focusCalculationIntervalMs ?? 60000}
+                    onChange={(e) => onUpdateSetting({ focusCalculationIntervalMs: Number(e.target.value) })}
+                    disabled={savingSettings}
+                    style={{
+                      ...styles.selectInput,
+                      opacity: savingSettings ? 0.6 : 1,
+                      cursor: savingSettings ? "not-allowed" : "pointer"
+                    }}
+                  >
+                    <option value={30000}>30 seconds</option>
+                    <option value={60000}>1 minute</option>
+                    <option value={120000}>2 minutes</option>
+                    <option value={300000}>5 minutes</option>
+                  </select>
+                </div>
+
+                {/* Inactivity Threshold */}
+                <div style={styles.selectSection}>
+                  <div style={styles.settingInfo}>
+                    <span style={styles.settingName}>Inactivity Threshold</span>
+                    <span style={styles.settingDesc}>End focus after inactivity</span>
+                  </div>
+                  <select
+                    value={settings.focusInactivityThresholdMs ?? 900000}
+                    onChange={(e) => onUpdateSetting({ focusInactivityThresholdMs: Number(e.target.value) })}
+                    disabled={savingSettings}
+                    style={{
+                      ...styles.selectInput,
+                      opacity: savingSettings ? 0.6 : 1,
+                      cursor: savingSettings ? "not-allowed" : "pointer"
+                    }}
+                  >
+                    <option value={300000}>5 minutes</option>
+                    <option value={600000}>10 minutes</option>
+                    <option value={900000}>15 minutes</option>
+                    <option value={1800000}>30 minutes</option>
+                    <option value={3600000}>1 hour</option>
+                  </select>
+                </div>
+
+                {/* Minimum Duration */}
+                <div style={styles.selectSection}>
+                  <div style={styles.settingInfo}>
+                    <span style={styles.settingName}>Minimum Focus Duration</span>
+                    <span style={styles.settingDesc}>Time before detecting new focus</span>
+                  </div>
+                  <select
+                    value={settings.focusMinDurationMs ?? 120000}
+                    onChange={(e) => onUpdateSetting({ focusMinDurationMs: Number(e.target.value) })}
+                    disabled={savingSettings}
+                    style={{
+                      ...styles.selectInput,
+                      opacity: savingSettings ? 0.6 : 1,
+                      cursor: savingSettings ? "not-allowed" : "pointer"
+                    }}
+                  >
+                    <option value={60000}>1 minute</option>
+                    <option value={120000}>2 minutes</option>
+                    <option value={300000}>5 minutes</option>
+                    <option value={600000}>10 minutes</option>
+                  </select>
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <p style={styles.text}>Loading settings...</p>
@@ -1133,6 +1343,65 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 4,
     fontSize: 11,
     fontWeight: 500
+  },
+  selectSection: {
+    padding: 10,
+    background: "#f8f9fa",
+    borderRadius: 6
+  },
+  selectInput: {
+    width: "100%",
+    marginTop: 6,
+    padding: 6,
+    border: "1px solid #ddd",
+    borderRadius: 4,
+    fontSize: 11,
+    background: "#fff",
+    boxSizing: "border-box" as const
+  },
+  // Focus styles
+  focusContainer: {
+    padding: "10px 16px",
+    background: "#f8f9fa",
+    borderBottom: "1px solid #eee"
+  },
+  focusHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4
+  },
+  focusIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: "50%",
+    display: "inline-block"
+  },
+  focusLabel: {
+    fontSize: 10,
+    fontWeight: 600,
+    color: "#666",
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.5px"
+  },
+  focusContent: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: 2
+  },
+  focusItem: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: "#007bff"
+  },
+  focusMeta: {
+    fontSize: 10,
+    color: "#666"
+  },
+  focusEmpty: {
+    fontSize: 12,
+    color: "#999",
+    fontStyle: "italic" as const
   }
 }
 

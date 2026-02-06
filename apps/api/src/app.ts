@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { env } from "./lib/index.js";
-import { healthRoutes, usersRoutes, sseRoutes, deviceTokenSSERoutes, deviceTokenRoutes, websiteVisitsRoutes, attentionRoutes, exportRoutes, settingsRoutes, settingsSSERoutes, chatsRoutes, chatSSERoutes } from "./routes/index.js";
+import { healthRoutes, usersRoutes, sseRoutes, deviceTokenSSERoutes, deviceTokenRoutes, websiteVisitsRoutes, attentionRoutes, exportRoutes, settingsRoutes, settingsSSERoutes, chatsRoutes, chatSSERoutes, focusRoutes, focusSSERoutes } from "./routes/index.js";
 
 const app = new Hono();
 
@@ -28,6 +28,7 @@ app.route("/users", usersRoutes);
 app.route("/sse/device-token", deviceTokenSSERoutes);
 app.route("/sse/settings", settingsSSERoutes);
 app.route("/sse/chats", chatSSERoutes);
+app.route("/sse/focus", focusSSERoutes);
 app.route("/sse", sseRoutes);
 app.route("/device-tokens", deviceTokenRoutes);
 app.route("/website-visits", websiteVisitsRoutes);
@@ -35,5 +36,6 @@ app.route("/attention", attentionRoutes);
 app.route("/export", exportRoutes);
 app.route("/settings", settingsRoutes);
 app.route("/chats", chatsRoutes);
+app.route("/focus", focusRoutes);
 
 export default app;
