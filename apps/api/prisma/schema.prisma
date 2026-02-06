@@ -154,9 +154,10 @@ model UserSettings {
   attentionSummarizationIntervalMs Int   @default(60000) // Default 1 minute
   // Focus Calculation Settings
   focusCalculationEnabled       Boolean  @default(true)
-  focusCalculationIntervalMs    Int      @default(60000)   // Default 1 minute
-  focusInactivityThresholdMs    Int      @default(900000)  // Default 15 minutes
-  focusMinDurationMs            Int      @default(120000)  // Default 2 minutes (minimum before drift can create new focus)
+  focusCalculationIntervalMs    Int      @default(30000)   // Default 30 seconds
+  focusInactivityThresholdMs    Int      @default(60000)   // Default 1 minute
+  focusMinDurationMs            Int      @default(30000)   // Default 30 seconds (minimum before drift can create new focus)
+  lastFocusCalculatedAt         DateTime?                  // Marker for last focus calculation (to avoid reprocessing attention)
   // LLM Settings
   llmProvider                   String?  // "gemini" | "anthropic" | "openai" | null (system default)
   llmModel                      String?  // Selected model for the provider

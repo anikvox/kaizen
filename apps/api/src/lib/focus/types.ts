@@ -15,9 +15,9 @@ export interface FocusSettings {
  */
 export const DEFAULT_FOCUS_SETTINGS: FocusSettings = {
   focusCalculationEnabled: true,
-  focusCalculationIntervalMs: 60000, // 1 minute
-  focusInactivityThresholdMs: 900000, // 15 minutes
-  focusMinDurationMs: 120000, // 2 minutes
+  focusCalculationIntervalMs: 30000, // 30 seconds
+  focusInactivityThresholdMs: 60000, // 1 minute
+  focusMinDurationMs: 30000, // 30 seconds
 };
 
 /**
@@ -56,6 +56,8 @@ export interface ProcessAllUsersResult {
   focusesCreated: number;
   focusesUpdated: number;
   focusesEnded: number;
+  skippedNoNewData: number; // Count of users skipped due to no new attention data
+  skippedIntervalNotElapsed: number; // Count of users skipped because their interval hasn't elapsed
   errors: number;
 }
 
@@ -67,6 +69,7 @@ export interface ProcessUserFocusResult {
   focusUpdated: boolean;
   focusEnded: boolean;
   inactivityDetected: boolean;
+  skippedNoNewData: boolean; // True when skipped because no new attention data since last calculation
   error?: string;
 }
 

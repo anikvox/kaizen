@@ -713,7 +713,7 @@ export default function Settings() {
                       Calculation Interval
                     </label>
                     <select
-                      value={settings.focusCalculationIntervalMs ?? 60000}
+                      value={settings.focusCalculationIntervalMs ?? 30000}
                       onChange={(e) => handleFocusIntervalChange(Number(e.target.value))}
                       disabled={saving}
                       style={{
@@ -740,36 +740,8 @@ export default function Settings() {
                       Inactivity Threshold
                     </label>
                     <select
-                      value={settings.focusInactivityThresholdMs ?? 900000}
+                      value={settings.focusInactivityThresholdMs ?? 60000}
                       onChange={(e) => handleFocusInactivityChange(Number(e.target.value))}
-                      disabled={saving}
-                      style={{
-                        width: "100%",
-                        padding: "0.5rem",
-                        borderRadius: "4px",
-                        border: "1px solid #ccc",
-                        fontSize: "0.9rem",
-                        cursor: saving ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      <option value={300000}>5 minutes</option>
-                      <option value={600000}>10 minutes</option>
-                      <option value={900000}>15 minutes</option>
-                      <option value={1800000}>30 minutes</option>
-                      <option value={3600000}>1 hour</option>
-                    </select>
-                    <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
-                      End focus after this period of inactivity.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: "500" }}>
-                      Minimum Focus Duration
-                    </label>
-                    <select
-                      value={settings.focusMinDurationMs ?? 120000}
-                      onChange={(e) => handleFocusMinDurationChange(Number(e.target.value))}
                       disabled={saving}
                       style={{
                         width: "100%",
@@ -784,6 +756,34 @@ export default function Settings() {
                       <option value={120000}>2 minutes</option>
                       <option value={300000}>5 minutes</option>
                       <option value={600000}>10 minutes</option>
+                      <option value={900000}>15 minutes</option>
+                    </select>
+                    <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
+                      End focus after this period of inactivity.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: "500" }}>
+                      Minimum Focus Duration
+                    </label>
+                    <select
+                      value={settings.focusMinDurationMs ?? 30000}
+                      onChange={(e) => handleFocusMinDurationChange(Number(e.target.value))}
+                      disabled={saving}
+                      style={{
+                        width: "100%",
+                        padding: "0.5rem",
+                        borderRadius: "4px",
+                        border: "1px solid #ccc",
+                        fontSize: "0.9rem",
+                        cursor: saving ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      <option value={30000}>30 seconds</option>
+                      <option value={60000}>1 minute</option>
+                      <option value={120000}>2 minutes</option>
+                      <option value={300000}>5 minutes</option>
                     </select>
                     <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
                       Minimum time before detecting a new focus area.

@@ -972,7 +972,7 @@ function SettingsTab({
                     <span style={styles.settingDesc}>How often to analyze activity</span>
                   </div>
                   <select
-                    value={settings.focusCalculationIntervalMs ?? 60000}
+                    value={settings.focusCalculationIntervalMs ?? 30000}
                     onChange={(e) => onUpdateSetting({ focusCalculationIntervalMs: Number(e.target.value) })}
                     disabled={savingSettings}
                     style={{
@@ -995,32 +995,8 @@ function SettingsTab({
                     <span style={styles.settingDesc}>End focus after inactivity</span>
                   </div>
                   <select
-                    value={settings.focusInactivityThresholdMs ?? 900000}
+                    value={settings.focusInactivityThresholdMs ?? 60000}
                     onChange={(e) => onUpdateSetting({ focusInactivityThresholdMs: Number(e.target.value) })}
-                    disabled={savingSettings}
-                    style={{
-                      ...styles.selectInput,
-                      opacity: savingSettings ? 0.6 : 1,
-                      cursor: savingSettings ? "not-allowed" : "pointer"
-                    }}
-                  >
-                    <option value={300000}>5 minutes</option>
-                    <option value={600000}>10 minutes</option>
-                    <option value={900000}>15 minutes</option>
-                    <option value={1800000}>30 minutes</option>
-                    <option value={3600000}>1 hour</option>
-                  </select>
-                </div>
-
-                {/* Minimum Duration */}
-                <div style={styles.selectSection}>
-                  <div style={styles.settingInfo}>
-                    <span style={styles.settingName}>Minimum Focus Duration</span>
-                    <span style={styles.settingDesc}>Time before detecting new focus</span>
-                  </div>
-                  <select
-                    value={settings.focusMinDurationMs ?? 120000}
-                    onChange={(e) => onUpdateSetting({ focusMinDurationMs: Number(e.target.value) })}
                     disabled={savingSettings}
                     style={{
                       ...styles.selectInput,
@@ -1032,6 +1008,30 @@ function SettingsTab({
                     <option value={120000}>2 minutes</option>
                     <option value={300000}>5 minutes</option>
                     <option value={600000}>10 minutes</option>
+                    <option value={900000}>15 minutes</option>
+                  </select>
+                </div>
+
+                {/* Minimum Duration */}
+                <div style={styles.selectSection}>
+                  <div style={styles.settingInfo}>
+                    <span style={styles.settingName}>Minimum Focus Duration</span>
+                    <span style={styles.settingDesc}>Time before detecting new focus</span>
+                  </div>
+                  <select
+                    value={settings.focusMinDurationMs ?? 30000}
+                    onChange={(e) => onUpdateSetting({ focusMinDurationMs: Number(e.target.value) })}
+                    disabled={savingSettings}
+                    style={{
+                      ...styles.selectInput,
+                      opacity: savingSettings ? 0.6 : 1,
+                      cursor: savingSettings ? "not-allowed" : "pointer"
+                    }}
+                  >
+                    <option value={30000}>30 seconds</option>
+                    <option value={60000}>1 minute</option>
+                    <option value={120000}>2 minutes</option>
+                    <option value={300000}>5 minutes</option>
                   </select>
                 </div>
               </>

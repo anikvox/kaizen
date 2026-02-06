@@ -100,6 +100,7 @@ export class LLMService {
     return new GeminiProvider({
       apiKey: env.geminiApiKey,
       model: SYSTEM_DEFAULT_MODEL,
+      userId: this.settings?.userId,
     });
   }
 
@@ -129,7 +130,7 @@ export class LLMService {
     apiKey: string,
     model: string
   ): LLMProvider {
-    const config = { apiKey, model };
+    const config = { apiKey, model, userId: this.settings?.userId };
 
     switch (providerType) {
       case "gemini":

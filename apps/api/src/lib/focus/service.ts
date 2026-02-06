@@ -252,6 +252,7 @@ export async function processUserFocus(userId: string): Promise<ProcessUserFocus
     focusUpdated: false,
     focusEnded: false,
     inactivityDetected: false,
+    skippedNoNewData: false,
   };
 
   // Prevent concurrent processing for the same user
@@ -283,24 +284,28 @@ export async function processUserFocus(userId: string): Promise<ProcessUserFocus
     if (activeFocus) {
       const wasInactive = await checkAndHandleInactivity(userId, activeFocus, settings);
       if (wasInactive) {
+        // Update the marker even when ending due to inactivity
+        await db.userSettings.update({
+          where: { userId },
+          data: { lastFocusCalculatedAt: now },
+        });
         result.focusEnded = true;
         result.inactivityDetected = true;
         return result;
       }
     }
 
-    // Calculate time window for attention data
-    const lastCalculatedAt = activeFocus?.lastCalculatedAt || new Date(now.getTime() - MAX_ATTENTION_WINDOW_MS);
-    const windowMs = Math.min(now.getTime() - lastCalculatedAt.getTime(), MAX_ATTENTION_WINDOW_MS);
-    const fromTime = new Date(now.getTime() - windowMs);
+    // Use user-level marker for attention window (not focus-level)
+    // This ensures we only process new attention data since last calculation
+    const lastCalculatedAt = settings?.lastFocusCalculatedAt || new Date(now.getTime() - MAX_ATTENTION_WINDOW_MS);
 
-    // Fetch attention data
+    // Fetch attention data only since last calculation
     const attentionData = await fetchRawAttentionData(userId, {
-      from: fromTime,
+      from: lastCalculatedAt,
       to: now,
     });
 
-    // Skip if no attention data
+    // Skip if no new attention data - no need to call LLM
     if (!hasMinimalContent(attentionData)) {
       // Update lastActivityAt if there's an active focus
       if (activeFocus) {
@@ -312,25 +317,35 @@ export async function processUserFocus(userId: string): Promise<ProcessUserFocus
           });
         }
       }
+      // Update the marker so we don't re-check the same empty window
+      await db.userSettings.update({
+        where: { userId },
+        data: { lastFocusCalculatedAt: now },
+      });
+      result.skippedNoNewData = true;
       return result;
     }
 
-    // Check if this attention data was already processed
+    // Check if this attention data was already processed (backup check)
     const attentionHash = hashAttentionData(attentionData);
     if (processedHashes.has(attentionHash)) {
+      // Update marker anyway
+      await db.userSettings.update({
+        where: { userId },
+        data: { lastFocusCalculatedAt: now },
+      });
+      result.skippedNoNewData = true;
       return result;
     }
 
     // Detect new focus area from attention
     const newFocusItem = await detectFocusArea(attentionData, settings);
     if (!newFocusItem) {
-      // Update lastCalculatedAt even if no focus detected
-      if (activeFocus) {
-        await db.focus.update({
-          where: { id: activeFocus.id },
-          data: { lastCalculatedAt: now },
-        });
-      }
+      // Update marker even if no focus detected
+      await db.userSettings.update({
+        where: { userId },
+        data: { lastFocusCalculatedAt: now },
+      });
       return result;
     }
 
@@ -348,6 +363,12 @@ export async function processUserFocus(userId: string): Promise<ProcessUserFocus
           lastCalculatedAt: now,
           lastActivityAt: now,
         },
+      });
+
+      // Update user-level marker
+      await db.userSettings.update({
+        where: { userId },
+        data: { lastFocusCalculatedAt: now },
       });
 
       // Emit focus created event
@@ -390,6 +411,12 @@ export async function processUserFocus(userId: string): Promise<ProcessUserFocus
             },
           });
 
+          // Update user-level marker
+          await db.userSettings.update({
+            where: { userId },
+            data: { lastFocusCalculatedAt: now },
+          });
+
           // Emit focus created event
           emitFocusChange(userId, newFocus, "created");
 
@@ -415,6 +442,12 @@ export async function processUserFocus(userId: string): Promise<ProcessUserFocus
             },
           });
 
+          // Update user-level marker
+          await db.userSettings.update({
+            where: { userId },
+            data: { lastFocusCalculatedAt: now },
+          });
+
           // Emit focus updated event
           emitFocusChange(userId, updatedFocus, "updated");
 
@@ -437,6 +470,12 @@ export async function processUserFocus(userId: string): Promise<ProcessUserFocus
             lastCalculatedAt: now,
             lastActivityAt: now,
           },
+        });
+
+        // Update user-level marker
+        await db.userSettings.update({
+          where: { userId },
+          data: { lastFocusCalculatedAt: now },
         });
 
         // Emit focus updated event
@@ -471,20 +510,38 @@ export async function processAllUsersFocus(): Promise<ProcessAllUsersResult> {
     focusesCreated: 0,
     focusesUpdated: 0,
     focusesEnded: 0,
+    skippedNoNewData: 0,
+    skippedIntervalNotElapsed: 0,
     errors: 0,
   };
 
-  // Get all users with focus calculation enabled
+  const now = new Date();
+
+  // Get all users with focus calculation enabled, including their interval settings
   const usersWithFocus = await db.userSettings.findMany({
     where: {
       focusCalculationEnabled: true,
     },
     select: {
       userId: true,
+      focusCalculationIntervalMs: true,
+      lastFocusCalculatedAt: true,
     },
   });
 
-  for (const { userId } of usersWithFocus) {
+  for (const userSettings of usersWithFocus) {
+    const { userId, focusCalculationIntervalMs, lastFocusCalculatedAt } = userSettings;
+
+    // Check if user's individual interval has elapsed
+    if (lastFocusCalculatedAt) {
+      const timeSinceLastCalc = now.getTime() - lastFocusCalculatedAt.getTime();
+      if (timeSinceLastCalc < focusCalculationIntervalMs) {
+        // User's interval hasn't elapsed yet, skip
+        result.skippedIntervalNotElapsed++;
+        continue;
+      }
+    }
+
     try {
       const userResult = await processUserFocus(userId);
 
@@ -493,6 +550,7 @@ export async function processAllUsersFocus(): Promise<ProcessAllUsersResult> {
       if (userResult.focusCreated) result.focusesCreated++;
       if (userResult.focusUpdated) result.focusesUpdated++;
       if (userResult.focusEnded) result.focusesEnded++;
+      if (userResult.skippedNoNewData) result.skippedNoNewData++;
       if (userResult.error) result.errors++;
     } catch (error) {
       console.error(`[Focus] Failed to process user ${userId}:`, error);
