@@ -29,6 +29,9 @@ export interface AttentionSummary {
   visitedAt: string;
   activeTime: number;
   activeTimeFormatted: string;
+  // AI-generated summaries from website visit
+  summary: string | null;
+  imageSummary: string | null;
   attention: {
     text: {
       totalWordsRead: number;
@@ -42,6 +45,7 @@ export interface AttentionSummary {
         hoverDuration: number;
         hoverDurationFormatted: string;
         timestamp: string;
+        summary: string | null; // AI-generated description of the image
       }[];
     };
     audio: {
@@ -188,6 +192,8 @@ export function aggregateAttentionData(
         visitedAt: visit.openedAt.toISOString(),
         activeTime: 0,
         activeTimeFormatted: "",
+        summary: visit.summary,
+        imageSummary: visit.imageSummary,
         attention: {
           text: { totalWordsRead: 0, excerpts: [] },
           images: { count: 0, items: [] },
@@ -198,6 +204,13 @@ export function aggregateAttentionData(
     }
     const summary = urlMap.get(visit.url)!;
     summary.activeTime += visit.activeTime;
+    // Use latest summary if available
+    if (visit.summary && !summary.summary) {
+      summary.summary = visit.summary;
+    }
+    if (visit.imageSummary && !summary.imageSummary) {
+      summary.imageSummary = visit.imageSummary;
+    }
     if (visit.openedAt < new Date(summary.visitedAt)) {
       summary.visitedAt = visit.openedAt.toISOString();
     }
@@ -213,6 +226,8 @@ export function aggregateAttentionData(
         visitedAt: timestamp.toISOString(),
         activeTime: 0,
         activeTimeFormatted: "",
+        summary: null,
+        imageSummary: null,
         attention: {
           text: { totalWordsRead: 0, excerpts: [] },
           images: { count: 0, items: [] },
@@ -246,6 +261,7 @@ export function aggregateAttentionData(
       hoverDuration: image.hoverDuration,
       hoverDurationFormatted: formatDuration(image.hoverDuration),
       timestamp: image.timestamp.toISOString(),
+      summary: image.summary,
     });
   }
 

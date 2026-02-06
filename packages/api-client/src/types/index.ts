@@ -125,6 +125,8 @@ export interface ImageAttention {
   hoverDuration: number;
   confidence: number;
   timestamp: string;
+  summary?: string | null; // AI-generated description of the image
+  summarizedAt?: string | null;
   createdAt: string;
 }
 
@@ -240,6 +242,7 @@ export interface ImageAttentionItem {
   hoverDuration: number;
   hoverDurationFormatted: string;
   timestamp: string;
+  summary?: string | null; // AI-generated description of the image
 }
 
 export interface AudioAttentionItem {
@@ -285,6 +288,8 @@ export interface AttentionPageSummary {
   visitedAt: string;
   activeTime: number;
   activeTimeFormatted: string;
+  summary?: string | null; // AI-generated summary of text attention
+  imageSummary?: string | null; // AI-generated summary of image attention
   attention: PageAttention;
 }
 
@@ -320,6 +325,9 @@ export interface UserSettings {
   cognitiveAttentionDebugMode: boolean;
   cognitiveAttentionShowOverlay: boolean;
   attentionTrackingIgnoreList: string | null; // Newline-separated list of URL patterns/regexes to ignore
+  // Summarization settings (optional for backward compatibility before migration)
+  attentionSummarizationEnabled?: boolean; // Default true
+  attentionSummarizationIntervalMs?: number; // Default 60000 (1 minute)
   // LLM settings
   llmProvider?: LLMProviderType | null;
   llmModel?: string | null;
@@ -332,6 +340,9 @@ export interface UserSettingsUpdateRequest {
   cognitiveAttentionDebugMode?: boolean;
   cognitiveAttentionShowOverlay?: boolean;
   attentionTrackingIgnoreList?: string | null;
+  // Summarization settings
+  attentionSummarizationEnabled?: boolean;
+  attentionSummarizationIntervalMs?: number;
   // LLM settings
   llmProvider?: LLMProviderType | null;
   llmModel?: string | null;
@@ -349,6 +360,9 @@ export interface SSESettingsChangedData {
   cognitiveAttentionDebugMode: boolean;
   cognitiveAttentionShowOverlay: boolean;
   attentionTrackingIgnoreList: string | null;
+  // Summarization settings (optional for backward compatibility)
+  attentionSummarizationEnabled?: boolean;
+  attentionSummarizationIntervalMs?: number;
   // LLM settings (optional for backward compatibility)
   llmProvider?: LLMProviderType | null;
   llmModel?: string | null;

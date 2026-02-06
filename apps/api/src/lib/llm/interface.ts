@@ -14,9 +14,28 @@ export interface LLMMediaPart {
   data: string; // Base64 encoded data
 }
 
+/**
+ * Image content for multimodal messages
+ */
+export interface LLMImageContent {
+  type: "image";
+  mimeType: string;
+  data: string; // Base64 encoded image data
+}
+
+/**
+ * Text content for messages
+ */
+export interface LLMTextContent {
+  type: "text";
+  text: string;
+}
+
+export type LLMMessageContent = string | (LLMTextContent | LLMImageContent)[];
+
 export interface LLMMessage {
   role: "user" | "assistant" | "system";
-  content: string;
+  content: LLMMessageContent;
 }
 
 export interface LLMStreamCallbacks {

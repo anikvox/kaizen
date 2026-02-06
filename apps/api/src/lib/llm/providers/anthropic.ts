@@ -6,6 +6,7 @@ import type {
   LLMGenerateOptions,
   LLMStreamOptions,
   LLMResponse,
+  LLMMessageContent,
 } from "../interface.js";
 import { env } from "../../env.js";
 
@@ -152,7 +153,37 @@ export class AnthropicProvider implements LLMProvider {
       .filter((m) => m.role !== "system") // System messages handled separately
       .map((msg) => ({
         role: msg.role === "user" ? "user" : "assistant",
-        content: msg.content,
+        content: this.formatContent(msg.content),
       }));
+  }
+
+  private formatContent(
+    content: LLMMessageContent
+  ): string | Anthropic.ContentBlockParam[] {
+    // Simple string content
+    if (typeof content === "string") {
+      return content;
+    }
+
+    // Multimodal content array
+    return content.map((part): Anthropic.ContentBlockParam => {
+      if (part.type === "text") {
+        return { type: "text", text: part.text };
+      } else if (part.type === "image") {
+        return {
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: part.mimeType as
+              | "image/jpeg"
+              | "image/png"
+              | "image/gif"
+              | "image/webp",
+            data: part.data,
+          },
+        };
+      }
+      return { type: "text", text: "" };
+    });
   }
 }

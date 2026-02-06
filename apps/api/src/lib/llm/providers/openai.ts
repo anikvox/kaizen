@@ -6,6 +6,7 @@ import type {
   LLMGenerateOptions,
   LLMStreamOptions,
   LLMResponse,
+  LLMMessageContent,
 } from "../interface.js";
 import { env } from "../../env.js";
 
@@ -104,14 +105,48 @@ export class OpenAIProvider implements LLMProvider {
     // Add conversation messages
     for (const msg of messages) {
       if (msg.role === "system") {
-        formatted.push({ role: "system", content: msg.content });
+        formatted.push({ role: "system", content: this.formatContentAsString(msg.content) });
       } else if (msg.role === "user") {
-        formatted.push({ role: "user", content: msg.content });
+        formatted.push({ role: "user", content: this.formatContent(msg.content) });
       } else {
-        formatted.push({ role: "assistant", content: msg.content });
+        formatted.push({ role: "assistant", content: this.formatContentAsString(msg.content) });
       }
     }
 
     return formatted;
+  }
+
+  private formatContent(
+    content: LLMMessageContent
+  ): string | OpenAI.ChatCompletionContentPart[] {
+    // Simple string content
+    if (typeof content === "string") {
+      return content;
+    }
+
+    // Multimodal content array
+    return content.map((part): OpenAI.ChatCompletionContentPart => {
+      if (part.type === "text") {
+        return { type: "text", text: part.text };
+      } else if (part.type === "image") {
+        return {
+          type: "image_url",
+          image_url: {
+            url: `data:${part.mimeType};base64,${part.data}`,
+          },
+        };
+      }
+      return { type: "text", text: "" };
+    });
+  }
+
+  private formatContentAsString(content: LLMMessageContent): string {
+    if (typeof content === "string") {
+      return content;
+    }
+    return content
+      .filter((part) => part.type === "text")
+      .map((part) => (part as { type: "text"; text: string }).text)
+      .join("\n");
   }
 }

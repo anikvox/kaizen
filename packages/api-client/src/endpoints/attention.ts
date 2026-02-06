@@ -28,20 +28,4 @@ export class AttentionEndpoint {
   async youtube(data: YoutubeAttentionRequest): Promise<YoutubeAttention> {
     return this.http.post<YoutubeAttention>("/attention/youtube", data, true);
   }
-
-  async listText(): Promise<TextAttention[]> {
-    return this.http.get<TextAttention[]>("/attention/text", true);
-  }
-
-  async listImage(): Promise<ImageAttention[]> {
-    return this.http.get<ImageAttention[]>("/attention/image", true);
-  }
-
-  async listAudio(): Promise<AudioAttention[]> {
-    return this.http.get<AudioAttention[]>("/attention/audio", true);
-  }
-
-  async listYoutube(): Promise<YoutubeAttention[]> {
-    return this.http.get<YoutubeAttention[]>("/attention/youtube", true);
-  }
 }

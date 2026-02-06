@@ -97,6 +97,9 @@ app.get("/", dualAuthMiddleware, async (c) => {
     cognitiveAttentionDebugMode: settings.cognitiveAttentionDebugMode,
     cognitiveAttentionShowOverlay: settings.cognitiveAttentionShowOverlay,
     attentionTrackingIgnoreList: settings.attentionTrackingIgnoreList,
+    // Summarization settings
+    attentionSummarizationEnabled: settings.attentionSummarizationEnabled,
+    attentionSummarizationIntervalMs: settings.attentionSummarizationIntervalMs,
     // LLM settings (don't expose actual API keys, just whether they're set)
     llmProvider: settings.llmProvider,
     llmModel: settings.llmModel,
@@ -174,6 +177,9 @@ app.post("/", dualAuthMiddleware, async (c) => {
     cognitiveAttentionDebugMode?: boolean;
     cognitiveAttentionShowOverlay?: boolean;
     attentionTrackingIgnoreList?: string | null;
+    // Summarization settings
+    attentionSummarizationEnabled?: boolean;
+    attentionSummarizationIntervalMs?: number;
     // LLM settings
     llmProvider?: LLMProviderType | null;
     llmModel?: string | null;
@@ -189,6 +195,8 @@ app.post("/", dualAuthMiddleware, async (c) => {
     cognitiveAttentionDebugMode: false as boolean,
     cognitiveAttentionShowOverlay: false as boolean,
     attentionTrackingIgnoreList: null as string | null,
+    attentionSummarizationEnabled: true as boolean,
+    attentionSummarizationIntervalMs: 60000 as number,
     llmProvider: null as string | null,
     llmModel: null as string | null,
     geminiApiKeyEncrypted: null as string | null,
@@ -208,6 +216,15 @@ app.post("/", dualAuthMiddleware, async (c) => {
   if (body.attentionTrackingIgnoreList !== undefined) {
     updateData.attentionTrackingIgnoreList = body.attentionTrackingIgnoreList;
     createData.attentionTrackingIgnoreList = body.attentionTrackingIgnoreList;
+  }
+  // Summarization settings
+  if (body.attentionSummarizationEnabled !== undefined) {
+    updateData.attentionSummarizationEnabled = body.attentionSummarizationEnabled;
+    createData.attentionSummarizationEnabled = body.attentionSummarizationEnabled;
+  }
+  if (body.attentionSummarizationIntervalMs !== undefined) {
+    updateData.attentionSummarizationIntervalMs = body.attentionSummarizationIntervalMs;
+    createData.attentionSummarizationIntervalMs = body.attentionSummarizationIntervalMs;
   }
 
   // LLM settings
@@ -247,6 +264,8 @@ app.post("/", dualAuthMiddleware, async (c) => {
       cognitiveAttentionDebugMode: settings.cognitiveAttentionDebugMode,
       cognitiveAttentionShowOverlay: settings.cognitiveAttentionShowOverlay,
       attentionTrackingIgnoreList: settings.attentionTrackingIgnoreList,
+      attentionSummarizationEnabled: settings.attentionSummarizationEnabled,
+      attentionSummarizationIntervalMs: settings.attentionSummarizationIntervalMs,
       llmProvider: settings.llmProvider,
       llmModel: settings.llmModel,
       hasGeminiApiKey: !!settings.geminiApiKeyEncrypted,
@@ -259,6 +278,8 @@ app.post("/", dualAuthMiddleware, async (c) => {
     cognitiveAttentionDebugMode: settings.cognitiveAttentionDebugMode,
     cognitiveAttentionShowOverlay: settings.cognitiveAttentionShowOverlay,
     attentionTrackingIgnoreList: settings.attentionTrackingIgnoreList,
+    attentionSummarizationEnabled: settings.attentionSummarizationEnabled,
+    attentionSummarizationIntervalMs: settings.attentionSummarizationIntervalMs,
     llmProvider: settings.llmProvider,
     llmModel: settings.llmModel,
     hasGeminiApiKey: !!settings.geminiApiKeyEncrypted,
@@ -336,6 +357,8 @@ settingsSSE.get("/", async (c) => {
           cognitiveAttentionDebugMode: settings.cognitiveAttentionDebugMode,
           cognitiveAttentionShowOverlay: settings.cognitiveAttentionShowOverlay,
           attentionTrackingIgnoreList: settings.attentionTrackingIgnoreList,
+          attentionSummarizationEnabled: settings.attentionSummarizationEnabled,
+          attentionSummarizationIntervalMs: settings.attentionSummarizationIntervalMs,
           llmProvider: settings.llmProvider,
           llmModel: settings.llmModel,
           hasGeminiApiKey: !!settings.geminiApiKeyEncrypted,

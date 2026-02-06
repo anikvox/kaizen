@@ -4,6 +4,9 @@ export type {
   LLMProviderType,
   LLMProviderConfig,
   LLMMessage,
+  LLMMessageContent,
+  LLMTextContent,
+  LLMImageContent,
   LLMMediaPart,
   LLMStreamCallbacks,
   LLMGenerateOptions,
@@ -44,4 +47,9 @@ export {
 } from "./model-fetcher.js";
 
 // Prompts
-export { SYSTEM_PROMPTS, generateChatTitle, serializeAttentionForLLM } from "./prompts.js";
+export {
+  SYSTEM_PROMPTS,
+  generateChatTitle,
+  serializeAttentionForLLM,
+  serializeAttentionCompact,
+} from "./prompts.js";

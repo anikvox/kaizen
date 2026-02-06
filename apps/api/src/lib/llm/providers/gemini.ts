@@ -7,6 +7,7 @@ import type {
   LLMStreamOptions,
   LLMResponse,
   LLMMediaPart,
+  LLMMessageContent,
 } from "../interface.js";
 import { env } from "../../env.js";
 
@@ -162,7 +163,29 @@ export class GeminiProvider implements LLMProvider {
       .filter((m) => m.role !== "system") // System messages handled separately
       .map((msg) => ({
         role: msg.role === "user" ? "user" : "model",
-        parts: [{ text: msg.content }],
+        parts: this.formatContent(msg.content),
       }));
+  }
+
+  private formatContent(content: LLMMessageContent): any[] {
+    // Simple string content
+    if (typeof content === "string") {
+      return [{ text: content }];
+    }
+
+    // Multimodal content array
+    return content.map((part) => {
+      if (part.type === "text") {
+        return { text: part.text };
+      } else if (part.type === "image") {
+        return {
+          inlineData: {
+            mimeType: part.mimeType,
+            data: part.data,
+          },
+        };
+      }
+      return { text: "" };
+    });
   }
 }
