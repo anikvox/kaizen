@@ -1,11 +1,20 @@
 import type { PlasmoCSConfig } from "plasmo"
 
 import { sendToBackground } from "@plasmohq/messaging"
+import { Storage } from "@plasmohq/storage"
+
+import { ATTENTION_TRACKING_IGNORE_LIST } from "../cognitive-attention/default-settings"
+import { shouldIgnoreUrlSync } from "../cognitive-attention/url-ignore-list"
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"]
 }
 
+// Skip tracking on the Kaizen web app itself
+const kaizenWebUrl = process.env.PLASMO_PUBLIC_KAIZEN_WEB_URL || "http://localhost:60091"
+const isKaizenWebApp = location.href.startsWith(kaizenWebUrl)
+
+const storage = new Storage()
 const WEBSITE_VISIT_MESSAGE_NAME = "website-visit"
 
 type WebsiteVisitEventType = "opened" | "active-time-update" | "closed"
@@ -116,4 +125,20 @@ const getWebsiteMetadata = () => {
   return metadata
 }
 
-export default new WebsiteTracker().start()
+const tracker = new WebsiteTracker()
+
+// Start tracker after checking ignore list
+const initTracker = async () => {
+  if (isKaizenWebApp) return
+
+  const ignoreList = await storage.get<string | null>(ATTENTION_TRACKING_IGNORE_LIST.key)
+  if (shouldIgnoreUrlSync(location.href, ignoreList)) {
+    return
+  }
+
+  tracker.start()
+}
+
+initTracker()
+
+export default tracker

@@ -3,7 +3,8 @@ import { createApiClient } from "@kaizen/api-client"
 
 import {
   COGNITIVE_ATTENTION_DEBUG_MODE,
-  COGNITIVE_ATTENTION_SHOW_OVERLAY
+  COGNITIVE_ATTENTION_SHOW_OVERLAY,
+  ATTENTION_TRACKING_IGNORE_LIST
 } from "../cognitive-attention/default-settings"
 
 const apiUrl = process.env.PLASMO_PUBLIC_KAIZEN_API_URL || "http://localhost:60092"
@@ -52,10 +53,12 @@ export function stopSettingsSync() {
 async function syncSettingsToStorage(settings: {
   cognitiveAttentionDebugMode: boolean
   cognitiveAttentionShowOverlay: boolean
+  attentionTrackingIgnoreList?: string | null
 }) {
   // Get current values to avoid unnecessary writes
   const currentDebugMode = await storage.get(COGNITIVE_ATTENTION_DEBUG_MODE.key)
   const currentShowOverlay = await storage.get(COGNITIVE_ATTENTION_SHOW_OVERLAY.key)
+  const currentIgnoreList = await storage.get(ATTENTION_TRACKING_IGNORE_LIST.key)
 
   // Only write if values actually changed
   if (String(currentDebugMode) !== String(settings.cognitiveAttentionDebugMode)) {
@@ -65,12 +68,18 @@ async function syncSettingsToStorage(settings: {
   if (String(currentShowOverlay) !== String(settings.cognitiveAttentionShowOverlay)) {
     await storage.set(COGNITIVE_ATTENTION_SHOW_OVERLAY.key, settings.cognitiveAttentionShowOverlay)
   }
+
+  if (settings.attentionTrackingIgnoreList !== undefined &&
+      String(currentIgnoreList ?? "") !== String(settings.attentionTrackingIgnoreList ?? "")) {
+    await storage.set(ATTENTION_TRACKING_IGNORE_LIST.key, settings.attentionTrackingIgnoreList)
+  }
 }
 
 // Function to push local settings changes to server
 export async function pushSettingsToServer(settings: {
   cognitiveAttentionDebugMode?: boolean
   cognitiveAttentionShowOverlay?: boolean
+  attentionTrackingIgnoreList?: string | null
 }) {
   const token = await storage.get<string>("deviceToken")
   if (!token) {

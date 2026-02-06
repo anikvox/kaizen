@@ -18,3 +18,7 @@ export const COGNITIVE_ATTENTION_SHOW_OVERLAY = {
   key: "setting-cognitive-attention-show-overlay",
   defaultValue: false
 }
+export const ATTENTION_TRACKING_IGNORE_LIST = {
+  key: "setting-attention-tracking-ignore-list",
+  defaultValue: null as string | null
+}

@@ -8,8 +8,10 @@ import {
   COGNITIVE_ATTENTION_IDLE_THRESHOLD_TIME,
   COGNITIVE_ATTENTION_SHOW_OVERLAY,
   COGNITIVE_ATTENTION_SUSTAINED_TIME,
-  COGNITIVE_ATTENTION_WORDS_PER_MINUTE
+  COGNITIVE_ATTENTION_WORDS_PER_MINUTE,
+  ATTENTION_TRACKING_IGNORE_LIST
 } from "../cognitive-attention/default-settings"
+import { shouldIgnoreUrlSync } from "../cognitive-attention/url-ignore-list"
 
 import CognitiveAttentionTextTracker from "../cognitive-attention/monitor-text"
 
@@ -20,6 +22,10 @@ export const config: PlasmoCSConfig = {
   ],
   all_frames: false
 }
+
+// Skip tracking on the Kaizen web app itself
+const kaizenWebUrl = process.env.PLASMO_PUBLIC_KAIZEN_WEB_URL || "http://localhost:60091"
+const isKaizenWebApp = location.href.startsWith(kaizenWebUrl)
 
 const COGNITIVE_ATTENTION_TEXT_MESSAGE_NAME = "cognitive-attention-text"
 
@@ -37,6 +43,18 @@ const parseNumber = (val: unknown, fallback: number) => {
 const readingProgressTracker = new Map<number, number>()
 
 const initTextTracker = async () => {
+  if (isKaizenWebApp) return
+
+  // Check user's ignore list
+  const ignoreList = await storage.get<string | null>(ATTENTION_TRACKING_IGNORE_LIST.key)
+  if (shouldIgnoreUrlSync(URL, ignoreList)) {
+    if (textTracker) {
+      textTracker.destroy?.()
+      textTracker = null
+    }
+    return
+  }
+
   const cognitiveAttentionThreshold = parseNumber(
     await storage.get(COGNITIVE_ATTENTION_SUSTAINED_TIME.key),
     COGNITIVE_ATTENTION_SUSTAINED_TIME.defaultValue
@@ -105,15 +123,18 @@ const initTextTracker = async () => {
   textTracker.init()
 }
 
-initTextTracker().then(() => {
-  storage.watch({
-    [COGNITIVE_ATTENTION_SUSTAINED_TIME.key]: initTextTracker,
-    [COGNITIVE_ATTENTION_IDLE_THRESHOLD_TIME.key]: initTextTracker,
-    [COGNITIVE_ATTENTION_WORDS_PER_MINUTE.key]: initTextTracker,
-    [COGNITIVE_ATTENTION_DEBUG_MODE.key]: initTextTracker,
-    [COGNITIVE_ATTENTION_SHOW_OVERLAY.key]: initTextTracker
+if (!isKaizenWebApp) {
+  initTextTracker().then(() => {
+    storage.watch({
+      [COGNITIVE_ATTENTION_SUSTAINED_TIME.key]: initTextTracker,
+      [COGNITIVE_ATTENTION_IDLE_THRESHOLD_TIME.key]: initTextTracker,
+      [COGNITIVE_ATTENTION_WORDS_PER_MINUTE.key]: initTextTracker,
+      [COGNITIVE_ATTENTION_DEBUG_MODE.key]: initTextTracker,
+      [COGNITIVE_ATTENTION_SHOW_OVERLAY.key]: initTextTracker,
+      [ATTENTION_TRACKING_IGNORE_LIST.key]: initTextTracker
+    })
   })
-})
+}
 
 const extractWords = (text: string, wordCount: number): string => {
   const words = text.split(/\s+/)

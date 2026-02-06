@@ -142,6 +142,7 @@ model UserSettings {
   // Cognitive Attention Settings
   cognitiveAttentionDebugMode   Boolean  @default(false)
   cognitiveAttentionShowOverlay Boolean  @default(false)
+  attentionTrackingIgnoreList   String?  @db.Text // Newline-separated list of URL patterns/regexes to ignore
   // LLM Settings
   llmProvider                   String?  // "gemini" | "anthropic" | "openai" | null (system default)
   llmModel                      String?  // Selected model for the provider

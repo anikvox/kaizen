@@ -3,7 +3,8 @@ import { Storage } from "@plasmohq/storage"
 
 import {
   COGNITIVE_ATTENTION_DEBUG_MODE,
-  COGNITIVE_ATTENTION_SHOW_OVERLAY
+  COGNITIVE_ATTENTION_SHOW_OVERLAY,
+  ATTENTION_TRACKING_IGNORE_LIST
 } from "../../cognitive-attention/default-settings"
 import { pushSettingsToServer } from "../settings-sync"
 
@@ -12,6 +13,7 @@ const storage = new Storage()
 export type UpdateSettingsRequest = {
   cognitiveAttentionDebugMode?: boolean
   cognitiveAttentionShowOverlay?: boolean
+  attentionTrackingIgnoreList?: string | null
 }
 
 export type UpdateSettingsResponse = {
@@ -39,6 +41,9 @@ const handler: PlasmoMessaging.MessageHandler<UpdateSettingsRequest, UpdateSetti
     }
     if (body.cognitiveAttentionShowOverlay !== undefined) {
       await storage.set(COGNITIVE_ATTENTION_SHOW_OVERLAY.key, body.cognitiveAttentionShowOverlay)
+    }
+    if (body.attentionTrackingIgnoreList !== undefined) {
+      await storage.set(ATTENTION_TRACKING_IGNORE_LIST.key, body.attentionTrackingIgnoreList)
     }
 
     // Then push to server (this will trigger SSE to sync to other extensions)

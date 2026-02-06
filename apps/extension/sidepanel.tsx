@@ -94,6 +94,24 @@ function SidePanel() {
     }
   }
 
+  const handleUpdateIgnoreList = async (value: string | null) => {
+    if (!settings) return
+
+    setSavingSettings(true)
+
+    try {
+      await sendToBackground({
+        name: "update-settings",
+        body: { attentionTrackingIgnoreList: value }
+      })
+      setSettings({ ...settings, attentionTrackingIgnoreList: value })
+    } catch (error) {
+      console.error("Failed to update ignore list:", error)
+    } finally {
+      setSavingSettings(false)
+    }
+  }
+
   // Fetch chat sessions
   const fetchSessions = async () => {
     const token = await storage.get<string>("deviceToken")
@@ -541,6 +559,7 @@ function SidePanel() {
           settings={settings}
           savingSettings={savingSettings}
           onToggleSetting={handleToggleSetting}
+          onUpdateIgnoreList={handleUpdateIgnoreList}
         />
       )}
     </div>
@@ -705,12 +724,35 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 function SettingsTab({
   settings,
   savingSettings,
-  onToggleSetting
+  onToggleSetting,
+  onUpdateIgnoreList
 }: {
   settings: UserSettings | null
   savingSettings: boolean
   onToggleSetting: (key: keyof UserSettings) => void
+  onUpdateIgnoreList: (value: string | null) => void
 }) {
+  const [ignoreListValue, setIgnoreListValue] = useState("")
+  const [ignoreListDirty, setIgnoreListDirty] = useState(false)
+
+  // Sync local state with settings when they change
+  useEffect(() => {
+    if (settings?.attentionTrackingIgnoreList !== undefined) {
+      setIgnoreListValue(settings.attentionTrackingIgnoreList || "")
+      setIgnoreListDirty(false)
+    }
+  }, [settings?.attentionTrackingIgnoreList])
+
+  const handleIgnoreListChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setIgnoreListValue(e.target.value)
+    setIgnoreListDirty(true)
+  }
+
+  const handleSaveIgnoreList = () => {
+    onUpdateIgnoreList(ignoreListValue.trim() || null)
+    setIgnoreListDirty(false)
+  }
+
   return (
     <div style={styles.settingsContainer}>
       <div style={styles.section}>
@@ -752,6 +794,37 @@ function SettingsTab({
               >
                 {settings.cognitiveAttentionShowOverlay ? "ON" : "OFF"}
               </button>
+            </div>
+
+            {/* Ignore List */}
+            <div style={styles.ignoreListSection}>
+              <div style={styles.settingInfo}>
+                <span style={styles.settingName}>Ignore List</span>
+                <span style={styles.settingDesc}>
+                  URLs to skip tracking (one per line, supports regex)
+                </span>
+              </div>
+              <textarea
+                value={ignoreListValue}
+                onChange={handleIgnoreListChange}
+                placeholder={"Example:\nexample.com\n/^https:\\/\\/mail\\.google\\.com/\n*.internal.company.com"}
+                disabled={savingSettings}
+                style={styles.ignoreListTextarea}
+                rows={5}
+              />
+              {ignoreListDirty && (
+                <button
+                  onClick={handleSaveIgnoreList}
+                  disabled={savingSettings}
+                  style={{
+                    ...styles.saveButton,
+                    opacity: savingSettings ? 0.6 : 1,
+                    cursor: savingSettings ? "not-allowed" : "pointer"
+                  }}
+                >
+                  {savingSettings ? "Saving..." : "Save"}
+                </button>
+              )}
             </div>
           </div>
         ) : (
@@ -1033,6 +1106,33 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     fontSize: 13,
     color: "#666"
+  },
+  ignoreListSection: {
+    marginTop: 12,
+    padding: 10,
+    background: "#f8f9fa",
+    borderRadius: 6
+  },
+  ignoreListTextarea: {
+    width: "100%",
+    marginTop: 8,
+    padding: 8,
+    border: "1px solid #ddd",
+    borderRadius: 4,
+    fontSize: 11,
+    fontFamily: "monospace",
+    resize: "vertical",
+    boxSizing: "border-box" as const
+  },
+  saveButton: {
+    marginTop: 8,
+    padding: "6px 12px",
+    background: "#007bff",
+    color: "#fff",
+    border: "none",
+    borderRadius: 4,
+    fontSize: 11,
+    fontWeight: 500
   }
 }
 

@@ -96,6 +96,7 @@ app.get("/", dualAuthMiddleware, async (c) => {
   return c.json({
     cognitiveAttentionDebugMode: settings.cognitiveAttentionDebugMode,
     cognitiveAttentionShowOverlay: settings.cognitiveAttentionShowOverlay,
+    attentionTrackingIgnoreList: settings.attentionTrackingIgnoreList,
     // LLM settings (don't expose actual API keys, just whether they're set)
     llmProvider: settings.llmProvider,
     llmModel: settings.llmModel,
@@ -172,6 +173,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
   const body = await c.req.json<{
     cognitiveAttentionDebugMode?: boolean;
     cognitiveAttentionShowOverlay?: boolean;
+    attentionTrackingIgnoreList?: string | null;
     // LLM settings
     llmProvider?: LLMProviderType | null;
     llmModel?: string | null;
@@ -186,6 +188,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
     userId,
     cognitiveAttentionDebugMode: false as boolean,
     cognitiveAttentionShowOverlay: false as boolean,
+    attentionTrackingIgnoreList: null as string | null,
     llmProvider: null as string | null,
     llmModel: null as string | null,
     geminiApiKeyEncrypted: null as string | null,
@@ -201,6 +204,10 @@ app.post("/", dualAuthMiddleware, async (c) => {
   if (body.cognitiveAttentionShowOverlay !== undefined) {
     updateData.cognitiveAttentionShowOverlay = body.cognitiveAttentionShowOverlay;
     createData.cognitiveAttentionShowOverlay = body.cognitiveAttentionShowOverlay;
+  }
+  if (body.attentionTrackingIgnoreList !== undefined) {
+    updateData.attentionTrackingIgnoreList = body.attentionTrackingIgnoreList;
+    createData.attentionTrackingIgnoreList = body.attentionTrackingIgnoreList;
   }
 
   // LLM settings
@@ -239,6 +246,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
     settings: {
       cognitiveAttentionDebugMode: settings.cognitiveAttentionDebugMode,
       cognitiveAttentionShowOverlay: settings.cognitiveAttentionShowOverlay,
+      attentionTrackingIgnoreList: settings.attentionTrackingIgnoreList,
       llmProvider: settings.llmProvider,
       llmModel: settings.llmModel,
       hasGeminiApiKey: !!settings.geminiApiKeyEncrypted,
@@ -250,6 +258,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
   return c.json({
     cognitiveAttentionDebugMode: settings.cognitiveAttentionDebugMode,
     cognitiveAttentionShowOverlay: settings.cognitiveAttentionShowOverlay,
+    attentionTrackingIgnoreList: settings.attentionTrackingIgnoreList,
     llmProvider: settings.llmProvider,
     llmModel: settings.llmModel,
     hasGeminiApiKey: !!settings.geminiApiKeyEncrypted,
@@ -326,6 +335,7 @@ settingsSSE.get("/", async (c) => {
         settings: {
           cognitiveAttentionDebugMode: settings.cognitiveAttentionDebugMode,
           cognitiveAttentionShowOverlay: settings.cognitiveAttentionShowOverlay,
+          attentionTrackingIgnoreList: settings.attentionTrackingIgnoreList,
           llmProvider: settings.llmProvider,
           llmModel: settings.llmModel,
           hasGeminiApiKey: !!settings.geminiApiKeyEncrypted,

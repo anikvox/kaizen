@@ -23,6 +23,10 @@ export default function Settings() {
   const [error, setError] = useState("");
   const eventSourceRef = useRef<EventSource | null>(null);
 
+  // Ignore list state
+  const [ignoreListValue, setIgnoreListValue] = useState("");
+  const [ignoreListDirty, setIgnoreListDirty] = useState(false);
+
   // LLM settings state - models are fetched dynamically per provider
   const [providerModels, setProviderModels] = useState<Partial<Record<LLMProviderType, ModelInfo[]>>>({});
   const [loadingModels, setLoadingModels] = useState<Partial<Record<LLMProviderType, boolean>>>({});
@@ -79,6 +83,8 @@ export default function Settings() {
         api.settings.getLLMModels(),
       ]);
       setSettings(settingsResult);
+      setIgnoreListValue(settingsResult.attentionTrackingIgnoreList || "");
+      setIgnoreListDirty(false);
       setLlmModels(modelsResult);
       setError("");
 
@@ -131,11 +137,16 @@ export default function Settings() {
           // Initial connection with settings
           if (data.settings) {
             setSettings(data.settings);
+            setIgnoreListValue(data.settings.attentionTrackingIgnoreList || "");
+            setIgnoreListDirty(false);
           }
         },
         (newSettings) => {
           // Settings changed from another source (e.g., extension)
           setSettings(newSettings);
+          if (!ignoreListDirty) {
+            setIgnoreListValue(newSettings.attentionTrackingIgnoreList || "");
+          }
         },
         (error) => {
           console.error("Settings SSE error:", error);
@@ -168,6 +179,27 @@ export default function Settings() {
     } catch (err) {
       console.error("Update settings error:", err);
       setError("Failed to update settings");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveIgnoreList = async () => {
+    if (!settings) return;
+
+    setSaving(true);
+    const api = createApiClient(apiUrl, getTokenFn);
+
+    try {
+      const result = await api.settings.update({
+        attentionTrackingIgnoreList: ignoreListValue.trim() || null,
+      });
+      setSettings(result);
+      setIgnoreListDirty(false);
+      setError("");
+    } catch (err) {
+      console.error("Update ignore list error:", err);
+      setError("Failed to update ignore list");
     } finally {
       setSaving(false);
     }
@@ -395,6 +427,61 @@ export default function Settings() {
               >
                 {settings.cognitiveAttentionShowOverlay ? "ON" : "OFF"}
               </button>
+            </div>
+
+            {/* Ignore List */}
+            <div
+              style={{
+                padding: "1rem",
+                border: "1px solid #ddd",
+                borderRadius: "8px",
+              }}
+            >
+              <p style={{ margin: 0, fontWeight: "bold" }}>Ignore List</p>
+              <p style={{ margin: "0.25rem 0 0.75rem", fontSize: "0.85rem", color: "#666" }}>
+                URLs to skip from attention tracking. Enter one pattern per line.
+                Supports plain text (substring match), glob patterns (*.example.com),
+                and regex (/pattern/).
+              </p>
+              <textarea
+                value={ignoreListValue}
+                onChange={(e) => {
+                  setIgnoreListValue(e.target.value);
+                  setIgnoreListDirty(true);
+                }}
+                placeholder={"Example patterns:\nexample.com\n*.internal.company.com\n/^https:\\/\\/mail\\.google\\.com/"}
+                disabled={saving}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem",
+                  borderRadius: "4px",
+                  border: "1px solid #ccc",
+                  fontSize: "0.9rem",
+                  fontFamily: "monospace",
+                  resize: "vertical",
+                  minHeight: "100px",
+                  boxSizing: "border-box",
+                }}
+                rows={5}
+              />
+              {ignoreListDirty && (
+                <button
+                  onClick={handleSaveIgnoreList}
+                  disabled={saving}
+                  style={{
+                    marginTop: "0.5rem",
+                    background: "#007bff",
+                    color: "white",
+                    border: "none",
+                    padding: "0.5rem 1rem",
+                    borderRadius: "4px",
+                    cursor: saving ? "not-allowed" : "pointer",
+                    opacity: saving ? 0.6 : 1,
+                  }}
+                >
+                  {saving ? "Saving..." : "Save Ignore List"}
+                </button>
+              )}
             </div>
           </div>
         )}

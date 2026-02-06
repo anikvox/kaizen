@@ -319,6 +319,7 @@ export type LLMModels = Record<LLMProviderType, ModelInfo[]>;
 export interface UserSettings {
   cognitiveAttentionDebugMode: boolean;
   cognitiveAttentionShowOverlay: boolean;
+  attentionTrackingIgnoreList: string | null; // Newline-separated list of URL patterns/regexes to ignore
   // LLM settings
   llmProvider?: LLMProviderType | null;
   llmModel?: string | null;
@@ -330,6 +331,7 @@ export interface UserSettings {
 export interface UserSettingsUpdateRequest {
   cognitiveAttentionDebugMode?: boolean;
   cognitiveAttentionShowOverlay?: boolean;
+  attentionTrackingIgnoreList?: string | null;
   // LLM settings
   llmProvider?: LLMProviderType | null;
   llmModel?: string | null;
@@ -346,6 +348,7 @@ export interface SSESettingsConnectedData {
 export interface SSESettingsChangedData {
   cognitiveAttentionDebugMode: boolean;
   cognitiveAttentionShowOverlay: boolean;
+  attentionTrackingIgnoreList: string | null;
   // LLM settings (optional for backward compatibility)
   llmProvider?: LLMProviderType | null;
   llmModel?: string | null;
