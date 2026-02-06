@@ -4,7 +4,7 @@ import { deviceAuthMiddleware, type DeviceAuthVariables } from "../middleware/in
 
 const app = new Hono<{ Variables: DeviceAuthVariables }>();
 
-// Text Attention
+// Text Attention - internal tracking only
 app.post("/text", deviceAuthMiddleware, async (c) => {
   const userId = c.get("userId");
   const body = await c.req.json<{
@@ -27,22 +27,7 @@ app.post("/text", deviceAuthMiddleware, async (c) => {
   return c.json(attention);
 });
 
-app.get("/text", deviceAuthMiddleware, async (c) => {
-  const userId = c.get("userId");
-  const limit = Number(c.req.query("limit")) || 100;
-  const offset = Number(c.req.query("offset")) || 0;
-
-  const attentions = await db.textAttention.findMany({
-    where: { userId },
-    orderBy: { timestamp: "desc" },
-    take: limit,
-    skip: offset,
-  });
-
-  return c.json(attentions);
-});
-
-// Image Attention
+// Image Attention - internal tracking only
 app.post("/image", deviceAuthMiddleware, async (c) => {
   const userId = c.get("userId");
   const body = await c.req.json<{
@@ -75,22 +60,7 @@ app.post("/image", deviceAuthMiddleware, async (c) => {
   return c.json(attention);
 });
 
-app.get("/image", deviceAuthMiddleware, async (c) => {
-  const userId = c.get("userId");
-  const limit = Number(c.req.query("limit")) || 100;
-  const offset = Number(c.req.query("offset")) || 0;
-
-  const attentions = await db.imageAttention.findMany({
-    where: { userId },
-    orderBy: { timestamp: "desc" },
-    take: limit,
-    skip: offset,
-  });
-
-  return c.json(attentions);
-});
-
-// Audio Attention
+// Audio Attention - internal tracking only
 app.post("/audio", deviceAuthMiddleware, async (c) => {
   const userId = c.get("userId");
   const body = await c.req.json<{
@@ -121,22 +91,7 @@ app.post("/audio", deviceAuthMiddleware, async (c) => {
   return c.json(attention);
 });
 
-app.get("/audio", deviceAuthMiddleware, async (c) => {
-  const userId = c.get("userId");
-  const limit = Number(c.req.query("limit")) || 100;
-  const offset = Number(c.req.query("offset")) || 0;
-
-  const attentions = await db.audioAttention.findMany({
-    where: { userId },
-    orderBy: { timestamp: "desc" },
-    take: limit,
-    skip: offset,
-  });
-
-  return c.json(attentions);
-});
-
-// YouTube Attention
+// YouTube Attention - internal tracking only
 app.post("/youtube", deviceAuthMiddleware, async (c) => {
   const userId = c.get("userId");
   const body = await c.req.json<{
@@ -165,21 +120,6 @@ app.post("/youtube", deviceAuthMiddleware, async (c) => {
   });
 
   return c.json(attention);
-});
-
-app.get("/youtube", deviceAuthMiddleware, async (c) => {
-  const userId = c.get("userId");
-  const limit = Number(c.req.query("limit")) || 100;
-  const offset = Number(c.req.query("offset")) || 0;
-
-  const attentions = await db.youtubeAttention.findMany({
-    where: { userId },
-    orderBy: { timestamp: "desc" },
-    take: limit,
-    skip: offset,
-  });
-
-  return c.json(attentions);
 });
 
 export default app;
