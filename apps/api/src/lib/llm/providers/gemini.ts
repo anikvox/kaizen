@@ -31,6 +31,7 @@ export class GeminiProvider implements LLMProvider {
       traceMetadata: {
         tags: ["kaizen", "gemini"],
         project: env.opikProjectName,
+        metadata: config.userId ? { userId: config.userId } : undefined,
       },
     }) as TrackedGoogleGenAI;
   }

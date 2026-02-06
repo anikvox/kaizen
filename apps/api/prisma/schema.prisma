@@ -22,6 +22,7 @@ model User {
   youtubeAttentions YoutubeAttention[]
   settings        UserSettings?
   chatSessions    ChatSession[]
+  focuses         Focus[]
 
   @@map("users")
 }
@@ -151,6 +152,13 @@ model UserSettings {
   // Summarization Settings
   attentionSummarizationEnabled Boolean  @default(true)
   attentionSummarizationIntervalMs Int   @default(60000) // Default 1 minute
+  lastSummarizationCalculatedAt DateTime?                // Marker for last summarization run (per-user interval)
+  // Focus Calculation Settings
+  focusCalculationEnabled       Boolean  @default(true)
+  focusCalculationIntervalMs    Int      @default(30000)   // Default 30 seconds
+  focusInactivityThresholdMs    Int      @default(60000)   // Default 1 minute
+  focusMinDurationMs            Int      @default(30000)   // Default 30 seconds (minimum before drift can create new focus)
+  lastFocusCalculatedAt         DateTime?                  // Marker for last focus calculation (to avoid reprocessing attention)
   // LLM Settings
   llmProvider                   String?  // "gemini" | "anthropic" | "openai" | null (system default)
   llmModel                      String?  // Selected model for the provider
@@ -190,4 +198,27 @@ model ChatMessage {
 
   @@index([sessionId])
   @@map("chat_messages")
+}
+
+model Focus {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  item             String    // 2-3 word focus description
+  keywords         String[]  // Historical keywords (max 10, then summarize)
+
+  isActive         Boolean   @default(true)
+  startedAt        DateTime  @default(now())
+  endedAt          DateTime? // Set when drift detected or inactivity
+  lastCalculatedAt DateTime  @default(now()) // For incremental processing
+  lastActivityAt   DateTime  @default(now()) // For inactivity detection
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([userId, isActive])
+  @@index([lastCalculatedAt])
+  @@map("focuses")
 }

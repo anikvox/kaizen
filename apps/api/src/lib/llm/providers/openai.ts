@@ -30,6 +30,7 @@ export class OpenAIProvider implements LLMProvider {
       traceMetadata: {
         tags: ["kaizen", "openai"],
         project: env.opikProjectName,
+        metadata: config.userId ? { userId: config.userId } : undefined,
       },
     }) as TrackedOpenAI;
   }

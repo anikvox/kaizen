@@ -16,9 +16,11 @@ export class AnthropicProvider implements LLMProvider {
 
   private client: Anthropic;
   private opikClient: Opik | null = null;
+  private userId: string | undefined;
 
   constructor(config: LLMProviderConfig) {
     this.model = config.model;
+    this.userId = config.userId;
 
     this.client = new Anthropic({
       apiKey: config.apiKey,
@@ -62,6 +64,7 @@ export class AnthropicProvider implements LLMProvider {
           durationMs: Date.now() - startTime,
           inputTokens: response.usage.input_tokens,
           outputTokens: response.usage.output_tokens,
+          userId: this.userId,
         },
       });
 
@@ -122,6 +125,7 @@ export class AnthropicProvider implements LLMProvider {
             inputTokens,
             outputTokens,
             streaming: true,
+            userId: this.userId,
           },
         });
 

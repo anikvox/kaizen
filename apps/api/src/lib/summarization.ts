@@ -245,22 +245,21 @@ export async function processUserSummarization(userId: string): Promise<number> 
     return 0;
   }
 
-  const intervalMs = settings.attentionSummarizationIntervalMs || 60000;
-  const cutoffTime = new Date(Date.now() - intervalMs);
-
-  // Find website visits that need summarization:
-  // - Either never summarized, or summarized before the cutoff time
+  // Find website visits that haven't been summarized yet
+  // Once summarized, a visit doesn't need re-summarization (content doesn't change)
   const visitsToSummarize = await db.websiteVisit.findMany({
     where: {
       userId,
-      OR: [
-        { summarizedAt: null },
-        { summarizedAt: { lt: cutoffTime } },
-      ],
+      summarizedAt: null,
     },
     orderBy: { openedAt: "desc" },
     take: 10, // Process up to 10 visits at a time to avoid overload
   });
+
+  // Skip if no visits need summarization
+  if (visitsToSummarize.length === 0) {
+    return 0;
+  }
 
   let summarizedCount = 0;
 
@@ -354,26 +353,47 @@ export async function processUserSummarization(userId: string): Promise<number> 
 
 /**
  * Process summarization for all users who have it enabled.
+ * Respects per-user intervals - only processes users whose interval has elapsed.
  */
 export async function processAllUsersSummarization(): Promise<{
   usersProcessed: number;
+  skippedIntervalNotElapsed: number;
   totalVisitsSummarized: number;
   totalImagesSummarized: number;
 }> {
-  // Get all users with summarization enabled
+  const now = new Date();
+
+  // Get all users with summarization enabled, including their interval settings
   const usersWithSummarization = await db.userSettings.findMany({
     where: {
       attentionSummarizationEnabled: true,
     },
     select: {
       userId: true,
+      attentionSummarizationIntervalMs: true,
+      lastSummarizationCalculatedAt: true,
     },
   });
 
+  let usersProcessed = 0;
+  let skippedIntervalNotElapsed = 0;
   let totalVisitsSummarized = 0;
   let totalImagesSummarized = 0;
 
-  for (const { userId } of usersWithSummarization) {
+  for (const userSettings of usersWithSummarization) {
+    const { userId, attentionSummarizationIntervalMs, lastSummarizationCalculatedAt } = userSettings;
+    const intervalMs = attentionSummarizationIntervalMs || 60000;
+
+    // Check if user's individual interval has elapsed
+    if (lastSummarizationCalculatedAt) {
+      const timeSinceLastCalc = now.getTime() - lastSummarizationCalculatedAt.getTime();
+      if (timeSinceLastCalc < intervalMs) {
+        // User's interval hasn't elapsed yet, skip
+        skippedIntervalNotElapsed++;
+        continue;
+      }
+    }
+
     try {
       // Process website visit summaries
       const visitCount = await processUserSummarization(userId);
@@ -382,13 +402,22 @@ export async function processAllUsersSummarization(): Promise<{
       // Process individual image summaries
       const imageCount = await processUserImageSummarization(userId);
       totalImagesSummarized += imageCount;
+
+      // Update the marker
+      await db.userSettings.update({
+        where: { userId },
+        data: { lastSummarizationCalculatedAt: now },
+      });
+
+      usersProcessed++;
     } catch (error) {
       console.error(`Failed to process summarization for user ${userId}:`, error);
     }
   }
 
   return {
-    usersProcessed: usersWithSummarization.length,
+    usersProcessed,
+    skippedIntervalNotElapsed,
     totalVisitsSummarized,
     totalImagesSummarized,
   };

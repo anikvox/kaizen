@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth, SignInButton, SignOutButton, useUser } from "@clerk/nextjs";
-import { createApiClient, type User } from "@kaizen/api-client";
+import { createApiClient, type User, type Focus } from "@kaizen/api-client";
 import Link from "next/link";
 
 const apiUrl =
@@ -14,8 +14,10 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [time, setTime] = useState("");
   const [user, setUser] = useState<User | null>(null);
+  const [focus, setFocus] = useState<Focus | null>(null);
   const [error, setError] = useState("");
   const eventSourceRef = useRef<EventSource | null>(null);
+  const focusEventSourceRef = useRef<EventSource | null>(null);
 
   const getTokenFn = useCallback(async () => {
     return getToken();
@@ -80,6 +82,45 @@ export default function Home() {
     };
   }, [isSignedIn, getToken]);
 
+  // Focus SSE connection
+  useEffect(() => {
+    if (!isSignedIn || !user) return;
+
+    const setupFocusSSE = async () => {
+      const token = await getToken();
+      if (!token) return;
+
+      // Close existing connection
+      if (focusEventSourceRef.current) {
+        focusEventSourceRef.current.close();
+        focusEventSourceRef.current = null;
+      }
+
+      const api = createApiClient(apiUrl);
+      focusEventSourceRef.current = api.focus.subscribeFocus(
+        (data) => {
+          setFocus(data.focus);
+        },
+        (data) => {
+          if (data.changeType === "ended") {
+            setFocus(null);
+          } else {
+            setFocus(data.focus);
+          }
+        },
+        () => console.error("Focus SSE connection error"),
+        token
+      );
+    };
+
+    setupFocusSSE();
+
+    return () => {
+      focusEventSourceRef.current?.close();
+      focusEventSourceRef.current = null;
+    };
+  }, [isSignedIn, user, getToken]);
+
   return (
     <main style={{ padding: "2rem" }}>
       <h1>Kaizen</h1>
@@ -88,7 +129,56 @@ export default function Home() {
       {isSignedIn ? (
         <>
           <p>Authenticated: {user ? `Hello ${user.name || user.email}` : "loading..."}</p>
-          <p>SSE: {time || "connecting..."}</p>
+
+          {/* Focus Display */}
+          <div style={{
+            margin: "1rem 0",
+            padding: "1rem",
+            borderRadius: "8px",
+            background: focus ? "#f0f7ff" : "#f5f5f5",
+            border: focus ? "2px solid #007bff" : "1px solid #ddd"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
+              <span style={{
+                width: "10px",
+                height: "10px",
+                borderRadius: "50%",
+                background: focus ? "#28a745" : "#6c757d",
+                display: "inline-block"
+              }} />
+              <strong style={{ fontSize: "0.9rem", color: "#333" }}>
+                Current Focus
+              </strong>
+            </div>
+            {focus ? (
+              <>
+                <p style={{
+                  margin: "0 0 0.5rem 0",
+                  fontSize: "1.5rem",
+                  fontWeight: "600",
+                  color: "#007bff"
+                }}>
+                  {focus.item}
+                </p>
+                <p style={{
+                  margin: 0,
+                  fontSize: "0.8rem",
+                  color: "#666"
+                }}>
+                  Since {new Date(focus.startedAt).toLocaleTimeString()}
+                  {focus.keywords.length > 1 && (
+                    <span> • Keywords: {focus.keywords.slice(0, 5).join(", ")}</span>
+                  )}
+                </p>
+              </>
+            ) : (
+              <p style={{ margin: 0, color: "#666", fontStyle: "italic" }}>
+                No active focus detected
+              </p>
+            )}
+          </div>
+
+          <p style={{ fontSize: "0.8rem", color: "#999" }}>SSE: {time || "connecting..."}</p>
           {error && <p style={{ color: "red" }}>{error}</p>}
           <div style={{ marginTop: "1rem", display: "flex", gap: "1rem" }}>
             <Link href="/chat">Chat</Link>

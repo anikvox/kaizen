@@ -328,6 +328,11 @@ export interface UserSettings {
   // Summarization settings (optional for backward compatibility before migration)
   attentionSummarizationEnabled?: boolean; // Default true
   attentionSummarizationIntervalMs?: number; // Default 60000 (1 minute)
+  // Focus calculation settings
+  focusCalculationEnabled?: boolean; // Default true
+  focusCalculationIntervalMs?: number; // Default 60000 (1 minute)
+  focusInactivityThresholdMs?: number; // Default 900000 (15 minutes)
+  focusMinDurationMs?: number; // Default 120000 (2 minutes)
   // LLM settings
   llmProvider?: LLMProviderType | null;
   llmModel?: string | null;
@@ -343,6 +348,11 @@ export interface UserSettingsUpdateRequest {
   // Summarization settings
   attentionSummarizationEnabled?: boolean;
   attentionSummarizationIntervalMs?: number;
+  // Focus calculation settings
+  focusCalculationEnabled?: boolean;
+  focusCalculationIntervalMs?: number;
+  focusInactivityThresholdMs?: number;
+  focusMinDurationMs?: number;
   // LLM settings
   llmProvider?: LLMProviderType | null;
   llmModel?: string | null;
@@ -363,6 +373,11 @@ export interface SSESettingsChangedData {
   // Summarization settings (optional for backward compatibility)
   attentionSummarizationEnabled?: boolean;
   attentionSummarizationIntervalMs?: number;
+  // Focus calculation settings
+  focusCalculationEnabled?: boolean;
+  focusCalculationIntervalMs?: number;
+  focusInactivityThresholdMs?: number;
+  focusMinDurationMs?: number;
   // LLM settings (optional for backward compatibility)
   llmProvider?: LLMProviderType | null;
   llmModel?: string | null;
@@ -472,4 +487,43 @@ export interface SSEChatMessageUpdatedData {
     status?: ChatMessageStatus;
     errorMessage?: string | null;
   };
+}
+
+// Focus Types
+export interface Focus {
+  id: string;
+  item: string; // 2-3 word focus description
+  keywords: string[]; // Historical keywords
+  isActive: boolean;
+  startedAt: string;
+  endedAt: string | null;
+  lastActivityAt: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface FocusListResponse {
+  focuses: Focus[];
+}
+
+export interface FocusResponse {
+  focus: Focus | null;
+}
+
+export interface FocusSettings {
+  focusCalculationEnabled: boolean;
+  focusCalculationIntervalMs: number;
+  focusInactivityThresholdMs: number;
+  focusMinDurationMs: number;
+}
+
+// Focus SSE Types
+export interface SSEFocusConnectedData {
+  connected: true;
+  focus: Focus | null;
+}
+
+export interface SSEFocusChangedData {
+  focus: Focus | null;
+  changeType: "created" | "updated" | "ended";
 }

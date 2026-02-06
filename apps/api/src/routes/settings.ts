@@ -100,6 +100,11 @@ app.get("/", dualAuthMiddleware, async (c) => {
     // Summarization settings
     attentionSummarizationEnabled: settings.attentionSummarizationEnabled,
     attentionSummarizationIntervalMs: settings.attentionSummarizationIntervalMs,
+    // Focus calculation settings
+    focusCalculationEnabled: settings.focusCalculationEnabled,
+    focusCalculationIntervalMs: settings.focusCalculationIntervalMs,
+    focusInactivityThresholdMs: settings.focusInactivityThresholdMs,
+    focusMinDurationMs: settings.focusMinDurationMs,
     // LLM settings (don't expose actual API keys, just whether they're set)
     llmProvider: settings.llmProvider,
     llmModel: settings.llmModel,
@@ -180,6 +185,11 @@ app.post("/", dualAuthMiddleware, async (c) => {
     // Summarization settings
     attentionSummarizationEnabled?: boolean;
     attentionSummarizationIntervalMs?: number;
+    // Focus calculation settings
+    focusCalculationEnabled?: boolean;
+    focusCalculationIntervalMs?: number;
+    focusInactivityThresholdMs?: number;
+    focusMinDurationMs?: number;
     // LLM settings
     llmProvider?: LLMProviderType | null;
     llmModel?: string | null;
@@ -197,6 +207,10 @@ app.post("/", dualAuthMiddleware, async (c) => {
     attentionTrackingIgnoreList: null as string | null,
     attentionSummarizationEnabled: true as boolean,
     attentionSummarizationIntervalMs: 60000 as number,
+    focusCalculationEnabled: true as boolean,
+    focusCalculationIntervalMs: 60000 as number,
+    focusInactivityThresholdMs: 900000 as number,
+    focusMinDurationMs: 120000 as number,
     llmProvider: null as string | null,
     llmModel: null as string | null,
     geminiApiKeyEncrypted: null as string | null,
@@ -225,6 +239,30 @@ app.post("/", dualAuthMiddleware, async (c) => {
   if (body.attentionSummarizationIntervalMs !== undefined) {
     updateData.attentionSummarizationIntervalMs = body.attentionSummarizationIntervalMs;
     createData.attentionSummarizationIntervalMs = body.attentionSummarizationIntervalMs;
+  }
+
+  // Focus calculation settings
+  if (body.focusCalculationEnabled !== undefined) {
+    updateData.focusCalculationEnabled = body.focusCalculationEnabled;
+    createData.focusCalculationEnabled = body.focusCalculationEnabled;
+  }
+  if (body.focusCalculationIntervalMs !== undefined) {
+    // Enforce minimum interval of 30 seconds
+    const interval = Math.max(30000, body.focusCalculationIntervalMs);
+    updateData.focusCalculationIntervalMs = interval;
+    createData.focusCalculationIntervalMs = interval;
+  }
+  if (body.focusInactivityThresholdMs !== undefined) {
+    // Enforce minimum threshold of 1 minute
+    const threshold = Math.max(60000, body.focusInactivityThresholdMs);
+    updateData.focusInactivityThresholdMs = threshold;
+    createData.focusInactivityThresholdMs = threshold;
+  }
+  if (body.focusMinDurationMs !== undefined) {
+    // Enforce minimum duration of 30 seconds
+    const minDuration = Math.max(30000, body.focusMinDurationMs);
+    updateData.focusMinDurationMs = minDuration;
+    createData.focusMinDurationMs = minDuration;
   }
 
   // LLM settings
@@ -266,6 +304,10 @@ app.post("/", dualAuthMiddleware, async (c) => {
       attentionTrackingIgnoreList: settings.attentionTrackingIgnoreList,
       attentionSummarizationEnabled: settings.attentionSummarizationEnabled,
       attentionSummarizationIntervalMs: settings.attentionSummarizationIntervalMs,
+      focusCalculationEnabled: settings.focusCalculationEnabled,
+      focusCalculationIntervalMs: settings.focusCalculationIntervalMs,
+      focusInactivityThresholdMs: settings.focusInactivityThresholdMs,
+      focusMinDurationMs: settings.focusMinDurationMs,
       llmProvider: settings.llmProvider,
       llmModel: settings.llmModel,
       hasGeminiApiKey: !!settings.geminiApiKeyEncrypted,
@@ -280,6 +322,10 @@ app.post("/", dualAuthMiddleware, async (c) => {
     attentionTrackingIgnoreList: settings.attentionTrackingIgnoreList,
     attentionSummarizationEnabled: settings.attentionSummarizationEnabled,
     attentionSummarizationIntervalMs: settings.attentionSummarizationIntervalMs,
+    focusCalculationEnabled: settings.focusCalculationEnabled,
+    focusCalculationIntervalMs: settings.focusCalculationIntervalMs,
+    focusInactivityThresholdMs: settings.focusInactivityThresholdMs,
+    focusMinDurationMs: settings.focusMinDurationMs,
     llmProvider: settings.llmProvider,
     llmModel: settings.llmModel,
     hasGeminiApiKey: !!settings.geminiApiKeyEncrypted,
@@ -359,6 +405,10 @@ settingsSSE.get("/", async (c) => {
           attentionTrackingIgnoreList: settings.attentionTrackingIgnoreList,
           attentionSummarizationEnabled: settings.attentionSummarizationEnabled,
           attentionSummarizationIntervalMs: settings.attentionSummarizationIntervalMs,
+          focusCalculationEnabled: settings.focusCalculationEnabled,
+          focusCalculationIntervalMs: settings.focusCalculationIntervalMs,
+          focusInactivityThresholdMs: settings.focusInactivityThresholdMs,
+          focusMinDurationMs: settings.focusMinDurationMs,
           llmProvider: settings.llmProvider,
           llmModel: settings.llmModel,
           hasGeminiApiKey: !!settings.geminiApiKeyEncrypted,

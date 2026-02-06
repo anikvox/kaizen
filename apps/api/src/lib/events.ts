@@ -25,6 +25,23 @@ export interface SettingsChangedEvent {
   };
 }
 
+// Focus Events
+export interface FocusData {
+  id: string;
+  item: string;
+  keywords: string[];
+  isActive: boolean;
+  startedAt: string;
+  endedAt: string | null;
+  lastActivityAt: string;
+}
+
+export interface FocusChangedEvent {
+  userId: string;
+  focus: FocusData | null;
+  changeType: "created" | "updated" | "ended";
+}
+
 // Chat Events
 export interface ChatSessionEvent {
   userId: string;
@@ -149,6 +166,16 @@ class AppEvents extends EventEmitter {
   onChatMessageUpdated(callback: (data: ChatMessageUpdatedEvent) => void) {
     this.on("chatMessageUpdated", callback);
     return () => this.off("chatMessageUpdated", callback);
+  }
+
+  // Focus Events
+  emitFocusChanged(data: FocusChangedEvent) {
+    this.emit("focusChanged", data);
+  }
+
+  onFocusChanged(callback: (data: FocusChangedEvent) => void) {
+    this.on("focusChanged", callback);
+    return () => this.off("focusChanged", callback);
   }
 }
 

@@ -88,4 +88,5 @@ export interface LLMProvider {
 export interface LLMProviderConfig {
   apiKey: string;
   model: string;
+  userId?: string; // For tracing/observability (Opik)
 }

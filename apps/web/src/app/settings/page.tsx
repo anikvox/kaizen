@@ -246,6 +246,88 @@ export default function Settings() {
     }
   };
 
+  // Focus calculation handlers
+  const handleFocusToggle = async () => {
+    if (!settings) return;
+
+    setSaving(true);
+    const api = createApiClient(apiUrl, getTokenFn);
+
+    try {
+      const currentValue = settings.focusCalculationEnabled ?? true;
+      const result = await api.settings.update({
+        focusCalculationEnabled: !currentValue,
+      });
+      setSettings(result);
+      setError("");
+    } catch (err) {
+      console.error("Update focus setting error:", err);
+      setError("Failed to update focus setting");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleFocusIntervalChange = async (intervalMs: number) => {
+    if (!settings) return;
+
+    setSaving(true);
+    const api = createApiClient(apiUrl, getTokenFn);
+
+    try {
+      const result = await api.settings.update({
+        focusCalculationIntervalMs: intervalMs,
+      });
+      setSettings(result);
+      setError("");
+    } catch (err) {
+      console.error("Update focus interval error:", err);
+      setError("Failed to update focus interval");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleFocusInactivityChange = async (thresholdMs: number) => {
+    if (!settings) return;
+
+    setSaving(true);
+    const api = createApiClient(apiUrl, getTokenFn);
+
+    try {
+      const result = await api.settings.update({
+        focusInactivityThresholdMs: thresholdMs,
+      });
+      setSettings(result);
+      setError("");
+    } catch (err) {
+      console.error("Update focus inactivity error:", err);
+      setError("Failed to update focus inactivity threshold");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleFocusMinDurationChange = async (durationMs: number) => {
+    if (!settings) return;
+
+    setSaving(true);
+    const api = createApiClient(apiUrl, getTokenFn);
+
+    try {
+      const result = await api.settings.update({
+        focusMinDurationMs: durationMs,
+      });
+      setSettings(result);
+      setError("");
+    } catch (err) {
+      console.error("Update focus min duration error:", err);
+      setError("Failed to update focus minimum duration");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleProviderChange = async (provider: LLMProviderType | "") => {
     if (!settings) return;
 
@@ -586,6 +668,127 @@ export default function Settings() {
                   <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
                     How often to check for new content to summarize.
                   </p>
+                </div>
+              )}
+            </div>
+
+            {/* Focus Calculation Settings */}
+            <div
+              style={{
+                padding: "1rem",
+                border: "1px solid #ddd",
+                borderRadius: "8px",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1rem" }}>
+                <div>
+                  <p style={{ margin: 0, fontWeight: "bold" }}>Focus Detection</p>
+                  <p style={{ margin: "0.25rem 0 0", fontSize: "0.85rem", color: "#666" }}>
+                    Automatically detect what you&apos;re focused on based on your browsing activity.
+                    Uses AI to analyze patterns and identify your current area of focus.
+                  </p>
+                </div>
+                <button
+                  onClick={handleFocusToggle}
+                  disabled={saving}
+                  style={{
+                    background: (settings.focusCalculationEnabled ?? true) ? "#28a745" : "#6c757d",
+                    color: "white",
+                    border: "none",
+                    padding: "0.5rem 1rem",
+                    borderRadius: "4px",
+                    cursor: saving ? "not-allowed" : "pointer",
+                    opacity: saving ? 0.6 : 1,
+                    minWidth: "60px",
+                  }}
+                >
+                  {(settings.focusCalculationEnabled ?? true) ? "ON" : "OFF"}
+                </button>
+              </div>
+
+              {(settings.focusCalculationEnabled ?? true) && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: "500" }}>
+                      Calculation Interval
+                    </label>
+                    <select
+                      value={settings.focusCalculationIntervalMs ?? 30000}
+                      onChange={(e) => handleFocusIntervalChange(Number(e.target.value))}
+                      disabled={saving}
+                      style={{
+                        width: "100%",
+                        padding: "0.5rem",
+                        borderRadius: "4px",
+                        border: "1px solid #ccc",
+                        fontSize: "0.9rem",
+                        cursor: saving ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      <option value={30000}>30 seconds</option>
+                      <option value={60000}>1 minute</option>
+                      <option value={120000}>2 minutes</option>
+                      <option value={300000}>5 minutes</option>
+                    </select>
+                    <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
+                      How often to analyze your activity and update focus.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: "500" }}>
+                      Inactivity Threshold
+                    </label>
+                    <select
+                      value={settings.focusInactivityThresholdMs ?? 60000}
+                      onChange={(e) => handleFocusInactivityChange(Number(e.target.value))}
+                      disabled={saving}
+                      style={{
+                        width: "100%",
+                        padding: "0.5rem",
+                        borderRadius: "4px",
+                        border: "1px solid #ccc",
+                        fontSize: "0.9rem",
+                        cursor: saving ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      <option value={60000}>1 minute</option>
+                      <option value={120000}>2 minutes</option>
+                      <option value={300000}>5 minutes</option>
+                      <option value={600000}>10 minutes</option>
+                      <option value={900000}>15 minutes</option>
+                    </select>
+                    <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
+                      End focus after this period of inactivity.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: "500" }}>
+                      Minimum Focus Duration
+                    </label>
+                    <select
+                      value={settings.focusMinDurationMs ?? 30000}
+                      onChange={(e) => handleFocusMinDurationChange(Number(e.target.value))}
+                      disabled={saving}
+                      style={{
+                        width: "100%",
+                        padding: "0.5rem",
+                        borderRadius: "4px",
+                        border: "1px solid #ccc",
+                        fontSize: "0.9rem",
+                        cursor: saving ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      <option value={30000}>30 seconds</option>
+                      <option value={60000}>1 minute</option>
+                      <option value={120000}>2 minutes</option>
+                      <option value={300000}>5 minutes</option>
+                    </select>
+                    <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
+                      Minimum time before detecting a new focus area.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
