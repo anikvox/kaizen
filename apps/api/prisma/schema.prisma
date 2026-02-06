@@ -152,6 +152,7 @@ model UserSettings {
   // Summarization Settings
   attentionSummarizationEnabled Boolean  @default(true)
   attentionSummarizationIntervalMs Int   @default(60000) // Default 1 minute
+  lastSummarizationCalculatedAt DateTime?                // Marker for last summarization run (per-user interval)
   // Focus Calculation Settings
   focusCalculationEnabled       Boolean  @default(true)
   focusCalculationIntervalMs    Int      @default(30000)   // Default 30 seconds

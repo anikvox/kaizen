@@ -12,12 +12,13 @@ serve({
 });
 
 // Background job for attention summarization
-// Runs every minute to check for website visits that need summarization
-const SUMMARIZATION_CHECK_INTERVAL = 60000; // 1 minute
+// Runs frequently to check users; each user has their own interval setting
+const SUMMARIZATION_CHECK_INTERVAL = 10000; // 10 seconds (to catch user intervals)
 
 async function runSummarizationJob() {
   try {
     const result = await processAllUsersSummarization();
+    // Only log when there are actual summaries generated
     if (result.totalVisitsSummarized > 0 || result.totalImagesSummarized > 0) {
       console.log(
         `[Summarization] Processed ${result.usersProcessed} users, summarized ${result.totalVisitsSummarized} visits and ${result.totalImagesSummarized} images`
@@ -30,7 +31,7 @@ async function runSummarizationJob() {
 
 // Start the summarization job
 setInterval(runSummarizationJob, SUMMARIZATION_CHECK_INTERVAL);
-console.log(`[Summarization] Background job started (interval: ${SUMMARIZATION_CHECK_INTERVAL}ms)`);
+console.log(`[Summarization] Background job started (poll interval: ${SUMMARIZATION_CHECK_INTERVAL}ms, per-user intervals apply)`);
 
 // Background job for focus calculation
 // Runs frequently to check users; each user has their own interval setting
