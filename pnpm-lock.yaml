@@ -23,6 +23,9 @@ importers:
       '@ai-sdk/openai':
         specifier: ^3.0.26
         version: 3.0.26(zod@4.3.6)
+      '@ai-sdk/provider-utils':
+        specifier: ^4.0.14
+        version: 4.0.14(zod@4.3.6)
       '@anthropic-ai/sdk':
         specifier: ^0.73.0
         version: 0.73.0(zod@4.3.6)
@@ -50,15 +53,6 @@ importers:
       openai:
         specifier: ^6.18.0
         version: 6.18.0(ws@8.19.0)(zod@4.3.6)
-      opik:
-        specifier: ^1.10.6
-        version: 1.10.6(chokidar@3.6.0)(zod@4.3.6)
-      opik-gemini:
-        specifier: ^1.10.6
-        version: 1.10.6(@google/genai@1.40.0)(opik@1.10.6(chokidar@3.6.0)(zod@4.3.6))
-      opik-openai:
-        specifier: ^1.10.6
-        version: 1.10.6(openai@6.18.0(ws@8.19.0)(zod@4.3.6))(opik@1.10.6(chokidar@3.6.0)(zod@4.3.6))
       opik-vercel:
         specifier: ^1.10.8
         version: 1.10.8(@opentelemetry/api@1.9.0)(@opentelemetry/core@2.5.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-node@0.211.0(@opentelemetry/api@1.9.0))(opik@1.10.6(chokidar@3.6.0)(zod@4.3.6))
@@ -4329,20 +4323,6 @@ packages:
         optional: true
       zod:
         optional: true
-
-  opik-gemini@1.10.6:
-    resolution: {integrity: sha512-1WJp1BPkVjOjRKjqtgaawbM1wn8F643fowxSr3NWfdl4v0Z75Y9yiXNqTLxr+Z69+4Po94JHIqhiRWw40kdVlw==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      '@google/genai': '>=1.0.0'
-      opik: ^1.7.25
-
-  opik-openai@1.10.6:
-    resolution: {integrity: sha512-J6sMF6CcOOrKByI5bbKwz9p18+cMTMTF/W1DLY3vKIU4DlhJYC+3uhfz4iEqmF8yiB4PyaaNSgM/LP7mV/k2Xw==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      openai: ^6.0.1
-      opik: ^1.8.61
 
   opik-vercel@1.10.8:
     resolution: {integrity: sha512-w6prlBuDay5VyB3H/ftnhrfOH7RZ0Onu1jlkZEOan69ttJAb5hRlVV4EXaY7DCJk9sAz94lTb0asSn08SfSzGw==}
@@ -9736,16 +9716,6 @@ snapshots:
     optionalDependencies:
       ws: 8.19.0
       zod: 4.3.6
-
-  opik-gemini@1.10.6(@google/genai@1.40.0)(opik@1.10.6(chokidar@3.6.0)(zod@4.3.6)):
-    dependencies:
-      '@google/genai': 1.40.0
-      opik: 1.10.6(chokidar@3.6.0)(zod@4.3.6)
-
-  opik-openai@1.10.6(openai@6.18.0(ws@8.19.0)(zod@4.3.6))(opik@1.10.6(chokidar@3.6.0)(zod@4.3.6)):
-    dependencies:
-      openai: 6.18.0(ws@8.19.0)(zod@4.3.6)
-      opik: 1.10.6(chokidar@3.6.0)(zod@4.3.6)
 
   opik-vercel@1.10.8(@opentelemetry/api@1.9.0)(@opentelemetry/core@2.5.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-node@0.211.0(@opentelemetry/api@1.9.0))(opik@1.10.6(chokidar@3.6.0)(zod@4.3.6)):
     dependencies:

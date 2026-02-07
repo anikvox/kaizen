@@ -5,7 +5,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import type { UserSettings } from "@prisma/client";
 import { db } from "../db.js";
 import { events } from "../events.js";
-import { getTelemetrySettings } from "../telemetry.js";
+import { getTelemetrySettings } from "../llm/telemetry.js";
 import { createFocusTools } from "./tools.js";
 import { formatAttentionData, hasMinimalContent, extractFocusSettings } from "./utils.js";
 import { formatAttentionForPrompt } from "./prompts.js";
@@ -161,7 +161,7 @@ export async function runFocusAgent(
     const formattedAttention = formatAttentionForPrompt(formattedItems);
 
     // Get Opik telemetry settings
-    const telemetry = await getTelemetrySettings("focus-agent", { userId });
+    const telemetry = getTelemetrySettings({ name: "focus-agent", userId });
 
     // Run the agent with tool calling
     const { steps } = await generateText({
