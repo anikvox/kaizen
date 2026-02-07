@@ -84,6 +84,60 @@ async function geocodeCity(city: string, retries = 2): Promise<{
 export function createChatTools(userId: string) {
   return {
     /**
+     * Get user's preferred translation language
+     */
+    get_translation_language: tool({
+      description: "Get the user's preferred language for translations. Use this before translating if you need to check their preference.",
+      parameters: z.object({}),
+      execute: async () => {
+        const settings = await db.userSettings.findUnique({
+          where: { userId },
+          select: { preferredTranslationLanguage: true },
+        });
+
+        if (settings?.preferredTranslationLanguage) {
+          return {
+            found: true,
+            language: settings.preferredTranslationLanguage,
+          };
+        }
+
+        return {
+          found: false,
+          message: "No preferred translation language set. Ask the user what language they want.",
+        };
+      },
+    }),
+
+    /**
+     * Save user's preferred translation language
+     */
+    set_translation_language: tool({
+      description: "Save the user's preferred language for translations. Use this when the user tells you what language they want translations in.",
+      parameters: z.object({
+        language: z.string().describe("The language name (e.g., 'Spanish', 'French', 'Japanese', 'German')"),
+      }),
+      execute: async ({ language }) => {
+        await db.userSettings.upsert({
+          where: { userId },
+          create: {
+            userId,
+            preferredTranslationLanguage: language,
+          },
+          update: {
+            preferredTranslationLanguage: language,
+          },
+        });
+
+        return {
+          success: true,
+          language,
+          message: `Saved ${language} as your preferred translation language. Future translations will use this language by default.`,
+        };
+      },
+    }),
+
+    /**
      * Get the current time for a location
      */
     get_current_time: tool({
@@ -906,6 +960,14 @@ export function formatToolResultMessage(toolName: string, result: unknown): stri
     case "get_reading_activity":
       if (!r.found) return r.message as string || "No reading activity";
       return `Reading activity: ${r.totalWordsRead} words across ${r.pagesRead} pages`;
+
+    case "get_translation_language":
+      if (!r.found) return `No preferred translation language set`;
+      return `Preferred translation language: ${r.language}`;
+
+    case "set_translation_language":
+      if (!r.success) return `Failed to save language preference`;
+      return `Saved ${r.language} as preferred translation language`;
 
     default:
       return `Tool ${toolName} completed`;

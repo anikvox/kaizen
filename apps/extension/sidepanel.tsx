@@ -72,6 +72,67 @@ function SidePanel() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
+  // Handle pending chat prompts from text selection
+  useEffect(() => {
+    const handlePendingPrompt = async () => {
+      const pending = await storage.get<{ prompt: string; action: string; timestamp: number }>("pendingChatPrompt")
+      if (pending && pending.prompt) {
+        console.log("[Sidepanel] Received pending prompt:", pending.action)
+
+        // Clear the pending prompt immediately to prevent re-processing
+        await storage.remove("pendingChatPrompt")
+
+        // Switch to chat tab
+        setActiveTab("chat")
+
+        // Start a new chat
+        setActiveSessionId(null)
+        setMessages([])
+        setShowSessionList(false)
+
+        // Set the input value
+        setInputValue(pending.prompt)
+
+        // Only auto-submit if action is not "add_to_chat"
+        if (pending.action !== "add_to_chat") {
+          // Auto-submit after state updates
+          setTimeout(async () => {
+            const token = await storage.get<string>("deviceToken")
+            if (!token) return
+
+            setSending(true)
+            const api = createApiClient(apiUrl, getTokenFn)
+
+            try {
+              const result = await api.chats.sendMessage({
+                sessionId: undefined, // New session
+                content: pending.prompt
+              })
+
+              setInputValue("")
+
+              if (result.isNewSession) {
+                setActiveSessionId(result.sessionId)
+              }
+            } catch (error) {
+              console.error("Failed to send message:", error)
+            } finally {
+              setSending(false)
+            }
+          }, 100)
+        }
+      }
+    }
+
+    // Check on mount
+    handlePendingPrompt()
+
+    // Watch for changes
+    storage.watch({
+      pendingChatPrompt: handlePendingPrompt
+    })
+  }, [])
+
   const handleUnlink = async () => {
     const token = await storage.get<string>("deviceToken")
     if (token) {

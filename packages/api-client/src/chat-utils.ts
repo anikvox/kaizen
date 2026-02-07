@@ -27,6 +27,8 @@ export function getToolDisplayInfo(toolName: string | null | undefined): ToolDis
                 search_browsing_history: { label: "Search history", loadingText: "Searching browsing history" },
                 get_youtube_history: { label: "YouTube history", loadingText: "Looking up YouTube history" },
                 get_reading_activity: { label: "Reading activity", loadingText: "Looking up reading activity" },
+                get_translation_language: { label: "Translation preference", loadingText: "Looking up translation preference" },
+                set_translation_language: { label: "Translation preference", loadingText: "Saving translation language" },
         };
         return info[toolName || ""] || { label: toolName || "Tool", loadingText: "Running tool" };
 }
@@ -92,6 +94,14 @@ export function formatToolResultMessage(toolName: string | null | undefined, con
                         case "get_reading_activity":
                                 if (!r.found) return `Looked up reading activity: ${r.message || "none found"}`;
                                 return `Looked up reading activity: ${r.totalWordsRead} words from ${r.pagesRead} page${r.pagesRead !== 1 ? "s" : ""}`;
+
+                        case "get_translation_language":
+                                if (!r.found) return `No preferred translation language set`;
+                                return `Preferred translation language: ${r.language}`;
+
+                        case "set_translation_language":
+                                if (!r.success) return `Failed to save translation language`;
+                                return `Saved ${r.language} as preferred translation language`;
 
                         default:
                                 return `Completed tool call`;

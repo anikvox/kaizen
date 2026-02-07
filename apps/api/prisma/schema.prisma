@@ -153,6 +153,8 @@ model UserSettings {
   // User Location (set by user via chat)
   location                      String?  // City name, e.g., "Tokyo", "New York"
   timezone                      String?  // Derived from location, e.g., "Asia/Tokyo"
+  // Translation Preferences
+  preferredTranslationLanguage  String?  // User's preferred language for translations, e.g., "Spanish", "French"
   // Cognitive Attention Settings
   cognitiveAttentionDebugMode   Boolean  @default(false)
   cognitiveAttentionShowOverlay Boolean  @default(false)

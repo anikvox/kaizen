@@ -8,6 +8,39 @@ import type { UserSettings } from "@prisma/client";
 import { createAgentProvider, getAgentModelId } from "../agent/index.js";
 import { startTrace, getPromptWithMetadata, PROMPT_NAMES } from "../llm/index.js";
 import { createChatTools } from "./tools.js";
+import { db } from "../db.js";
+
+/**
+ * Build user context section to append to system prompt
+ */
+async function buildUserContext(userId: string): Promise<string> {
+  const settings = await db.userSettings.findUnique({
+    where: { userId },
+    select: {
+      location: true,
+      timezone: true,
+      preferredTranslationLanguage: true,
+    },
+  });
+
+  const contextParts: string[] = [];
+
+  if (settings?.location) {
+    contextParts.push(`- Location: ${settings.location}`);
+  }
+  if (settings?.timezone) {
+    contextParts.push(`- Timezone: ${settings.timezone}`);
+  }
+  if (settings?.preferredTranslationLanguage) {
+    contextParts.push(`- Preferred translation language: ${settings.preferredTranslationLanguage}`);
+  }
+
+  if (contextParts.length === 0) {
+    return "";
+  }
+
+  return `\n\n## User Context\n${contextParts.join("\n")}`;
+}
 
 export interface ChatAgentCallbacks {
   /** Called when streaming text content */
@@ -49,7 +82,10 @@ export async function runChatAgent(
 
   // Fetch prompt from Opik (with local fallback) and get metadata for trace linking
   const promptData = await getPromptWithMetadata(PROMPT_NAMES.CHAT_AGENT);
-  const systemPrompt = systemPromptOverride || promptData.content;
+
+  // Build user context and append to system prompt
+  const userContext = await buildUserContext(userId);
+  const systemPrompt = (systemPromptOverride || promptData.content) + userContext;
 
   // Start trace for this agent run (don't include userId for privacy)
   const trace = startTrace({
