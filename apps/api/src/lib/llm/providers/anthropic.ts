@@ -1,5 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { Opik } from "opik";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { generateText, streamText } from "ai";
+import type { UserModelMessage, AssistantModelMessage } from "@ai-sdk/provider-utils";
 import type {
   LLMProvider,
   LLMProviderConfig,
@@ -7,134 +8,106 @@ import type {
   LLMStreamOptions,
   LLMResponse,
   LLMMessageContent,
+  LLMToolCall,
+  LLMToolResult,
 } from "../interface.js";
-import { env } from "../../env.js";
+import { getTelemetrySettings } from "../telemetry.js";
+
+type Message = UserModelMessage | AssistantModelMessage;
 
 export class AnthropicProvider implements LLMProvider {
   readonly providerType = "anthropic" as const;
   readonly model: string;
 
-  private client: Anthropic;
-  private opikClient: Opik | null = null;
-  private userId: string | undefined;
+  private anthropic: ReturnType<typeof createAnthropic>;
+  private userId?: string;
 
   constructor(config: LLMProviderConfig) {
     this.model = config.model;
     this.userId = config.userId;
 
-    this.client = new Anthropic({
+    this.anthropic = createAnthropic({
       apiKey: config.apiKey,
     });
-
-    // Initialize Opik client for manual tracing
-    if (env.opikApiKey) {
-      this.opikClient = new Opik({
-        apiKey: env.opikApiKey,
-        projectName: env.opikProjectName,
-      });
-    }
   }
 
   async generate(options: LLMGenerateOptions): Promise<LLMResponse> {
-    const startTime = Date.now();
     const messages = this.formatMessages(options.messages);
 
-    const response = await this.client.messages.create({
-      model: this.model,
-      max_tokens: options.maxTokens || 4096,
+    const result = await generateText({
+      model: this.anthropic(this.model),
       system: options.systemPrompt,
       messages,
+      maxOutputTokens: options.maxTokens || 4096,
       temperature: options.temperature,
+      tools: options.tools,
+      experimental_telemetry: getTelemetrySettings({
+        name: `anthropic-${this.model}`,
+        userId: this.userId,
+      }),
     });
 
-    const content = response.content
-      .filter((block): block is Anthropic.TextBlock => block.type === "text")
-      .map((block) => block.text)
-      .join("");
+    // Extract tool calls and results
+    const toolCalls: LLMToolCall[] | undefined = result.toolCalls?.map((tc) => ({
+      toolCallId: tc.toolCallId,
+      toolName: tc.toolName,
+      args: "args" in tc ? (tc.args as Record<string, unknown>) : {},
+    }));
 
-    // Log trace to Opik
-    if (this.opikClient) {
-      const trace = this.opikClient.trace({
-        name: `anthropic-${this.model}`,
-        input: { messages, systemPrompt: options.systemPrompt },
-        output: { content },
-        metadata: {
-          provider: "anthropic",
-          model: this.model,
-          durationMs: Date.now() - startTime,
-          inputTokens: response.usage.input_tokens,
-          outputTokens: response.usage.output_tokens,
-          userId: this.userId,
-        },
-      });
-
-      trace.span({
-        name: "generate",
-        type: "llm",
-        input: { messages },
-        output: { content },
-      });
-    }
+    const toolResults: LLMToolResult[] | undefined = result.toolResults?.map((tr) => ({
+      toolCallId: tr.toolCallId,
+      toolName: tr.toolName,
+      result: "result" in tr ? tr.result : undefined,
+    }));
 
     return {
-      content,
-      usage: {
-        inputTokens: response.usage.input_tokens,
-        outputTokens: response.usage.output_tokens,
-      },
+      content: result.text,
+      usage: result.usage
+        ? {
+            inputTokens: result.usage.inputTokens ?? 0,
+            outputTokens: result.usage.outputTokens ?? 0,
+          }
+        : undefined,
+      toolCalls: toolCalls?.length ? toolCalls : undefined,
+      toolResults: toolResults?.length ? toolResults : undefined,
     };
   }
 
   async stream(options: LLMStreamOptions): Promise<void> {
-    const startTime = Date.now();
     const messages = this.formatMessages(options.messages);
 
     try {
-      const stream = this.client.messages.stream({
-        model: this.model,
-        max_tokens: options.maxTokens || 4096,
+      const result = streamText({
+        model: this.anthropic(this.model),
         system: options.systemPrompt,
         messages,
+        maxOutputTokens: options.maxTokens || 4096,
         temperature: options.temperature,
+        tools: options.tools,
+        experimental_telemetry: getTelemetrySettings({
+          name: `anthropic-${this.model}-stream`,
+          userId: this.userId,
+        }),
       });
 
       let fullContent = "";
-      let inputTokens = 0;
-      let outputTokens = 0;
 
-      stream.on("text", async (text) => {
-        fullContent += text;
-        await options.callbacks.onToken(text, fullContent);
-      });
+      // Handle text stream
+      for await (const chunk of result.textStream) {
+        fullContent += chunk;
+        await options.callbacks.onToken(chunk, fullContent);
+      }
 
-      const finalMessage = await stream.finalMessage();
-
-      inputTokens = finalMessage.usage.input_tokens;
-      outputTokens = finalMessage.usage.output_tokens;
-
-      // Log trace to Opik
-      if (this.opikClient) {
-        const trace = this.opikClient.trace({
-          name: `anthropic-${this.model}-stream`,
-          input: { messages, systemPrompt: options.systemPrompt },
-          output: { content: fullContent },
-          metadata: {
-            provider: "anthropic",
-            model: this.model,
-            durationMs: Date.now() - startTime,
-            inputTokens,
-            outputTokens,
-            streaming: true,
-            userId: this.userId,
-          },
-        });
-
-        trace.span({
-          name: "stream",
-          type: "llm",
-          input: { messages },
-          output: { content: fullContent },
-        });
+      // Get final result for tool calls
+      const finalResult = await result;
+      if (finalResult.toolCalls && options.callbacks.onToolCall) {
+        for (const tc of await finalResult.toolCalls) {
+          await options.callbacks.onToolCall({
+            toolCallId: tc.toolCallId,
+            toolName: tc.toolName,
+            args: "args" in tc ? (tc.args as Record<string, unknown>) : {},
+          });
+        }
       }
 
       await options.callbacks.onFinished(fullContent);
@@ -145,49 +118,53 @@ export class AnthropicProvider implements LLMProvider {
   }
 
   async flush(): Promise<void> {
-    if (this.opikClient) {
-      await this.opikClient.flush();
-    }
+    // OpenTelemetry handles flushing automatically
   }
 
-  private formatMessages(
-    messages: LLMGenerateOptions["messages"]
-  ): Anthropic.MessageParam[] {
+  private formatMessages(messages: LLMGenerateOptions["messages"]): Message[] {
     return messages
       .filter((m) => m.role !== "system") // System messages handled separately
-      .map((msg) => ({
-        role: msg.role === "user" ? "user" : "assistant",
-        content: this.formatContent(msg.content),
-      }));
+      .map((msg): Message => {
+        if (msg.role === "user") {
+          return {
+            role: "user",
+            content: this.formatUserContent(msg.content),
+          };
+        }
+        return {
+          role: "assistant",
+          content: this.formatContentAsString(msg.content),
+        };
+      });
   }
 
-  private formatContent(
-    content: LLMMessageContent
-  ): string | Anthropic.ContentBlockParam[] {
+  private formatUserContent(content: LLMMessageContent): UserModelMessage["content"] {
     // Simple string content
     if (typeof content === "string") {
       return content;
     }
 
     // Multimodal content array
-    return content.map((part): Anthropic.ContentBlockParam => {
+    return content.map((part) => {
       if (part.type === "text") {
-        return { type: "text", text: part.text };
+        return { type: "text" as const, text: part.text };
       } else if (part.type === "image") {
         return {
-          type: "image",
-          source: {
-            type: "base64",
-            media_type: part.mimeType as
-              | "image/jpeg"
-              | "image/png"
-              | "image/gif"
-              | "image/webp",
-            data: part.data,
-          },
+          type: "image" as const,
+          image: `data:${part.mimeType};base64,${part.data}`,
         };
       }
-      return { type: "text", text: "" };
+      return { type: "text" as const, text: "" };
     });
+  }
+
+  private formatContentAsString(content: LLMMessageContent): string {
+    if (typeof content === "string") {
+      return content;
+    }
+    return content
+      .filter((part) => part.type === "text")
+      .map((part) => (part as { type: "text"; text: string }).text)
+      .join("\n");
   }
 }

@@ -1,6 +1,5 @@
 export type { BotInterface, BotMessage, BotMediaPart, BotCallbacks } from "./interface.js";
 export { FakeBot, fakeBot } from "./fake-bot.js";
-export { GeminiBot, geminiBot } from "./gemini-bot.js";
 export { LLMBot, createLLMBot, type LLMBotOptions } from "./llm-bot.js";
 
 import { env } from "../env.js";

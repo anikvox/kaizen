@@ -3,6 +3,10 @@ import { env } from "./lib/index.js";
 import app from "./app.js";
 import { processAllUsersSummarization } from "./lib/summarization.js";
 import { processAllUsersFocus } from "./lib/focus/index.js";
+import { initTelemetry } from "./lib/llm/index.js";
+
+// Initialize OpenTelemetry for LLM tracing (must be done early)
+initTelemetry();
 
 console.log(`Server running on http://localhost:${env.port}`);
 

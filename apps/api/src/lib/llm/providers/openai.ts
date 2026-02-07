@@ -1,5 +1,6 @@
-import OpenAI from "openai";
-import { trackOpenAI } from "opik-openai";
+import { createOpenAI } from "@ai-sdk/openai";
+import { generateText, streamText } from "ai";
+import type { UserModelMessage, AssistantModelMessage, SystemModelMessage } from "@ai-sdk/provider-utils";
 import type {
   LLMProvider,
   LLMProviderConfig,
@@ -7,54 +8,67 @@ import type {
   LLMStreamOptions,
   LLMResponse,
   LLMMessageContent,
+  LLMToolCall,
+  LLMToolResult,
 } from "../interface.js";
-import { env } from "../../env.js";
+import { getTelemetrySettings } from "../telemetry.js";
 
-// Type for the tracked client with Opik extension
-type TrackedOpenAI = OpenAI & { flush(): Promise<void> };
+type Message = UserModelMessage | AssistantModelMessage | SystemModelMessage;
 
 export class OpenAIProvider implements LLMProvider {
   readonly providerType = "openai" as const;
   readonly model: string;
 
-  private client: TrackedOpenAI;
+  private openai: ReturnType<typeof createOpenAI>;
+  private userId?: string;
 
   constructor(config: LLMProviderConfig) {
     this.model = config.model;
+    this.userId = config.userId;
 
-    const baseClient = new OpenAI({
+    this.openai = createOpenAI({
       apiKey: config.apiKey,
     });
-
-    this.client = trackOpenAI(baseClient, {
-      traceMetadata: {
-        tags: ["kaizen", "openai"],
-        project: env.opikProjectName,
-        metadata: config.userId ? { userId: config.userId } : undefined,
-      },
-    }) as TrackedOpenAI;
   }
 
   async generate(options: LLMGenerateOptions): Promise<LLMResponse> {
     const messages = this.formatMessages(options.messages, options.systemPrompt);
 
-    const response = await this.client.chat.completions.create({
-      model: this.model,
+    const result = await generateText({
+      model: this.openai(this.model),
       messages,
-      max_tokens: options.maxTokens,
+      maxOutputTokens: options.maxTokens,
       temperature: options.temperature,
+      tools: options.tools,
+      experimental_telemetry: getTelemetrySettings({
+        name: `openai-${this.model}`,
+        userId: this.userId,
+      }),
     });
 
-    const content = response.choices[0]?.message?.content || "";
+    // Extract tool calls and results
+    const toolCalls: LLMToolCall[] | undefined = result.toolCalls?.map((tc) => ({
+      toolCallId: tc.toolCallId,
+      toolName: tc.toolName,
+      args: "args" in tc ? (tc.args as Record<string, unknown>) : {},
+    }));
+
+    const toolResults: LLMToolResult[] | undefined = result.toolResults?.map((tr) => ({
+      toolCallId: tr.toolCallId,
+      toolName: tr.toolName,
+      result: "result" in tr ? tr.result : undefined,
+    }));
 
     return {
-      content,
-      usage: response.usage
+      content: result.text,
+      usage: result.usage
         ? {
-            inputTokens: response.usage.prompt_tokens,
-            outputTokens: response.usage.completion_tokens,
+            inputTokens: result.usage.inputTokens ?? 0,
+            outputTokens: result.usage.outputTokens ?? 0,
           }
         : undefined,
+      toolCalls: toolCalls?.length ? toolCalls : undefined,
+      toolResults: toolResults?.length ? toolResults : undefined,
     };
   }
 
@@ -62,22 +76,35 @@ export class OpenAIProvider implements LLMProvider {
     const messages = this.formatMessages(options.messages, options.systemPrompt);
 
     try {
-      const stream = await this.client.chat.completions.create({
-        model: this.model,
+      const result = streamText({
+        model: this.openai(this.model),
         messages,
-        max_tokens: options.maxTokens,
+        maxOutputTokens: options.maxTokens,
         temperature: options.temperature,
-        stream: true,
-        stream_options: { include_usage: true },
+        tools: options.tools,
+        experimental_telemetry: getTelemetrySettings({
+          name: `openai-${this.model}-stream`,
+          userId: this.userId,
+        }),
       });
 
       let fullContent = "";
 
-      for await (const chunk of stream) {
-        const delta = chunk.choices[0]?.delta?.content;
-        if (delta) {
-          fullContent += delta;
-          await options.callbacks.onToken(delta, fullContent);
+      // Handle text stream
+      for await (const chunk of result.textStream) {
+        fullContent += chunk;
+        await options.callbacks.onToken(chunk, fullContent);
+      }
+
+      // Get final result for tool calls
+      const finalResult = await result;
+      if (finalResult.toolCalls && options.callbacks.onToolCall) {
+        for (const tc of await finalResult.toolCalls) {
+          await options.callbacks.onToolCall({
+            toolCallId: tc.toolCallId,
+            toolName: tc.toolName,
+            args: "args" in tc ? (tc.args as Record<string, unknown>) : {},
+          });
         }
       }
 
@@ -89,14 +116,14 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   async flush(): Promise<void> {
-    await this.client.flush();
+    // OpenTelemetry handles flushing automatically
   }
 
   private formatMessages(
     messages: LLMGenerateOptions["messages"],
     systemPrompt?: string
-  ): OpenAI.ChatCompletionMessageParam[] {
-    const formatted: OpenAI.ChatCompletionMessageParam[] = [];
+  ): Message[] {
+    const formatted: Message[] = [];
 
     // Add system prompt if provided
     if (systemPrompt) {
@@ -106,38 +133,43 @@ export class OpenAIProvider implements LLMProvider {
     // Add conversation messages
     for (const msg of messages) {
       if (msg.role === "system") {
-        formatted.push({ role: "system", content: this.formatContentAsString(msg.content) });
+        formatted.push({
+          role: "system",
+          content: this.formatContentAsString(msg.content),
+        });
       } else if (msg.role === "user") {
-        formatted.push({ role: "user", content: this.formatContent(msg.content) });
+        formatted.push({
+          role: "user",
+          content: this.formatUserContent(msg.content),
+        });
       } else {
-        formatted.push({ role: "assistant", content: this.formatContentAsString(msg.content) });
+        formatted.push({
+          role: "assistant",
+          content: this.formatContentAsString(msg.content),
+        });
       }
     }
 
     return formatted;
   }
 
-  private formatContent(
-    content: LLMMessageContent
-  ): string | OpenAI.ChatCompletionContentPart[] {
+  private formatUserContent(content: LLMMessageContent): UserModelMessage["content"] {
     // Simple string content
     if (typeof content === "string") {
       return content;
     }
 
     // Multimodal content array
-    return content.map((part): OpenAI.ChatCompletionContentPart => {
+    return content.map((part) => {
       if (part.type === "text") {
-        return { type: "text", text: part.text };
+        return { type: "text" as const, text: part.text };
       } else if (part.type === "image") {
         return {
-          type: "image_url",
-          image_url: {
-            url: `data:${part.mimeType};base64,${part.data}`,
-          },
+          type: "image" as const,
+          image: `data:${part.mimeType};base64,${part.data}`,
         };
       }
-      return { type: "text", text: "" };
+      return { type: "text" as const, text: "" };
     });
   }
 

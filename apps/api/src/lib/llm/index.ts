@@ -12,6 +12,9 @@ export type {
   LLMGenerateOptions,
   LLMStreamOptions,
   LLMResponse,
+  LLMTool,
+  LLMToolCall,
+  LLMToolResult,
 } from "./interface.js";
 
 // Models
@@ -53,3 +56,6 @@ export {
   serializeAttentionForLLM,
   serializeAttentionCompact,
 } from "./prompts.js";
+
+// Telemetry (Opik via OpenTelemetry)
+export { initTelemetry, getTelemetrySettings, shutdownTelemetry } from "./telemetry.js";

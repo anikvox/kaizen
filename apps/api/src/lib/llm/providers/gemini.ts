@@ -1,192 +1,170 @@
-import { GoogleGenAI } from "@google/genai";
-import { trackGemini } from "opik-gemini";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { generateText, streamText } from "ai";
+import type { UserModelMessage, AssistantModelMessage } from "@ai-sdk/provider-utils";
 import type {
   LLMProvider,
   LLMProviderConfig,
   LLMGenerateOptions,
   LLMStreamOptions,
   LLMResponse,
-  LLMMediaPart,
   LLMMessageContent,
+  LLMToolCall,
+  LLMToolResult,
 } from "../interface.js";
-import { env } from "../../env.js";
+import { getTelemetrySettings } from "../telemetry.js";
 
-// Type for the tracked client with Opik extension
-type TrackedGoogleGenAI = GoogleGenAI & { flush(): Promise<void> };
+type Message = UserModelMessage | AssistantModelMessage;
 
 export class GeminiProvider implements LLMProvider {
   readonly providerType = "gemini" as const;
   readonly model: string;
 
-  private client: TrackedGoogleGenAI;
+  private google: ReturnType<typeof createGoogleGenerativeAI>;
+  private userId?: string;
 
   constructor(config: LLMProviderConfig) {
     this.model = config.model;
+    this.userId = config.userId;
 
-    const baseClient = new GoogleGenAI({
+    this.google = createGoogleGenerativeAI({
       apiKey: config.apiKey,
     });
-
-    this.client = trackGemini(baseClient, {
-      traceMetadata: {
-        tags: ["kaizen", "gemini"],
-        project: env.opikProjectName,
-        metadata: config.userId ? { userId: config.userId } : undefined,
-      },
-    }) as TrackedGoogleGenAI;
   }
 
   async generate(options: LLMGenerateOptions): Promise<LLMResponse> {
-    const contents = this.formatMessages(options.messages);
+    const messages = this.formatMessages(options.messages);
 
-    const response = await this.client.models.generateContent({
-      model: this.model,
-      contents,
-      config: {
-        systemInstruction: options.systemPrompt,
-        maxOutputTokens: options.maxTokens,
-        temperature: options.temperature,
-      },
+    const result = await generateText({
+      model: this.google(this.model),
+      system: options.systemPrompt,
+      messages,
+      maxOutputTokens: options.maxTokens,
+      temperature: options.temperature,
+      tools: options.tools,
+      experimental_telemetry: getTelemetrySettings({
+        name: `gemini-${this.model}`,
+        userId: this.userId,
+      }),
     });
 
-    // Extract text and media from response
-    const { text, media } = this.extractResponseParts(response);
+    // Extract tool calls and results
+    const toolCalls: LLMToolCall[] | undefined = result.toolCalls?.map((tc) => ({
+      toolCallId: tc.toolCallId,
+      toolName: tc.toolName,
+      args: "args" in tc ? (tc.args as Record<string, unknown>) : {},
+    }));
+
+    const toolResults: LLMToolResult[] | undefined = result.toolResults?.map((tr) => ({
+      toolCallId: tr.toolCallId,
+      toolName: tr.toolName,
+      result: "result" in tr ? tr.result : undefined,
+    }));
 
     return {
-      content: text,
-      media: media.length > 0 ? media : undefined,
-      usage: response.usageMetadata
+      content: result.text,
+      usage: result.usage
         ? {
-            inputTokens: response.usageMetadata.promptTokenCount || 0,
-            outputTokens: response.usageMetadata.candidatesTokenCount || 0,
+            inputTokens: result.usage.inputTokens ?? 0,
+            outputTokens: result.usage.outputTokens ?? 0,
           }
         : undefined,
+      toolCalls: toolCalls?.length ? toolCalls : undefined,
+      toolResults: toolResults?.length ? toolResults : undefined,
     };
   }
 
   async stream(options: LLMStreamOptions): Promise<void> {
-    const contents = this.formatMessages(options.messages);
+    const messages = this.formatMessages(options.messages);
 
     try {
-      const response = await this.client.models.generateContentStream({
-        model: this.model,
-        contents,
-        config: {
-          systemInstruction: options.systemPrompt,
-          maxOutputTokens: options.maxTokens,
-          temperature: options.temperature,
-        },
+      const result = streamText({
+        model: this.google(this.model),
+        system: options.systemPrompt,
+        messages,
+        maxOutputTokens: options.maxTokens,
+        temperature: options.temperature,
+        tools: options.tools,
+        experimental_telemetry: getTelemetrySettings({
+          name: `gemini-${this.model}-stream`,
+          userId: this.userId,
+        }),
       });
 
       let fullContent = "";
-      const allMedia: LLMMediaPart[] = [];
 
-      for await (const chunk of response) {
-        // Extract text and media from each chunk
-        const { text, media } = this.extractResponseParts(chunk);
+      // Handle text stream
+      for await (const chunk of result.textStream) {
+        fullContent += chunk;
+        await options.callbacks.onToken(chunk, fullContent);
+      }
 
-        if (text) {
-          fullContent += text;
-          await options.callbacks.onToken(text, fullContent);
-        }
-
-        // Handle media parts
-        for (const mediaPart of media) {
-          allMedia.push(mediaPart);
-          if (options.callbacks.onMedia) {
-            await options.callbacks.onMedia(mediaPart);
-          }
+      // Get final result for tool calls
+      const finalResult = await result;
+      if (finalResult.toolCalls && options.callbacks.onToolCall) {
+        for (const tc of await finalResult.toolCalls) {
+          await options.callbacks.onToolCall({
+            toolCallId: tc.toolCallId,
+            toolName: tc.toolName,
+            args: "args" in tc ? (tc.args as Record<string, unknown>) : {},
+          });
         }
       }
 
-      await options.callbacks.onFinished(fullContent, allMedia.length > 0 ? allMedia : undefined);
+      await options.callbacks.onFinished(fullContent);
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       await options.callbacks.onError(err);
     }
   }
 
-  /**
-   * Extract text and media parts from a Gemini response
-   */
-  private extractResponseParts(response: any): { text: string; media: LLMMediaPart[] } {
-    const textParts: string[] = [];
-    const media: LLMMediaPart[] = [];
-
-    // Get candidates from response
-    const candidates = response.candidates || [];
-
-    for (const candidate of candidates) {
-      const parts = candidate.content?.parts || [];
-
-      for (const part of parts) {
-        // Text part
-        if (part.text) {
-          textParts.push(part.text);
-        }
-
-        // Inline data (images, etc.)
-        if (part.inlineData) {
-          const mimeType = part.inlineData.mimeType || "application/octet-stream";
-          const mediaType = this.getMediaType(mimeType);
-
-          media.push({
-            type: mediaType,
-            mimeType,
-            data: part.inlineData.data,
-          });
-        }
-      }
-    }
-
-    return {
-      text: textParts.join(""),
-      media,
-    };
-  }
-
-  /**
-   * Determine media type from MIME type
-   */
-  private getMediaType(mimeType: string): "image" | "audio" | "video" {
-    if (mimeType.startsWith("image/")) return "image";
-    if (mimeType.startsWith("audio/")) return "audio";
-    if (mimeType.startsWith("video/")) return "video";
-    return "image"; // Default to image for unknown types
-  }
-
   async flush(): Promise<void> {
-    await this.client.flush();
+    // OpenTelemetry handles flushing automatically
   }
 
-  private formatMessages(messages: LLMGenerateOptions["messages"]) {
+  private formatMessages(messages: LLMGenerateOptions["messages"]): Message[] {
     return messages
       .filter((m) => m.role !== "system") // System messages handled separately
-      .map((msg) => ({
-        role: msg.role === "user" ? "user" : "model",
-        parts: this.formatContent(msg.content),
-      }));
+      .map((msg): Message => {
+        if (msg.role === "user") {
+          return {
+            role: "user",
+            content: this.formatUserContent(msg.content),
+          };
+        }
+        return {
+          role: "assistant",
+          content: this.formatContentAsString(msg.content),
+        };
+      });
   }
 
-  private formatContent(content: LLMMessageContent): any[] {
+  private formatUserContent(content: LLMMessageContent): UserModelMessage["content"] {
     // Simple string content
     if (typeof content === "string") {
-      return [{ text: content }];
+      return content;
     }
 
     // Multimodal content array
     return content.map((part) => {
       if (part.type === "text") {
-        return { text: part.text };
+        return { type: "text" as const, text: part.text };
       } else if (part.type === "image") {
         return {
-          inlineData: {
-            mimeType: part.mimeType,
-            data: part.data,
-          },
+          type: "image" as const,
+          image: `data:${part.mimeType};base64,${part.data}`,
         };
       }
-      return { text: "" };
+      return { type: "text" as const, text: "" };
     });
+  }
+
+  private formatContentAsString(content: LLMMessageContent): string {
+    if (typeof content === "string") {
+      return content;
+    }
+    return content
+      .filter((part) => part.type === "text")
+      .map((part) => (part as { type: "text"; text: string }).text)
+      .join("\n");
   }
 }

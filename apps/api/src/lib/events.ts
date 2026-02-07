@@ -16,6 +16,13 @@ export interface SettingsChangedEvent {
   settings: {
     cognitiveAttentionDebugMode: boolean;
     cognitiveAttentionShowOverlay: boolean;
+    attentionTrackingIgnoreList?: string | null;
+    attentionSummarizationEnabled?: boolean;
+    attentionSummarizationIntervalMs?: number;
+    focusCalculationEnabled?: boolean;
+    focusCalculationIntervalMs?: number;
+    focusInactivityThresholdMs?: number;
+    focusMinDurationMs?: number;
     // LLM settings
     llmProvider?: string | null;
     llmModel?: string | null;
