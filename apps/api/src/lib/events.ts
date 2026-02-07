@@ -110,6 +110,14 @@ export interface ToolCallStartedEvent {
   toolName: string;
 }
 
+// Active tab changed event - synced from extension
+export interface ActiveTabChangedEvent {
+  userId: string;
+  url: string | null;
+  title: string | null;
+  timestamp: number;
+}
+
 class AppEvents extends EventEmitter {
   emitDeviceTokenRevoked(data: DeviceTokenRevokedEvent) {
     this.emit("deviceTokenRevoked", data);
@@ -203,6 +211,16 @@ class AppEvents extends EventEmitter {
   onFocusChanged(callback: (data: FocusChangedEvent) => void) {
     this.on("focusChanged", callback);
     return () => this.off("focusChanged", callback);
+  }
+
+  // Active Tab Events
+  emitActiveTabChanged(data: ActiveTabChangedEvent) {
+    this.emit("activeTabChanged", data);
+  }
+
+  onActiveTabChanged(callback: (data: ActiveTabChangedEvent) => void) {
+    this.on("activeTabChanged", callback);
+    return () => this.off("activeTabChanged", callback);
   }
 }
 

@@ -415,6 +415,11 @@ settingsSSE.get("/", async (c) => {
           hasAnthropicApiKey: !!settings.anthropicApiKeyEncrypted,
           hasOpenaiApiKey: !!settings.openaiApiKeyEncrypted,
         },
+        activeTab: settings.currentActiveUrl ? {
+          url: settings.currentActiveUrl,
+          title: settings.currentActiveTitle,
+          timestamp: settings.currentActiveAt?.getTime() || null,
+        } : null,
       }),
       event: "connected",
       id: String(id++),
@@ -427,6 +432,21 @@ settingsSSE.get("/", async (c) => {
         await stream.writeSSE({
           data: JSON.stringify(data.settings),
           event: "settings-changed",
+          id: String(id++),
+        });
+      }
+    });
+
+    // Listen for active tab changes
+    const cleanupActiveTab = events.onActiveTabChanged(async (data) => {
+      if (data.userId === userId) {
+        await stream.writeSSE({
+          data: JSON.stringify({
+            url: data.url,
+            title: data.title,
+            timestamp: data.timestamp,
+          }),
+          event: "active-tab-changed",
           id: String(id++),
         });
       }
@@ -457,6 +477,7 @@ settingsSSE.get("/", async (c) => {
       }
     } finally {
       cleanup();
+      cleanupActiveTab();
       if (typeof cleanupRevoked === "function") {
         cleanupRevoked();
       }

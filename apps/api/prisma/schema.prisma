@@ -145,6 +145,13 @@ model UserSettings {
   id                            String   @id @default(cuid())
   userId                        String   @unique
   user                          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Current Active Tab (synced from extension)
+  currentActiveUrl              String?
+  currentActiveTitle            String?
+  currentActiveAt               DateTime?
+  // User Location (set by user via chat)
+  location                      String?  // City name, e.g., "Tokyo", "New York"
+  timezone                      String?  // Derived from location, e.g., "Asia/Tokyo"
   // Cognitive Attention Settings
   cognitiveAttentionDebugMode   Boolean  @default(false)
   cognitiveAttentionShowOverlay Boolean  @default(false)
