@@ -28,7 +28,12 @@ export class HttpClient {
     const headers = await this.getHeaders(auth);
     const response = await fetch(`${this.baseUrl}${path}`, { headers });
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const errorBody = await response.json().catch(() => ({}));
+      const error = Object.assign(
+        new Error(errorBody.error || `HTTP ${response.status}: ${response.statusText}`),
+        { status: response.status, code: errorBody.code, ...errorBody }
+      );
+      throw error;
     }
     return response.json();
   }
@@ -41,7 +46,12 @@ export class HttpClient {
       body: JSON.stringify(body),
     });
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const errorBody = await response.json().catch(() => ({}));
+      const error = Object.assign(
+        new Error(errorBody.error || `HTTP ${response.status}: ${response.statusText}`),
+        { status: response.status, code: errorBody.code, ...errorBody }
+      );
+      throw error;
     }
     return response.json();
   }

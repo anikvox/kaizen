@@ -339,6 +339,9 @@ export interface UserSettings {
   hasGeminiApiKey?: boolean;
   hasAnthropicApiKey?: boolean;
   hasOpenaiApiKey?: boolean;
+  // Quiz settings
+  quizAnswerOptionsCount?: number; // 2, 3, or 4
+  quizActivityDays?: number; // 1-7
 }
 
 export interface UserSettingsUpdateRequest {
@@ -359,6 +362,9 @@ export interface UserSettingsUpdateRequest {
   geminiApiKey?: string | null;
   anthropicApiKey?: string | null;
   openaiApiKey?: string | null;
+  // Quiz settings
+  quizAnswerOptionsCount?: number;
+  quizActivityDays?: number;
 }
 
 export interface SSESettingsConnectedData {
@@ -557,4 +563,46 @@ export interface SSEActiveTabChangedData {
   url: string | null;
   title: string | null;
   timestamp: number;
+}
+
+// Quiz Types (stateless - progress tracked on client)
+export interface QuizQuestion {
+  id: string;
+  questionIndex: number;
+  question: string;
+  options: string[];
+  correctIndex: number;
+}
+
+export interface GeneratedQuiz {
+  questions: QuizQuestion[];
+  generatedAt: string;
+  activityDays: number;
+  optionsCount: number;
+}
+
+export type QuizJobStatus = "pending" | "processing" | "completed" | "failed";
+
+export interface QuizJobResponse {
+  jobId?: string;
+  status: QuizJobStatus;
+  quiz?: GeneratedQuiz;
+  error?: string;
+  code?: string;
+}
+
+export interface QuizResultItem {
+  id: string;
+  totalQuestions: number;
+  correctAnswers: number;
+  completedAt: string;
+}
+
+export interface QuizHistoryResponse {
+  results: QuizResultItem[];
+  stats: {
+    totalQuizzes: number;
+    totalQuestions: number;
+    totalCorrect: number;
+  };
 }
