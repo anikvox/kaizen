@@ -24,7 +24,13 @@ export type ImageAttentionEvent = {
   timestamp: number
 }
 
-const handler: PlasmoMessaging.MessageHandler<ImageAttentionEvent> = async (req, res) => {
+export type ImageAttentionResponse = {
+  success: boolean
+  error?: string
+  summary?: string | null
+}
+
+const handler: PlasmoMessaging.MessageHandler<ImageAttentionEvent, ImageAttentionResponse> = async (req, res) => {
   const body = req.body
   if (!body) {
     res.send({ success: false, error: "No body provided" })
@@ -41,7 +47,7 @@ const handler: PlasmoMessaging.MessageHandler<ImageAttentionEvent> = async (req,
   const api = getApiClient()
 
   try {
-    await api.attention.image({
+    const response = await api.attention.image({
       url: body.url,
       src: body.src,
       alt: body.alt,
@@ -52,7 +58,7 @@ const handler: PlasmoMessaging.MessageHandler<ImageAttentionEvent> = async (req,
       confidence: body.confidence,
       timestamp: body.timestamp
     })
-    res.send({ success: true })
+    res.send({ success: true, summary: response.summary })
   } catch (error) {
     console.error("Failed to send image attention data:", error)
     res.send({ success: false, error: String(error) })

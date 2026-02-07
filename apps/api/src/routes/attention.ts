@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { db, events } from "../lib/index.js";
 import { deviceAuthMiddleware, type DeviceAuthVariables } from "../middleware/index.js";
+import { generateIndividualImageSummary } from "../lib/summarization.js";
 
 const app = new Hono<{ Variables: DeviceAuthVariables }>();
 
@@ -27,7 +28,7 @@ app.post("/text", deviceAuthMiddleware, async (c) => {
   return c.json(attention);
 });
 
-// Image Attention - internal tracking only
+// Image Attention - tracks image attention and returns AI-generated summary
 app.post("/image", deviceAuthMiddleware, async (c) => {
   const userId = c.get("userId");
   const body = await c.req.json<{
@@ -42,6 +43,26 @@ app.post("/image", deviceAuthMiddleware, async (c) => {
     timestamp: number;
   }>();
 
+  // Get user settings for LLM configuration
+  const settings = await db.userSettings.findUnique({
+    where: { userId },
+  });
+
+  // Generate image summary using multimodal LLM
+  let summary: string | null = null;
+  if (settings?.attentionSummarizationEnabled) {
+    try {
+      summary = await generateIndividualImageSummary(
+        body.src,
+        body.alt,
+        body.title,
+        settings
+      );
+    } catch (error) {
+      console.error("Failed to generate image summary:", error);
+    }
+  }
+
   const attention = await db.imageAttention.create({
     data: {
       url: body.url,
@@ -54,10 +75,12 @@ app.post("/image", deviceAuthMiddleware, async (c) => {
       confidence: body.confidence,
       timestamp: new Date(body.timestamp),
       userId,
+      summary,
+      summarizedAt: summary ? new Date() : null,
     },
   });
 
-  return c.json(attention);
+  return c.json({ ...attention, summary });
 });
 
 // Audio Attention - internal tracking only
