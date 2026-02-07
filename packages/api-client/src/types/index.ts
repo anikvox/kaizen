@@ -128,6 +128,7 @@ export interface ImageAttention {
   summary?: string | null; // AI-generated description of the image
   summarizedAt?: string | null;
   createdAt: string;
+  kaizenId?: string; // Client-side unique identifier for matching summary to image element
 }
 
 export interface ImageAttentionRequest {
@@ -140,6 +141,7 @@ export interface ImageAttentionRequest {
   hoverDuration: number;
   confidence: number;
   timestamp: number;
+  kaizenId?: string; // Client-side unique identifier for matching summary to image element
 }
 
 // Audio Attention Types

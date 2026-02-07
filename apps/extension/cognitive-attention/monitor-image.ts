@@ -142,6 +142,13 @@ class CognitiveAttentionImageTracker {
             hoverDuration
           )
 
+          // Generate unique kaizen-id for this image if it doesn't have one
+          if (!imageElement.getAttribute("data-kaizen-id")) {
+            const kaizenId = `kaizen-img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+            imageElement.setAttribute("data-kaizen-id", kaizenId)
+            console.log(`[Kaizen] Assigned ID to image: ${kaizenId}`, { src: imageElement.src })
+          }
+
           const attention: SustainedImageAttention = {
             src: imageElement.src,
             alt: getImageDescription(imageElement),
