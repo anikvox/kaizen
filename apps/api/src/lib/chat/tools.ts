@@ -3,6 +3,8 @@ import { tool } from "ai";
 import { db } from "../db.js";
 import { getAttentionData, serializeAttentionForLLM, formatDuration } from "../attention.js";
 import { getActiveFocuses, getUserFocusHistory } from "../focus/index.js";
+import { createTextTools } from "./text-tools.js";
+import type { UserSettings } from "@prisma/client";
 
 /**
  * Helper to get user's location settings
@@ -81,8 +83,15 @@ async function geocodeCity(city: string, retries = 2): Promise<{
  * Create chat tools for the agentic chat.
  * These tools allow the LLM to perform actions during conversation.
  */
-export function createChatTools(userId: string) {
+export function createChatTools(userId: string, settings: UserSettings | null = null) {
+  // Get text manipulation tools
+  const textTools = createTextTools(userId, settings);
+
   return {
+    // Text manipulation tools
+    ...textTools,
+
+    // Context and data tools
     /**
      * Get the current time for a location
      */
@@ -906,6 +915,20 @@ export function formatToolResultMessage(toolName: string, result: unknown): stri
     case "get_reading_activity":
       if (!r.found) return r.message as string || "No reading activity";
       return `Reading activity: ${r.totalWordsRead} words across ${r.pagesRead} pages`;
+
+    case "summarize_text":
+      return `Summary (${r.summaryLength}/${r.originalLength} words): ${r.summary}`;
+
+    case "proofread_text":
+      if (!r.hasErrors) return `No errors found. Text looks good!`;
+      return `Proofread complete. Changes: ${r.changesMade}`;
+
+    case "translate_text":
+      if (r.needsLanguage) return r.message as string;
+      return `Translated to ${r.targetLanguage}${r.savedPreference ? " (saved as preference)" : ""}`;
+
+    case "rephrase_text":
+      return `Rephrased in ${r.styleUsed} style`;
 
     default:
       return `Tool ${toolName} completed`;

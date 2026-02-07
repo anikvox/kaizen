@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth, SignInButton, useUser } from "@clerk/nextjs";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   createApiClient,
   formatToolResultMessage,
@@ -34,6 +35,8 @@ interface PendingToolCall {
 export default function ChatPage() {
   const { isSignedIn, isLoaded, getToken } = useAuth();
   const { user: clerkUser } = useUser();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [sessions, setSessions] = useState<ChatSessionListItem[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -46,6 +49,7 @@ export default function ChatPage() {
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const hasHandledUrlParams = useRef(false);
 
   // Helper to sort sessions by updatedAt descending
   const sortSessionsByDate = (sessions: ChatSessionListItem[]) =>
@@ -111,6 +115,36 @@ export default function ChatPage() {
     }
     fetchSessions();
   }, [isLoaded, isSignedIn, fetchSessions]);
+
+  // Handle URL parameters (new chat with pre-filled prompt)
+  useEffect(() => {
+    if (!isSignedIn || !sessions.length || hasHandledUrlParams.current) return;
+
+    const isNewChat = searchParams.get("new") === "true";
+    const promptParam = searchParams.get("prompt");
+
+    if (isNewChat && promptParam) {
+      hasHandledUrlParams.current = true;
+
+      // Create new session
+      const createNewSessionWithPrompt = async () => {
+        const api = createApiClient(apiUrl, getTokenFn);
+        try {
+          const newSession = await api.chats.createSession({ attentionRange: selectedAttentionRange });
+          setSessions((prev) => sortSessionsByDate([newSession, ...prev]));
+          setActiveSessionId(newSession.id);
+          setInputValue(promptParam);
+
+          // Clear URL parameters
+          router.replace("/chat");
+        } catch (err) {
+          console.error("Failed to create session from URL:", err);
+        }
+      };
+
+      createNewSessionWithPrompt();
+    }
+  }, [isSignedIn, sessions, searchParams, getTokenFn, selectedAttentionRange, router]);
 
   // Load messages when active session changes
   useEffect(() => {

@@ -39,7 +39,7 @@ export async function runChatAgent(
 ): Promise<{ content: string; toolCalls: Array<{ id: string; name: string; args: unknown; result: unknown }> }> {
   const provider = createAgentProvider(settings);
   const modelId = getAgentModelId(settings);
-  const tools = createChatTools(userId);
+  const tools = createChatTools(userId, settings);
 
   // Convert messages to CoreMessage format (only user and assistant messages)
   const coreMessages: CoreMessage[] = messages.map((msg) => ({
