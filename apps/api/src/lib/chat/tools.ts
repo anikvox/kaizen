@@ -5,17 +5,76 @@ import { getAttentionData, serializeAttentionForLLM, formatDuration } from "../a
 import { getActiveFocuses, getUserFocusHistory } from "../focus/index.js";
 
 /**
- * Helper to get user's locale settings
+ * Helper to get user's location settings
  */
-async function getUserLocaleSettings(userId: string) {
+async function getUserLocationSettings(userId: string) {
   const settings = await db.userSettings.findUnique({
     where: { userId },
-    select: { locale: true, timezone: true },
+    select: { location: true, timezone: true },
   });
   return {
-    locale: settings?.locale || "en-US",
-    timezone: settings?.timezone || "UTC",
+    location: settings?.location || null,
+    timezone: settings?.timezone || null,
   };
+}
+
+/**
+ * Geocode a city name and get its timezone (with retry)
+ */
+async function geocodeCity(city: string, retries = 2): Promise<{
+  found: boolean;
+  lat?: number;
+  lon?: number;
+  name?: string;
+  timezone?: string;
+  error?: string;
+}> {
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`;
+  console.log(`[Geocode] Fetching: ${url}`);
+
+  let lastError: string = "Unknown error";
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      if (attempt > 0) {
+        console.log(`[Geocode] Retry attempt ${attempt}...`);
+        await new Promise((r) => setTimeout(r, 500 * attempt)); // Backoff
+      }
+
+      const geoResponse = await fetch(url, {
+        headers: {
+          "User-Agent": "Kaizen/1.0",
+        },
+      });
+
+      if (!geoResponse.ok) {
+        console.error(`[Geocode] HTTP error: ${geoResponse.status} ${geoResponse.statusText}`);
+        lastError = `Geocoding API returned ${geoResponse.status}`;
+        continue;
+      }
+
+      const geoData = await geoResponse.json();
+      console.log(`[Geocode] Response:`, JSON.stringify(geoData).slice(0, 200));
+
+      if (!geoData.results || geoData.results.length === 0) {
+        return { found: false, error: `Could not find location: ${city}` };
+      }
+
+      const result = geoData.results[0];
+      return {
+        found: true,
+        lat: result.latitude,
+        lon: result.longitude,
+        name: `${result.name}, ${result.country}`,
+        timezone: result.timezone,
+      };
+    } catch (error) {
+      console.error(`[Geocode] Fetch error (attempt ${attempt + 1}):`, error);
+      lastError = error instanceof Error ? error.message : "Geocoding failed";
+    }
+  }
+
+  return { found: false, error: lastError };
 }
 
 /**
@@ -25,136 +84,98 @@ async function getUserLocaleSettings(userId: string) {
 export function createChatTools(userId: string) {
   return {
     /**
-     * Get the current time using user's locale and timezone
+     * Get the current time for a location
      */
     get_current_time: tool({
-      description: "Get the current time. Automatically uses the user's locale and timezone. Use this when the user asks about the current time, date, or needs timestamp information.",
+      description: "Get the current time for a city/location. IMPORTANT: If the user mentions a specific city (e.g., 'time in Tokyo'), you MUST pass that city name as the 'city' parameter. Only omit the city parameter if the user doesn't specify one.",
       parameters: z.object({
-        format: z.enum(["iso", "human", "unix"]).optional().describe(
-          "Output format: 'iso' for ISO 8601, 'human' for human-readable in user's locale (default), 'unix' for Unix timestamp"
+        city: z.string().optional().describe(
+          "The city name mentioned by the user. REQUIRED if user specifies a city (e.g., 'Tokyo' from 'time in Tokyo'). Only omit if user doesn't specify a city."
         ),
       }),
-      execute: async ({ format = "human" }) => {
-        const { locale, timezone } = await getUserLocaleSettings(userId);
+      execute: async ({ city }) => {
+        const { location, timezone } = await getUserLocationSettings(userId);
         const now = new Date();
 
-        let timeStr: string | number;
-        let formatDesc: string;
+        // Determine which city/timezone to use
+        let targetCity = city || location;
+        let targetTimezone = timezone;
 
-        switch (format) {
-          case "human":
-            try {
-              timeStr = now.toLocaleString(locale, {
-                timeZone: timezone,
-                dateStyle: "full",
-                timeStyle: "long",
-              });
-              formatDesc = `Human readable (${timezone})`;
-            } catch {
-              timeStr = now.toUTCString();
-              formatDesc = "Human readable UTC";
-            }
-            break;
-          case "unix":
-            timeStr = Math.floor(now.getTime() / 1000);
-            formatDesc = "Unix timestamp (seconds)";
-            break;
-          default:
-            timeStr = now.toISOString();
-            formatDesc = "ISO 8601";
+        // If no city provided and no saved location, ask user
+        if (!targetCity) {
+          return {
+            needsLocation: true,
+            message: "I don't know your location yet. Please tell me which city you're in so I can give you the correct time.",
+          };
         }
 
-        return {
-          time: timeStr,
-          format: formatDesc,
-          locale,
-          timezone,
-          utcTime: now.toISOString(),
-        };
+        // If city is provided (or using saved location but no timezone), geocode to get timezone
+        if (city || !targetTimezone) {
+          const geo = await geocodeCity(targetCity);
+          if (!geo.found) {
+            return { found: false, error: geo.error };
+          }
+          targetCity = geo.name!;
+          targetTimezone = geo.timezone!;
+        }
+
+        try {
+          const timeStr = now.toLocaleString("en-US", {
+            timeZone: targetTimezone,
+            dateStyle: "full",
+            timeStyle: "long",
+          });
+
+          return {
+            found: true,
+            time: timeStr,
+            location: targetCity,
+            timezone: targetTimezone,
+            utcTime: now.toISOString(),
+          };
+        } catch {
+          return {
+            found: false,
+            error: `Invalid timezone: ${targetTimezone}`,
+          };
+        }
       },
     }),
 
     /**
-     * Get current weather using user's timezone to infer location
+     * Get current weather for a location
      */
     get_current_weather: tool({
-      description: "Get the current weather for the user's location. Use this when the user asks about the weather, temperature, or weather conditions. Can also get weather for a specific city.",
+      description: "Get the current weather for a city/location. IMPORTANT: If the user mentions a specific city (e.g., 'weather in Delhi'), you MUST pass that city name as the 'city' parameter. Only omit the city parameter if the user doesn't specify one.",
       parameters: z.object({
         city: z.string().optional().describe(
-          "City name to get weather for (e.g., 'London', 'New York', 'Tokyo'). If not provided, uses user's timezone to infer location."
+          "The city name mentioned by the user. REQUIRED if user specifies a city (e.g., 'Delhi' from 'weather in Delhi'). Only omit if user doesn't specify a city."
         ),
       }),
       execute: async ({ city }) => {
         try {
-          const { timezone } = await getUserLocaleSettings(userId);
+          const { location } = await getUserLocationSettings(userId);
 
-          // If city is provided, geocode it. Otherwise, infer from timezone.
-          let lat: number;
-          let lon: number;
-          let locationName: string;
+          // Determine which city to use
+          const targetCity = city || location;
 
-          if (city) {
-            // Use Open-Meteo geocoding API
-            const geoResponse = await fetch(
-              `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`
-            );
-            const geoData = await geoResponse.json();
-
-            if (!geoData.results || geoData.results.length === 0) {
-              return {
-                found: false,
-                error: `Could not find location: ${city}`,
-              };
-            }
-
-            lat = geoData.results[0].latitude;
-            lon = geoData.results[0].longitude;
-            locationName = `${geoData.results[0].name}, ${geoData.results[0].country}`;
-          } else {
-            // Infer location from timezone (approximate city centers)
-            const timezoneLocations: Record<string, { lat: number; lon: number; name: string }> = {
-              "America/New_York": { lat: 40.7128, lon: -74.006, name: "New York, US" },
-              "America/Los_Angeles": { lat: 34.0522, lon: -118.2437, name: "Los Angeles, US" },
-              "America/Chicago": { lat: 41.8781, lon: -87.6298, name: "Chicago, US" },
-              "America/Denver": { lat: 39.7392, lon: -104.9903, name: "Denver, US" },
-              "America/Toronto": { lat: 43.6532, lon: -79.3832, name: "Toronto, CA" },
-              "America/Vancouver": { lat: 49.2827, lon: -123.1207, name: "Vancouver, CA" },
-              "Europe/London": { lat: 51.5074, lon: -0.1278, name: "London, UK" },
-              "Europe/Paris": { lat: 48.8566, lon: 2.3522, name: "Paris, FR" },
-              "Europe/Berlin": { lat: 52.52, lon: 13.405, name: "Berlin, DE" },
-              "Europe/Amsterdam": { lat: 52.3676, lon: 4.9041, name: "Amsterdam, NL" },
-              "Europe/Madrid": { lat: 40.4168, lon: -3.7038, name: "Madrid, ES" },
-              "Europe/Rome": { lat: 41.9028, lon: 12.4964, name: "Rome, IT" },
-              "Europe/Moscow": { lat: 55.7558, lon: 37.6173, name: "Moscow, RU" },
-              "Asia/Tokyo": { lat: 35.6762, lon: 139.6503, name: "Tokyo, JP" },
-              "Asia/Shanghai": { lat: 31.2304, lon: 121.4737, name: "Shanghai, CN" },
-              "Asia/Hong_Kong": { lat: 22.3193, lon: 114.1694, name: "Hong Kong" },
-              "Asia/Singapore": { lat: 1.3521, lon: 103.8198, name: "Singapore" },
-              "Asia/Dubai": { lat: 25.2048, lon: 55.2708, name: "Dubai, AE" },
-              "Asia/Kolkata": { lat: 28.6139, lon: 77.209, name: "New Delhi, IN" },
-              "Asia/Seoul": { lat: 37.5665, lon: 126.978, name: "Seoul, KR" },
-              "Australia/Sydney": { lat: -33.8688, lon: 151.2093, name: "Sydney, AU" },
-              "Australia/Melbourne": { lat: -37.8136, lon: 144.9631, name: "Melbourne, AU" },
-              "Pacific/Auckland": { lat: -36.8509, lon: 174.7645, name: "Auckland, NZ" },
-              "America/Sao_Paulo": { lat: -23.5505, lon: -46.6333, name: "São Paulo, BR" },
-              "America/Mexico_City": { lat: 19.4326, lon: -99.1332, name: "Mexico City, MX" },
-              "Africa/Johannesburg": { lat: -26.2041, lon: 28.0473, name: "Johannesburg, ZA" },
-              "Africa/Cairo": { lat: 30.0444, lon: 31.2357, name: "Cairo, EG" },
+          // If no city provided and no saved location, ask user
+          if (!targetCity) {
+            return {
+              needsLocation: true,
+              message: "I don't know your location yet. Please tell me which city you're in so I can give you the weather.",
             };
-
-            const location = timezoneLocations[timezone] || { lat: 0, lon: 0, name: "Unknown (use city parameter)" };
-            lat = location.lat;
-            lon = location.lon;
-            locationName = location.name;
-
-            if (lat === 0 && lon === 0) {
-              return {
-                found: false,
-                error: `Could not determine location from timezone: ${timezone}. Please specify a city.`,
-                timezone,
-              };
-            }
           }
+
+          // Geocode the city
+          const geo = await geocodeCity(targetCity);
+          if (!geo.found) {
+            return { found: false, error: geo.error };
+          }
+
+          const lat = geo.lat!;
+          const lon = geo.lon!;
+          const locationName = geo.name!;
 
           // Fetch weather from Open-Meteo
           const weatherResponse = await fetch(
@@ -233,17 +254,76 @@ export function createChatTools(userId: string) {
     }),
 
     /**
-     * Get user's locale and context information
+     * Save user's location for future time/weather requests
+     */
+    set_user_location: tool({
+      description: "Save the user's location (city) for future time and weather requests. Use this after the user tells you their location.",
+      parameters: z.object({
+        city: z.string().optional().describe("The city name to save as the user's location (e.g., 'Tokyo', 'New York', 'London')"),
+        location: z.string().optional().describe("Alternative parameter for city name"),
+      }),
+      execute: async ({ city, location }) => {
+        // Accept either 'city' or 'location' parameter (Gemini sometimes uses 'location')
+        const cityName = city || location;
+        if (!cityName) {
+          return { success: false, error: "No city provided" };
+        }
+
+        // Geocode to validate and get timezone
+        const geo = await geocodeCity(cityName);
+        if (!geo.found) {
+          return { success: false, error: geo.error };
+        }
+
+        // Save to user settings
+        await db.userSettings.upsert({
+          where: { userId },
+          create: {
+            userId,
+            location: geo.name!,
+            timezone: geo.timezone!,
+          },
+          update: {
+            location: geo.name!,
+            timezone: geo.timezone!,
+          },
+        });
+
+        // Also return current time since that's often why location is being set
+        const now = new Date();
+        let currentTime: string | null = null;
+        try {
+          currentTime = now.toLocaleString("en-US", {
+            timeZone: geo.timezone!,
+            dateStyle: "full",
+            timeStyle: "long",
+          });
+        } catch {
+          // Ignore timezone errors
+        }
+
+        return {
+          success: true,
+          location: geo.name,
+          timezone: geo.timezone,
+          currentTime,
+          message: `Saved your location as ${geo.name}. I'll use this for future time and weather requests.`,
+        };
+      },
+    }),
+
+    /**
+     * Get user's location and context information
      */
     get_user_context: tool({
-      description: "Get the user's locale, timezone, and other context information. Use this when you need to understand the user's location context or personalize responses based on their locale.",
+      description: "Get the user's saved location, timezone, and other context information. Use this when you need to understand the user's location context.",
       parameters: z.object({}),
       execute: async () => {
         try {
           const settings = await db.userSettings.findUnique({
             where: { userId },
             select: {
-              locale: true,
+              location: true,
               timezone: true,
               currentActiveUrl: true,
               currentActiveTitle: true,
@@ -255,7 +335,7 @@ export function createChatTools(userId: string) {
 
           if (settings?.timezone) {
             try {
-              localTime = now.toLocaleString(settings.locale || "en-US", {
+              localTime = now.toLocaleString("en-US", {
                 timeZone: settings.timezone,
                 dateStyle: "full",
                 timeStyle: "short",
@@ -266,9 +346,10 @@ export function createChatTools(userId: string) {
           }
 
           return {
-            locale: settings?.locale || null,
+            location: settings?.location || null,
             timezone: settings?.timezone || null,
             localTime,
+            hasLocation: !!settings?.location,
             currentPage: settings?.currentActiveUrl ? {
               url: settings.currentActiveUrl,
               title: settings.currentActiveTitle,
@@ -776,15 +857,24 @@ export function formatToolResultMessage(toolName: string, result: unknown): stri
 
   switch (toolName) {
     case "get_current_time":
-      return `Current time: ${r.time} (${r.timezone})`;
+      if (r.needsLocation) return "Needs location to get time";
+      if (!r.found) return r.error as string || "Time not found";
+      return `Time in ${r.location}: ${r.time}`;
 
     case "get_current_weather":
-      if (!r.found) return r.message as string || "Weather not found";
+      if (r.needsLocation) return "Needs location to get weather";
+      if (!r.found) return r.error as string || "Weather not found";
       const temp = r.temperature as { celsius: number; fahrenheit: number };
       return `Weather in ${r.location}: ${r.condition}, ${temp.celsius}°C / ${temp.fahrenheit}°F`;
 
+    case "set_user_location":
+      if (!r.success) return `Failed to save location: ${r.error}`;
+      if (r.currentTime) return `Saved location: ${r.location} (${r.currentTime})`;
+      return `Saved location: ${r.location}`;
+
     case "get_user_context":
-      return `User context: ${r.timezone || "unknown timezone"}, ${r.locale || "unknown locale"}`;
+      if (r.hasLocation) return `User context: ${r.location}`;
+      return "User context: no location saved";
 
     case "get_active_website":
       if (!r.found) return r.message as string || "No active website";

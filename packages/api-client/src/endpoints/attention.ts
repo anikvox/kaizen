@@ -10,8 +10,6 @@ import type {
   YoutubeAttentionRequest,
   ActiveTabRequest,
   ActiveTabResponse,
-  LocaleRequest,
-  LocaleResponse,
 } from "../types/index.js";
 
 export class AttentionEndpoint {
@@ -35,9 +33,5 @@ export class AttentionEndpoint {
 
   async activeTab(data: ActiveTabRequest): Promise<ActiveTabResponse> {
     return this.http.post<ActiveTabResponse>("/attention/active-tab", data, true);
-  }
-
-  async locale(data: LocaleRequest): Promise<LocaleResponse> {
-    return this.http.post<LocaleResponse>("/attention/locale", data, true);
   }
 }

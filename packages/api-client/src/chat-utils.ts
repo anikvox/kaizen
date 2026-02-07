@@ -18,6 +18,7 @@ export function getToolDisplayInfo(toolName: string | null | undefined): ToolDis
         const info: Record<string, ToolDisplayInfo> = {
                 get_current_time: { label: "Current time", loadingText: "Looking up current time" },
                 get_current_weather: { label: "Weather", loadingText: "Looking up weather" },
+                set_user_location: { label: "Save location", loadingText: "Saving your location" },
                 get_user_context: { label: "User context", loadingText: "Looking up user context" },
                 get_active_website: { label: "Active website", loadingText: "Looking up active website" },
                 get_active_focus: { label: "Active focus", loadingText: "Looking up active focus" },
@@ -45,14 +46,22 @@ export function formatToolResultMessage(toolName: string | null | undefined, con
 
                 switch (toolName) {
                         case "get_current_time":
-                                return `Looked up current time: ${r.time}`;
+                                if (r.needsLocation) return `Needs location to get time`;
+                                if (!r.found) return `Looked up time: ${r.error || "not found"}`;
+                                return `Looked up time in ${r.location}: ${r.time}`;
 
                         case "get_current_weather":
-                                if (!r.found) return `Looked up weather: ${r.message || "not found"}`;
+                                if (r.needsLocation) return `Needs location to get weather`;
+                                if (!r.found) return `Looked up weather: ${r.error || "not found"}`;
                                 return `Looked up weather in ${r.location}: ${r.condition}, ${r.temperature?.celsius}°C`;
 
+                        case "set_user_location":
+                                if (!r.success) return `Failed to save location: ${r.error}`;
+                                return `Saved location: ${r.location}`;
+
                         case "get_user_context":
-                                return `Looked up user context: ${r.timezone || "unknown timezone"}`;
+                                if (r.hasLocation) return `Looked up user context: ${r.location}`;
+                                return `Looked up user context: no location saved`;
 
                         case "get_active_website":
                                 if (!r.found) return `Looked up active website: none detected`;

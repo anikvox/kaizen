@@ -157,32 +157,4 @@ app.post("/active-tab", deviceAuthMiddleware, async (c) => {
   return c.json({ success: true, url: settings.currentActiveUrl });
 });
 
-// Locale - sync user's locale and timezone from extension
-app.post("/locale", deviceAuthMiddleware, async (c) => {
-  const userId = c.get("userId");
-  const body = await c.req.json<{
-    locale: string;      // e.g., "en-US", "fr-FR"
-    timezone: string;    // e.g., "America/New_York", "Europe/Paris"
-  }>();
-
-  const settings = await db.userSettings.upsert({
-    where: { userId },
-    create: {
-      userId,
-      locale: body.locale,
-      timezone: body.timezone,
-    },
-    update: {
-      locale: body.locale,
-      timezone: body.timezone,
-    },
-  });
-
-  return c.json({
-    success: true,
-    locale: settings.locale,
-    timezone: settings.timezone,
-  });
-});
-
 export default app;
