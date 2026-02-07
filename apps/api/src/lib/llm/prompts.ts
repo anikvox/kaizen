@@ -4,9 +4,9 @@
 
 import type { LLMProvider } from "./interface.js";
 import { getSystemProvider } from "./service.js";
-import { TITLE_GENERATION_SYSTEM_PROMPT } from "./system-prompts.js";
 import { LLM_CONFIG } from "./config.js";
 import { validateTitle } from "./validators.js";
+import { getPrompt, PROMPT_NAMES } from "./prompt-provider.js";
 import type { AttentionDataResponse, AttentionSummary } from "../attention.js";
 
 /**
@@ -271,9 +271,12 @@ Message: "${message}"
 Title:`;
 
   try {
+    // Fetch prompt from Opik (with local fallback)
+    const systemPrompt = await getPrompt(PROMPT_NAMES.TITLE_GENERATION);
+
     const response = await llm.generate({
       messages: [{ role: "user", content: prompt }],
-      systemPrompt: TITLE_GENERATION_SYSTEM_PROMPT,
+      systemPrompt,
       maxTokens: LLM_CONFIG.titleGeneration.maxTokens,
       temperature: LLM_CONFIG.titleGeneration.temperature,
     });

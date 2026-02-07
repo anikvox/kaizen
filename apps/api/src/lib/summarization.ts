@@ -1,11 +1,10 @@
 import { db } from "./db.js";
 import { createLLMService } from "./llm/service.js";
 import {
-  TEXT_SUMMARIZATION_SYSTEM_PROMPT,
-  IMAGE_SUMMARIZATION_SYSTEM_PROMPT,
-  INDIVIDUAL_IMAGE_SYSTEM_PROMPT,
   LLM_CONFIG,
   validateSummary,
+  getPrompt,
+  PROMPT_NAMES,
 } from "./llm/index.js";
 import { fetchImageAsBase64 } from "./image-fetcher.js";
 import type { UserSettings } from "@prisma/client";
@@ -31,9 +30,12 @@ ${textContent}
 Provide a concise summary (2-4 sentences) of what the user was reading about.`;
 
   try {
+    // Fetch prompt from Opik (with local fallback)
+    const systemPrompt = await getPrompt(PROMPT_NAMES.TEXT_SUMMARIZATION);
+
     const response = await provider.generate({
       messages: [{ role: "user", content: prompt }],
-      systemPrompt: TEXT_SUMMARIZATION_SYSTEM_PROMPT,
+      systemPrompt,
       maxTokens: LLM_CONFIG.summarization.maxTokens,
       temperature: LLM_CONFIG.summarization.temperature,
     });
@@ -76,9 +78,12 @@ ${imageDescriptions}
 Provide a concise summary (2-4 sentences) describing what types of images the user was looking at and any patterns in their viewing.`;
 
   try {
+    // Fetch prompt from Opik (with local fallback)
+    const systemPrompt = await getPrompt(PROMPT_NAMES.IMAGE_SUMMARIZATION);
+
     const response = await provider.generate({
       messages: [{ role: "user", content: prompt }],
-      systemPrompt: IMAGE_SUMMARIZATION_SYSTEM_PROMPT,
+      systemPrompt,
       maxTokens: LLM_CONFIG.summarization.maxTokens,
       temperature: LLM_CONFIG.summarization.temperature,
     });
@@ -128,6 +133,9 @@ export async function generateIndividualImageSummary(
   const prompt = `Describe this image concisely.${contextText}`;
 
   try {
+    // Fetch prompt from Opik (with local fallback)
+    const systemPrompt = await getPrompt(PROMPT_NAMES.INDIVIDUAL_IMAGE);
+
     const response = await provider.generate({
       messages: [
         {
@@ -138,7 +146,7 @@ export async function generateIndividualImageSummary(
           ],
         },
       ],
-      systemPrompt: INDIVIDUAL_IMAGE_SYSTEM_PROMPT,
+      systemPrompt,
       maxTokens: LLM_CONFIG.imageDescription.maxTokens,
       temperature: LLM_CONFIG.imageDescription.temperature,
     });

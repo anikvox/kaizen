@@ -36,3 +36,9 @@ prod-down:
 
 prod-clean:
     cd .devcontainer && docker compose down -v
+
+prompts-status:
+    pnpm --filter @kaizen/api prompts:status
+
+prompts-sync:
+    pnpm --filter @kaizen/api prompts:sync

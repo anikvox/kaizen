@@ -6,7 +6,7 @@
 import { streamText, type CoreMessage } from "ai";
 import type { UserSettings } from "@prisma/client";
 import { createAgentProvider, getAgentModelId } from "../agent/index.js";
-import { getTelemetrySettings, CHAT_AGENT_SYSTEM_PROMPT } from "../llm/index.js";
+import { getTelemetrySettings, getPrompt, PROMPT_NAMES } from "../llm/index.js";
 import { createChatTools } from "./tools.js";
 
 export interface ChatAgentCallbacks {
@@ -48,7 +48,8 @@ export async function runChatAgent(
     content: msg.content,
   }));
 
-  const systemPrompt = systemPromptOverride || CHAT_AGENT_SYSTEM_PROMPT;
+  // Fetch prompt from Opik (with local fallback)
+  const systemPrompt = systemPromptOverride || await getPrompt(PROMPT_NAMES.CHAT_AGENT);
   let fullContent = "";
   const toolCallsResult: Array<{ id: string; name: string; args: unknown; result: unknown }> = [];
 

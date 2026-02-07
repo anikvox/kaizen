@@ -11,8 +11,8 @@ import { getUserFocusHistory } from "../focus/index.js";
 import type { UserSettings } from "@prisma/client";
 import type { QuizSettings, GeneratedQuiz, QuizGenerationContext, QuizJob } from "./types.js";
 import { DEFAULT_QUIZ_SETTINGS } from "./types.js";
-import { QUIZ_SYSTEM_PROMPT, createQuizPrompt, parseQuizResponse } from "./prompts.js";
-import { LLM_CONFIG } from "../llm/index.js";
+import { createQuizPrompt, parseQuizResponse } from "./prompts.js";
+import { LLM_CONFIG, getPrompt, PROMPT_NAMES } from "../llm/index.js";
 
 const QUESTION_COUNT = 10;
 
@@ -145,9 +145,12 @@ async function doGenerateQuiz(userId: string): Promise<GeneratedQuiz | null> {
 
   console.log(`[Quiz] Calling LLM to generate ${QUESTION_COUNT} questions`);
 
+  // Fetch prompt from Opik (with local fallback)
+  const systemPrompt = await getPrompt(PROMPT_NAMES.QUIZ_GENERATION);
+
   const response = await provider.generate({
     messages: [{ role: "user", content: prompt }],
-    systemPrompt: QUIZ_SYSTEM_PROMPT,
+    systemPrompt,
     maxTokens: LLM_CONFIG.quizGeneration.maxTokens,
     temperature: LLM_CONFIG.quizGeneration.temperature,
   });

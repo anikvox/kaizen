@@ -88,3 +88,16 @@ export {
 
 // Telemetry (Opik via OpenTelemetry)
 export { initTelemetry, getTelemetrySettings, shutdownTelemetry } from "./telemetry.js";
+
+// Opik Prompt Library
+export {
+  getPrompt,
+  getAllLocalPrompts,
+  PROMPT_NAMES,
+  type PromptName,
+} from "./prompt-provider.js";
+export {
+  syncPromptToOpik,
+  syncAllPromptsToOpik,
+  isOpikPromptsEnabled,
+} from "./prompts-opik.js";

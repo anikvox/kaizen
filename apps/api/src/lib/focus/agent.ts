@@ -3,7 +3,7 @@ import type { UserSettings } from "@prisma/client";
 import { db } from "../db.js";
 import { events } from "../events.js";
 import { createAgentProvider, getAgentModelId } from "../agent/index.js";
-import { getTelemetrySettings, FOCUS_AGENT_SYSTEM_PROMPT } from "../llm/index.js";
+import { getTelemetrySettings, getPrompt, PROMPT_NAMES } from "../llm/index.js";
 import { createFocusTools } from "./tools.js";
 import { formatAttentionData, hasMinimalContent, extractFocusSettings } from "./utils.js";
 import { formatAttentionForPrompt } from "./prompts.js";
@@ -58,10 +58,13 @@ export async function runFocusAgent(
     // Get Opik telemetry settings
     const telemetry = getTelemetrySettings({ name: "focus-agent", userId });
 
+    // Fetch prompt from Opik (with local fallback)
+    const systemPrompt = await getPrompt(PROMPT_NAMES.FOCUS_AGENT);
+
     // Run the agent with tool calling
     const { steps } = await generateText({
       model: provider(modelId),
-      system: FOCUS_AGENT_SYSTEM_PROMPT,
+      system: systemPrompt,
       prompt: `Here is the user's recent attention data. Analyze it and manage their focus sessions appropriately using the available tools.
 
 ATTENTION DATA:
