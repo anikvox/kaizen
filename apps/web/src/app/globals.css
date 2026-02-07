@@ -41,3 +41,14 @@ body {
 .typing-indicator span:nth-child(3) {
   animation-delay: 0.4s;
 }
+
+/* Agent spinner animation */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.agent-spinner {
+  display: inline-block;
+}

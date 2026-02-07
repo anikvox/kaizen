@@ -386,3 +386,63 @@ export async function getAttentionData(
   const raw = await fetchRawAttentionData(userId, timeRange);
   return aggregateAttentionData(raw, timeRange);
 }
+
+/**
+ * Serialize attention data into a compact, LLM-friendly format
+ */
+export function serializeAttentionForLLM(data: AttentionDataResponse): string {
+  const lines: string[] = [];
+
+  lines.push(`Activity Summary (${data.summary.totalPages} pages, ${data.summary.totalActiveTimeFormatted} active time):`);
+  lines.push(`- Words read: ${data.summary.totalWordsRead}`);
+  lines.push(`- Images viewed: ${data.summary.totalImagesViewed}`);
+  lines.push(`- YouTube videos: ${data.summary.totalYoutubeVideos}`);
+  lines.push("");
+
+  for (const page of data.pages) {
+    lines.push(`## ${page.title || page.url}`);
+    lines.push(`   URL: ${page.url}`);
+    lines.push(`   Active time: ${page.activeTimeFormatted}`);
+
+    if (page.summary) {
+      lines.push(`   Summary: ${page.summary}`);
+    }
+
+    if (page.attention.text.totalWordsRead > 0) {
+      lines.push(`   Text read: ${page.attention.text.totalWordsRead} words`);
+      // Include first few excerpts
+      const excerpts = page.attention.text.excerpts.slice(0, 3);
+      for (const excerpt of excerpts) {
+        const text = excerpt.text.slice(0, 200);
+        lines.push(`     - "${text}${excerpt.text.length > 200 ? "..." : ""}"`);
+      }
+    }
+
+    if (page.attention.images.count > 0) {
+      lines.push(`   Images viewed: ${page.attention.images.count}`);
+      for (const img of page.attention.images.items.slice(0, 3)) {
+        if (img.summary) {
+          lines.push(`     - ${img.summary}`);
+        } else if (img.alt) {
+          lines.push(`     - ${img.alt}`);
+        }
+      }
+    }
+
+    if (page.attention.youtube.videos.length > 0) {
+      for (const video of page.attention.youtube.videos) {
+        lines.push(`   YouTube: "${video.title || "Unknown"}" by ${video.channelName || "Unknown"}`);
+        if (video.activeWatchTimeFormatted) {
+          lines.push(`     Watched: ${video.activeWatchTimeFormatted}`);
+        }
+        if (video.captions.length > 0) {
+          lines.push(`     Captions: ${video.captions.slice(0, 5).join(" ")}`);
+        }
+      }
+    }
+
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}

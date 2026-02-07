@@ -189,10 +189,13 @@ model ChatMessage {
   id            String      @id @default(cuid())
   sessionId     String
   session       ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  role          String      // "user" | "bot"
+  role          String      // "user" | "assistant" | "tool"
   content       String      @db.Text
   status        String      @default("sent") // "sending" | "sent" | "typing" | "streaming" | "finished" | "error"
   errorMessage  String?
+  // Tool-related fields (for role="tool" messages)
+  toolCallId    String?     // ID linking tool call to tool result
+  toolName      String?     // Name of the tool that was called
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 

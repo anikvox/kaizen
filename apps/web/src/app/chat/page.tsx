@@ -22,12 +22,20 @@ const ATTENTION_RANGE_LABELS: Record<ChatAttentionRange, string> = {
   "all": "All time",
 };
 
+// Pending tool call (shown while tool is executing)
+interface PendingToolCall {
+  toolCallId: string;
+  toolName: string;
+  sessionId: string;
+}
+
 export default function ChatPage() {
   const { isSignedIn, isLoaded, getToken } = useAuth();
   const { user: clerkUser } = useUser();
   const [sessions, setSessions] = useState<ChatSessionListItem[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [pendingToolCalls, setPendingToolCalls] = useState<PendingToolCall[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -41,10 +49,10 @@ export default function ChatPage() {
     return getToken();
   }, [getToken]);
 
-  // Scroll to bottom when messages change
+  // Scroll to bottom when messages or pending tool calls change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, pendingToolCalls]);
 
   // Fetch sessions list
   const fetchSessions = useCallback(async () => {
@@ -96,6 +104,7 @@ export default function ChatPage() {
 
   // Load messages when active session changes
   useEffect(() => {
+    setPendingToolCalls([]); // Clear pending tool calls
     if (activeSessionId) {
       fetchMessages(activeSessionId);
     } else {
@@ -156,6 +165,12 @@ export default function ChatPage() {
           onMessageCreated: (data) => {
             if (data.sessionId === activeSessionId) {
               setMessages((prev) => [...prev, data.message]);
+              // If this is a tool result, remove from pending tool calls
+              if (data.message.role === "tool" && data.message.toolCallId) {
+                setPendingToolCalls((prev) =>
+                  prev.filter((t) => t.toolCallId !== data.message.toolCallId)
+                );
+              }
             }
             // Update message count in session list
             setSessions((prev) =>
@@ -175,6 +190,18 @@ export default function ChatPage() {
                     : m
                 )
               );
+            }
+          },
+          onToolCallStarted: (data) => {
+            if (data.sessionId === activeSessionId) {
+              setPendingToolCalls((prev) => [
+                ...prev,
+                {
+                  toolCallId: data.toolCallId,
+                  toolName: data.toolName,
+                  sessionId: data.sessionId,
+                },
+              ]);
             }
           },
           onError: () => {
@@ -216,7 +243,6 @@ export default function ChatPage() {
       const result = await api.chats.sendMessage({
         sessionId: activeSessionId || undefined,
         content: inputValue.trim(),
-        attentionRange: getCurrentAttentionRange(),
       });
 
       setInputValue("");
@@ -370,9 +396,14 @@ export default function ChatPage() {
               </p>
             </div>
           ) : (
-            messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
-            ))
+            <>
+              {messages.map((message) => (
+                <MessageBubble key={message.id} message={message} />
+              ))}
+              {pendingToolCalls.map((tool) => (
+                <PendingToolLine key={tool.toolCallId} toolName={tool.toolName} />
+              ))}
+            </>
           )}
           <div ref={messagesEndRef} />
         </div>
@@ -404,18 +435,83 @@ export default function ChatPage() {
   );
 }
 
+/**
+ * Get human-readable tool display info
+ */
+function getToolInfo(toolName: string | null | undefined): { label: string; loadingText: string } {
+  const info: Record<string, { label: string; loadingText: string }> = {
+    get_current_utc_time: { label: "Current time", loadingText: "Getting current time" },
+    get_user_attention_data: { label: "Browsing activity", loadingText: "Fetching browsing activity" },
+  };
+  return info[toolName || ""] || { label: toolName || "Tool", loadingText: `Running ${toolName || "tool"}` };
+}
+
+/**
+ * Format tool result for display
+ */
+function formatToolResult(toolName: string | null | undefined, content: string): string {
+  try {
+    const result = JSON.parse(content);
+
+    if (toolName === "get_current_utc_time") {
+      return `Current time: ${result.time} (${result.format})`;
+    }
+
+    if (toolName === "get_user_attention_data") {
+      if (!result.found) {
+        return result.message || "No browsing activity found";
+      }
+      return `Fetched browsing activity (${result.timeRange}): ${result.summary}`;
+    }
+
+    // Generic fallback
+    return `Tool result: ${JSON.stringify(result).slice(0, 100)}...`;
+  } catch {
+    return content.slice(0, 100) + (content.length > 100 ? "..." : "");
+  }
+}
+
+/**
+ * Pending tool call line (shown while tool is executing)
+ */
+function PendingToolLine({ toolName }: { toolName: string }) {
+  const { loadingText } = getToolInfo(toolName);
+  return (
+    <div style={styles.agentLine}>
+      <span style={styles.agentIcon}>○</span>
+      <span style={{ ...styles.agentText, opacity: 0.7 }}>
+        {loadingText}...
+      </span>
+      <span style={styles.agentSpinner} className="agent-spinner" />
+    </div>
+  );
+}
+
 function MessageBubble({ message }: { message: ChatMessage }) {
-  const isBot = message.role === "bot";
+  const isAssistant = message.role === "assistant";
+  const isTool = message.role === "tool";
+  const isUser = message.role === "user";
   const isStreaming = message.status === "streaming" || message.status === "typing";
   const isError = message.status === "error";
+
+  // Render tool messages as compact agentic status lines
+  if (isTool) {
+    const text = formatToolResult(message.toolName, message.content);
+    return (
+      <div style={styles.agentLine}>
+        <span style={styles.agentIcon}>●</span>
+        <span style={styles.agentText}>{text}</span>
+      </div>
+    );
+  }
 
   return (
     <div
       style={{
         ...styles.messageBubble,
-        alignSelf: isBot ? "flex-start" : "flex-end",
-        background: isBot ? "#f0f0f0" : "#007bff",
-        color: isBot ? "#333" : "#fff",
+        alignSelf: isUser ? "flex-end" : "flex-start",
+        background: isUser ? "#007bff" : "#f0f0f0",
+        color: isUser ? "#fff" : "#333",
       }}
     >
       {message.status === "typing" ? (
@@ -427,7 +523,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       ) : (
         <>
           <div style={styles.messageContent}>
-            {isBot ? (
+            {isAssistant ? (
               <ReactMarkdown
                 urlTransform={(url) => {
                   // Allow data: URLs for base64 images
@@ -543,13 +639,13 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           )}
         </>
       )}
-      <StatusIndicator status={message.status} isBot={isBot} />
+      <StatusIndicator status={message.status} isAssistant={isAssistant} />
     </div>
   );
 }
 
-function StatusIndicator({ status, isBot }: { status: ChatMessageStatus; isBot: boolean }) {
-  if (!isBot) return null;
+function StatusIndicator({ status, isAssistant }: { status: ChatMessageStatus; isAssistant: boolean }) {
+  if (!isAssistant) return null;
 
   const statusText = {
     typing: "Typing...",
@@ -763,6 +859,34 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: "0.25rem",
     fontSize: "0.7rem",
   },
+  agentLine: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    padding: "0.25rem 0.5rem",
+    margin: "0.125rem 0",
+    fontSize: "0.8rem",
+    color: "#666",
+    alignSelf: "flex-start",
+  } as React.CSSProperties,
+  agentIcon: {
+    fontSize: "0.5rem",
+    color: "#999",
+    lineHeight: 1,
+  } as React.CSSProperties,
+  agentText: {
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    fontSize: "0.8rem",
+    color: "#666",
+  } as React.CSSProperties,
+  agentSpinner: {
+    width: "10px",
+    height: "10px",
+    border: "1.5px solid #ccc",
+    borderTopColor: "#666",
+    borderRadius: "50%",
+    animation: "spin 0.8s linear infinite",
+  } as React.CSSProperties,
   inputContainer: {
     padding: "1rem",
     borderTop: "1px solid #e0e0e0",

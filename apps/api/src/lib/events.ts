@@ -80,10 +80,12 @@ export interface ChatMessageEvent {
   sessionId: string;
   message: {
     id: string;
-    role: "user" | "bot";
+    role: "user" | "assistant" | "tool";
     content: string;
     status: "sending" | "sent" | "typing" | "streaming" | "finished" | "error";
     errorMessage?: string | null;
+    toolCallId?: string | null;
+    toolName?: string | null;
     createdAt: string;
     updatedAt: string;
   };
@@ -98,6 +100,14 @@ export interface ChatMessageUpdatedEvent {
     status?: "sending" | "sent" | "typing" | "streaming" | "finished" | "error";
     errorMessage?: string | null;
   };
+}
+
+// Tool call started event - for UI only, not persisted to DB
+export interface ToolCallStartedEvent {
+  userId: string;
+  sessionId: string;
+  toolCallId: string;
+  toolName: string;
 }
 
 class AppEvents extends EventEmitter {
@@ -173,6 +183,16 @@ class AppEvents extends EventEmitter {
   onChatMessageUpdated(callback: (data: ChatMessageUpdatedEvent) => void) {
     this.on("chatMessageUpdated", callback);
     return () => this.off("chatMessageUpdated", callback);
+  }
+
+  // Tool Events (UI-only, not persisted)
+  emitToolCallStarted(data: ToolCallStartedEvent) {
+    this.emit("toolCallStarted", data);
+  }
+
+  onToolCallStarted(callback: (data: ToolCallStartedEvent) => void) {
+    this.on("toolCallStarted", callback);
+    return () => this.off("toolCallStarted", callback);
   }
 
   // Focus Events
