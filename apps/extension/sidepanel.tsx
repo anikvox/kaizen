@@ -56,6 +56,10 @@ function SidePanel() {
   const sortSessionsByDate = (sessions: ChatSessionListItem[]) =>
     [...sessions].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
 
+  // Helper to sort messages by updatedAt ascending
+  const sortMessagesByDate = (messages: ChatMessage[]) =>
+    [...messages].sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime())
+
   // Refs
   const eventSourceRef = useRef<EventSource | null>(null)
   const settingsEventSourceRef = useRef<EventSource | null>(null)
@@ -469,7 +473,7 @@ function SidePanel() {
           },
           onMessageCreated: (data) => {
             if (!cancelled && data.sessionId === activeSessionId) {
-              setMessages((prev) => [...prev, data.message])
+              setMessages((prev) => sortMessagesByDate([...prev, data.message]))
             }
             setSessions((prev) =>
               sortSessionsByDate(
@@ -484,8 +488,12 @@ function SidePanel() {
           onMessageUpdated: (data) => {
             if (!cancelled && data.sessionId === activeSessionId) {
               setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === data.messageId ? { ...m, ...data.updates } : m
+                sortMessagesByDate(
+                  prev.map((m) =>
+                    m.id === data.messageId
+                      ? { ...m, ...data.updates, updatedAt: new Date().toISOString() }
+                      : m
+                  )
                 )
               )
             }

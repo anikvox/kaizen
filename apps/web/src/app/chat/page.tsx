@@ -51,6 +51,10 @@ export default function ChatPage() {
   const sortSessionsByDate = (sessions: ChatSessionListItem[]) =>
     [...sessions].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
+  // Helper to sort messages by updatedAt ascending
+  const sortMessagesByDate = (messages: ChatMessage[]) =>
+    [...messages].sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+
   const getTokenFn = useCallback(async () => {
     return getToken();
   }, [getToken]);
@@ -174,7 +178,7 @@ export default function ChatPage() {
           },
           onMessageCreated: (data) => {
             if (data.sessionId === activeSessionId) {
-              setMessages((prev) => [...prev, data.message]);
+              setMessages((prev) => sortMessagesByDate([...prev, data.message]));
               // If this is a tool result, remove from pending tool calls
               if (data.message.role === "tool" && data.message.toolCallId) {
                 setPendingToolCalls((prev) =>
@@ -196,10 +200,12 @@ export default function ChatPage() {
           onMessageUpdated: (data) => {
             if (data.sessionId === activeSessionId) {
               setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === data.messageId
-                    ? { ...m, ...data.updates }
-                    : m
+                sortMessagesByDate(
+                  prev.map((m) =>
+                    m.id === data.messageId
+                      ? { ...m, ...data.updates, updatedAt: new Date().toISOString() }
+                      : m
+                  )
                 )
               );
             }
