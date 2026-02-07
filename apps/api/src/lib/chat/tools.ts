@@ -3,8 +3,6 @@ import { tool } from "ai";
 import { db } from "../db.js";
 import { getAttentionData, serializeAttentionForLLM, formatDuration } from "../attention.js";
 import { getActiveFocuses, getUserFocusHistory } from "../focus/index.js";
-import { createTextTools } from "./text-tools.js";
-import type { UserSettings } from "@prisma/client";
 
 /**
  * Helper to get user's location settings
@@ -83,15 +81,62 @@ async function geocodeCity(city: string, retries = 2): Promise<{
  * Create chat tools for the agentic chat.
  * These tools allow the LLM to perform actions during conversation.
  */
-export function createChatTools(userId: string, settings: UserSettings | null = null) {
-  // Get text manipulation tools
-  const textTools = createTextTools(userId, settings);
-
+export function createChatTools(userId: string) {
   return {
-    // Text manipulation tools
-    ...textTools,
+    /**
+     * Get user's preferred translation language
+     */
+    get_translation_language: tool({
+      description: "Get the user's preferred language for translations. Use this before translating if you need to check their preference.",
+      parameters: z.object({}),
+      execute: async () => {
+        const settings = await db.userSettings.findUnique({
+          where: { userId },
+          select: { preferredTranslationLanguage: true },
+        });
 
-    // Context and data tools
+        if (settings?.preferredTranslationLanguage) {
+          return {
+            found: true,
+            language: settings.preferredTranslationLanguage,
+          };
+        }
+
+        return {
+          found: false,
+          message: "No preferred translation language set. Ask the user what language they want.",
+        };
+      },
+    }),
+
+    /**
+     * Save user's preferred translation language
+     */
+    set_translation_language: tool({
+      description: "Save the user's preferred language for translations. Use this when the user tells you what language they want translations in.",
+      parameters: z.object({
+        language: z.string().describe("The language name (e.g., 'Spanish', 'French', 'Japanese', 'German')"),
+      }),
+      execute: async ({ language }) => {
+        await db.userSettings.upsert({
+          where: { userId },
+          create: {
+            userId,
+            preferredTranslationLanguage: language,
+          },
+          update: {
+            preferredTranslationLanguage: language,
+          },
+        });
+
+        return {
+          success: true,
+          language,
+          message: `Saved ${language} as your preferred translation language. Future translations will use this language by default.`,
+        };
+      },
+    }),
+
     /**
      * Get the current time for a location
      */
@@ -916,19 +961,13 @@ export function formatToolResultMessage(toolName: string, result: unknown): stri
       if (!r.found) return r.message as string || "No reading activity";
       return `Reading activity: ${r.totalWordsRead} words across ${r.pagesRead} pages`;
 
-    case "summarize_text":
-      return `Summary (${r.summaryLength}/${r.originalLength} words): ${r.summary}`;
+    case "get_translation_language":
+      if (!r.found) return `No preferred translation language set`;
+      return `Preferred translation language: ${r.language}`;
 
-    case "proofread_text":
-      if (!r.hasErrors) return `No errors found. Text looks good!`;
-      return `Proofread complete. Changes: ${r.changesMade}`;
-
-    case "translate_text":
-      if (r.needsLanguage) return r.message as string;
-      return `Translated to ${r.targetLanguage}${r.savedPreference ? " (saved as preference)" : ""}`;
-
-    case "rephrase_text":
-      return `Rephrased in ${r.styleUsed} style`;
+    case "set_translation_language":
+      if (!r.success) return `Failed to save language preference`;
+      return `Saved ${r.language} as preferred translation language`;
 
     default:
       return `Tool ${toolName} completed`;
