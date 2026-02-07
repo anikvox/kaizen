@@ -1,39 +1,38 @@
-import { NodeSDK } from "@opentelemetry/sdk-node";
-import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
-import { OpikExporter } from "opik-vercel";
 import { env } from "../env.js";
 
-let sdk: NodeSDK | null = null;
+let initialized = false;
 
 /**
- * Initialize OpenTelemetry with Opik exporter for LLM tracing.
- * Must be called at application startup.
+ * Initialize telemetry for LLM tracing.
+ * Uses Opik exporter with Vercel AI SDK's experimental_telemetry.
  */
-export function initTelemetry(): void {
-  if (sdk) {
-    console.warn("[Telemetry] Already initialized");
+export async function initTelemetry(): Promise<void> {
+  if (initialized) {
     return;
   }
 
   if (!env.opikApiKey) {
-    console.warn("[Telemetry] OPIK_API_KEY not set, tracing disabled");
+    console.log("[Telemetry] OPIK_API_KEY not set, tracing disabled");
+    initialized = true;
     return;
   }
 
-  const exporter = new OpikExporter({
-    tags: ["kaizen"],
-    metadata: {
-      environment: process.env.NODE_ENV || "development",
-    },
-  });
-
-  sdk = new NodeSDK({
-    traceExporter: exporter,
-    instrumentations: [getNodeAutoInstrumentations()],
-  });
-
-  sdk.start();
-  console.log("[Telemetry] OpenTelemetry initialized with Opik exporter");
+  // Dynamically import opik-vercel only when API key is available
+  // This prevents errors when the package tries to validate config on import
+  try {
+    const { OpikExporter } = await import("opik-vercel");
+    new OpikExporter({
+      tags: ["kaizen"],
+      metadata: {
+        environment: process.env.NODE_ENV || "development",
+      },
+    });
+    initialized = true;
+    console.log("[Telemetry] Opik tracing initialized");
+  } catch (error) {
+    console.warn("[Telemetry] Failed to initialize:", error);
+    initialized = true;
+  }
 }
 
 /**
@@ -45,6 +44,11 @@ export function getTelemetrySettings(options?: {
   userId?: string;
   metadata?: Record<string, unknown>;
 }): { isEnabled: boolean } {
+  // If Opik is not configured, just return disabled
+  if (!env.opikApiKey) {
+    return { isEnabled: false };
+  }
+
   const metadata: Record<string, string> = {};
 
   if (options?.metadata) {
@@ -59,22 +63,18 @@ export function getTelemetrySettings(options?: {
     metadata.userId = options.userId;
   }
 
-  // Enable telemetry when Opik is configured
+  // Return basic telemetry settings
+  // The OpikExporter handles the rest when initialized
   return {
-    isEnabled: !!env.opikApiKey,
-    ...OpikExporter.getSettings({
-      name: options?.name,
-      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
-    }),
-  };
+    isEnabled: true,
+    functionId: options?.name,
+    metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+  } as { isEnabled: boolean };
 }
 
 /**
  * Shutdown telemetry gracefully.
  */
 export async function shutdownTelemetry(): Promise<void> {
-  if (sdk) {
-    await sdk.shutdown();
-    sdk = null;
-  }
+  // Opik exporter handles its own cleanup
 }

@@ -24,8 +24,6 @@
     "@clerk/backend": "^1.21.4",
     "@google/genai": "^1.40.0",
     "@hono/node-server": "^1.13.7",
-    "@opentelemetry/auto-instrumentations-node": "^0.69.0",
-    "@opentelemetry/sdk-node": "^0.211.0",
     "@prisma/client": "^6.2.1",
     "ai": "^6.0.77",
     "hono": "^4.6.14",
