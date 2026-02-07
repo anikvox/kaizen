@@ -7,6 +7,8 @@ import {
   hashAttentionData,
   hasMinimalContent,
   emitFocusChange,
+  getEarliestTimestamp,
+  getLatestTimestamp,
 } from "./utils.js";
 import {
   MAX_ATTENTION_WINDOW_MS,
@@ -129,8 +131,14 @@ export async function processUserFocus(userId: string): Promise<ProcessUserFocus
       return result;
     }
 
+    // Get timestamps from attention data
+    // - earliest: used as startedAt for new focuses (when user actually started focusing)
+    // - latest: used as lastActivityAt (when the most recent activity occurred)
+    const earliestAttentionTime = getEarliestTimestamp(attentionData);
+    const latestAttentionTime = getLatestTimestamp(attentionData);
+
     // Run the focus agent to cluster attention into focuses
-    const agentResult = await runFocusAgent(userId, attentionData, settings);
+    const agentResult = await runFocusAgent(userId, attentionData, settings, earliestAttentionTime, latestAttentionTime);
 
     if (agentResult.success) {
       // Update results based on agent actions

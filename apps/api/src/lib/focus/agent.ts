@@ -30,11 +30,18 @@ export interface FocusAgentResult {
 /**
  * Run the focus clustering agent on attention data.
  * Uses Vercel AI SDK's tool calling to manage multiple concurrent focuses.
+ * @param userId - The user's ID
+ * @param attentionData - The raw attention data to process
+ * @param settings - User settings for LLM provider
+ * @param earliestAttentionTime - The earliest timestamp from the attention data (used for focus start times)
+ * @param latestAttentionTime - The latest timestamp from the attention data (used for lastActivityAt)
  */
 export async function runFocusAgent(
   userId: string,
   attentionData: RawAttentionData,
-  settings: UserSettings | null
+  settings: UserSettings | null,
+  earliestAttentionTime?: Date,
+  latestAttentionTime?: Date
 ): Promise<FocusAgentResult> {
   const result: FocusAgentResult = {
     success: false,
@@ -90,7 +97,7 @@ export async function runFocusAgent(
     // Create the AI provider and tools
     const provider = createAgentProvider(settings);
     const modelId = getAgentModelId(settings);
-    const tools = createFocusTools(userId, focusSettings.focusInactivityThresholdMs);
+    const tools = createFocusTools(userId, focusSettings.focusInactivityThresholdMs, earliestAttentionTime, latestAttentionTime);
 
     // Create span for the LLM call
     const llmSpan = trace?.span({

@@ -5,8 +5,14 @@ import { emitFocusChange } from "./utils.js";
 /**
  * Create focus management tools for the agent.
  * These tools allow the LLM agent to manage multiple concurrent focuses.
+ * @param userId - The user's ID
+ * @param inactivityThresholdMs - Threshold for focus inactivity
+ * @param earliestAttentionTime - The earliest timestamp from the attention data being processed (used as startedAt for new focuses)
+ * @param latestAttentionTime - The latest timestamp from the attention data being processed (used as lastActivityAt)
  */
-export function createFocusTools(userId: string, inactivityThresholdMs: number) {
+export function createFocusTools(userId: string, inactivityThresholdMs: number, earliestAttentionTime?: Date, latestAttentionTime?: Date) {
+  // Calculate activity time - use latest attention time or now
+  const activityTime = latestAttentionTime || new Date();
   return {
     /**
      * Get all active focuses for the user
@@ -47,15 +53,18 @@ export function createFocusTools(userId: string, inactivityThresholdMs: number) 
       }),
       execute: async ({ item, keywords }: { item: string; keywords: string[] }) => {
         const now = new Date();
+        // Use the earliest attention time as the start time (when the user actually started focusing)
+        // Fall back to now if not provided
+        const startTime = earliestAttentionTime || now;
         const newFocus = await db.focus.create({
           data: {
             userId,
             item,
             keywords,
             isActive: true,
-            startedAt: now,
+            startedAt: startTime,
             lastCalculatedAt: now,
-            lastActivityAt: now,
+            lastActivityAt: activityTime,
           },
         });
 
@@ -103,7 +112,7 @@ export function createFocusTools(userId: string, inactivityThresholdMs: number) 
             keywords: mergedKeywords,
             item: newItem || existingFocus.item,
             lastCalculatedAt: now,
-            lastActivityAt: now,
+            lastActivityAt: activityTime,
           },
         });
 
@@ -153,7 +162,7 @@ export function createFocusTools(userId: string, inactivityThresholdMs: number) 
             item: mergedItem,
             keywords: mergedKeywords,
             lastCalculatedAt: now,
-            lastActivityAt: now,
+            lastActivityAt: activityTime,
           },
         });
 
@@ -261,7 +270,7 @@ export function createFocusTools(userId: string, inactivityThresholdMs: number) 
             endedAt: null,
             keywords: mergedKeywords,
             lastCalculatedAt: now,
-            lastActivityAt: now,
+            lastActivityAt: activityTime,
           },
         });
 
