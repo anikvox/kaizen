@@ -23,6 +23,7 @@ model User {
   settings        UserSettings?
   chatSessions    ChatSession[]
   focuses         Focus[]
+  quizResults     QuizResult[]
 
   @@map("users")
 }
@@ -172,6 +173,9 @@ model UserSettings {
   geminiApiKeyEncrypted         String?  @db.Text
   anthropicApiKeyEncrypted      String?  @db.Text
   openaiApiKeyEncrypted         String?  @db.Text
+  // Quiz Settings
+  quizAnswerOptionsCount        Int      @default(2)    // 2, 3, or 4 answer options per question
+  quizActivityDays              Int      @default(3)    // 1-7 days of activity to use for quiz
   createdAt                     DateTime @default(now())
   updatedAt                     DateTime @updatedAt
 
@@ -232,3 +236,19 @@ model Focus {
   @@index([lastCalculatedAt])
   @@map("focuses")
 }
+
+model QuizResult {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  totalQuestions Int
+  correctAnswers Int
+
+  completedAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, completedAt])
+  @@map("quiz_results")
+}
+

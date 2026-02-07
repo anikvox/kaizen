@@ -111,6 +111,9 @@ app.get("/", dualAuthMiddleware, async (c) => {
     hasGeminiApiKey: !!settings.geminiApiKeyEncrypted,
     hasAnthropicApiKey: !!settings.anthropicApiKeyEncrypted,
     hasOpenaiApiKey: !!settings.openaiApiKeyEncrypted,
+    // Quiz settings
+    quizAnswerOptionsCount: settings.quizAnswerOptionsCount,
+    quizActivityDays: settings.quizActivityDays,
   });
 });
 
@@ -196,6 +199,9 @@ app.post("/", dualAuthMiddleware, async (c) => {
     geminiApiKey?: string | null;
     anthropicApiKey?: string | null;
     openaiApiKey?: string | null;
+    // Quiz settings
+    quizAnswerOptionsCount?: number;
+    quizActivityDays?: number;
   }>();
 
   // Build update data - using Prisma's unchecked types for direct field assignment
@@ -216,6 +222,8 @@ app.post("/", dualAuthMiddleware, async (c) => {
     geminiApiKeyEncrypted: null as string | null,
     anthropicApiKeyEncrypted: null as string | null,
     openaiApiKeyEncrypted: null as string | null,
+    quizAnswerOptionsCount: 2 as number,
+    quizActivityDays: 3 as number,
   };
 
   // Cognitive attention settings
@@ -289,6 +297,20 @@ app.post("/", dualAuthMiddleware, async (c) => {
     createData.openaiApiKeyEncrypted = body.openaiApiKey ? encrypt(body.openaiApiKey) : null;
   }
 
+  // Quiz settings
+  if (body.quizAnswerOptionsCount !== undefined) {
+    // Enforce valid range 2-4
+    const count = Math.min(4, Math.max(2, body.quizAnswerOptionsCount));
+    updateData.quizAnswerOptionsCount = count;
+    createData.quizAnswerOptionsCount = count;
+  }
+  if (body.quizActivityDays !== undefined) {
+    // Enforce valid range 1-7
+    const days = Math.min(7, Math.max(1, body.quizActivityDays));
+    updateData.quizActivityDays = days;
+    createData.quizActivityDays = days;
+  }
+
   const settings = await db.userSettings.upsert({
     where: { userId },
     update: updateData,
@@ -313,6 +335,8 @@ app.post("/", dualAuthMiddleware, async (c) => {
       hasGeminiApiKey: !!settings.geminiApiKeyEncrypted,
       hasAnthropicApiKey: !!settings.anthropicApiKeyEncrypted,
       hasOpenaiApiKey: !!settings.openaiApiKeyEncrypted,
+      quizAnswerOptionsCount: settings.quizAnswerOptionsCount,
+      quizActivityDays: settings.quizActivityDays,
     },
   });
 
@@ -331,6 +355,8 @@ app.post("/", dualAuthMiddleware, async (c) => {
     hasGeminiApiKey: !!settings.geminiApiKeyEncrypted,
     hasAnthropicApiKey: !!settings.anthropicApiKeyEncrypted,
     hasOpenaiApiKey: !!settings.openaiApiKeyEncrypted,
+    quizAnswerOptionsCount: settings.quizAnswerOptionsCount,
+    quizActivityDays: settings.quizActivityDays,
   });
 });
 

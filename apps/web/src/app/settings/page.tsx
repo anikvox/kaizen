@@ -977,6 +977,145 @@ export default function Settings() {
           </div>
         )}
       </section>
+
+      {/* Quiz Settings Section */}
+      <section style={{ marginBottom: "2rem" }}>
+        <h2 style={{ fontSize: "1.25rem", marginBottom: "1rem" }}>Quiz Settings</h2>
+        <p style={{ color: "#666", fontSize: "0.9rem", marginBottom: "1rem" }}>
+          Configure how the daily learning quiz is generated based on your browsing activity.
+        </p>
+
+        {settings && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div
+              style={{
+                padding: "1rem",
+                border: "1px solid #ddd",
+                borderRadius: "8px",
+              }}
+            >
+              <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: "500" }}>
+                Answer Options per Question
+              </label>
+              <select
+                value={settings.quizAnswerOptionsCount ?? 2}
+                onChange={async (e) => {
+                  setSaving(true);
+                  const api = createApiClient(apiUrl, getTokenFn);
+                  try {
+                    const result = await api.settings.update({
+                      quizAnswerOptionsCount: Number(e.target.value),
+                    });
+                    setSettings(result);
+                    setError("");
+                  } catch (err) {
+                    console.error("Update quiz options error:", err);
+                    setError("Failed to update quiz settings");
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                disabled={saving}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem",
+                  borderRadius: "4px",
+                  border: "1px solid #ccc",
+                  fontSize: "0.9rem",
+                  cursor: saving ? "not-allowed" : "pointer",
+                }}
+              >
+                <option value={2}>2 options</option>
+                <option value={3}>3 options</option>
+                <option value={4}>4 options</option>
+              </select>
+              <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
+                More options make the quiz harder.
+              </p>
+            </div>
+
+            <div
+              style={{
+                padding: "1rem",
+                border: "1px solid #ddd",
+                borderRadius: "8px",
+              }}
+            >
+              <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: "500" }}>
+                Activity Lookback Period
+              </label>
+              <select
+                value={settings.quizActivityDays ?? 3}
+                onChange={async (e) => {
+                  setSaving(true);
+                  const api = createApiClient(apiUrl, getTokenFn);
+                  try {
+                    const result = await api.settings.update({
+                      quizActivityDays: Number(e.target.value),
+                    });
+                    setSettings(result);
+                    setError("");
+                  } catch (err) {
+                    console.error("Update quiz days error:", err);
+                    setError("Failed to update quiz settings");
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                disabled={saving}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem",
+                  borderRadius: "4px",
+                  border: "1px solid #ccc",
+                  fontSize: "0.9rem",
+                  cursor: saving ? "not-allowed" : "pointer",
+                }}
+              >
+                <option value={1}>1 day</option>
+                <option value={2}>2 days</option>
+                <option value={3}>3 days</option>
+                <option value={4}>4 days</option>
+                <option value={5}>5 days</option>
+                <option value={6}>6 days</option>
+                <option value={7}>7 days</option>
+              </select>
+              <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
+                How many days of browsing activity to use for generating quiz questions.
+              </p>
+            </div>
+
+            {/* Generate Quiz Button */}
+            <div
+              style={{
+                padding: "1rem",
+                border: "1px solid #ddd",
+                borderRadius: "8px",
+                textAlign: "center",
+              }}
+            >
+              <p style={{ margin: "0 0 1rem", fontSize: "0.9rem", color: "#666" }}>
+                Ready to test your knowledge? Generate a quiz based on your recent browsing activity.
+              </p>
+              <Link
+                href="/quiz"
+                style={{
+                  display: "inline-block",
+                  padding: "0.75rem 1.5rem",
+                  background: "#007bff",
+                  color: "white",
+                  textDecoration: "none",
+                  borderRadius: "4px",
+                  fontSize: "1rem",
+                  fontWeight: "500",
+                }}
+              >
+                Take Quiz
+              </Link>
+            </div>
+          </div>
+        )}
+      </section>
     </main>
   );
 }

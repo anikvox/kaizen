@@ -202,6 +202,7 @@ export default function Home() {
           {error && <p style={{ color: "red" }}>{error}</p>}
           <div style={{ marginTop: "1rem", display: "flex", gap: "1rem" }}>
             <Link href="/chat">Chat</Link>
+            <Link href="/quiz">Quiz</Link>
             <Link href="/extensions">Manage Extensions</Link>
             <Link href="/settings">Settings</Link>
             <SignOutButton />

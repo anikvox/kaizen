@@ -8,3 +8,4 @@ export { default as exportRoutes } from "./export.js";
 export { default as settingsRoutes, settingsSSE as settingsSSERoutes } from "./settings.js";
 export { default as chatsRoutes, chatSSE as chatSSERoutes } from "./chats.js";
 export { default as focusRoutes, focusSSE as focusSSERoutes } from "./focus.js";
+export { default as quizRoutes } from "./quiz.js";
