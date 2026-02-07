@@ -1,4 +1,11 @@
 import type { FormattedAttentionItem } from "./types.js";
+import { FOCUS_ANALYSIS_SYSTEM_PROMPT, validateYesNo, validateFocusItem } from "../llm/index.js";
+
+// Re-export centralized prompt for backward compatibility
+export { FOCUS_ANALYSIS_SYSTEM_PROMPT as FOCUS_SYSTEM_PROMPT };
+
+// Re-export validators for use in focus service
+export { validateYesNo, validateFocusItem };
 
 /**
  * Format attention data for inclusion in LLM prompts.
@@ -125,12 +132,3 @@ Rules:
 - No punctuation or explanation in your response`;
 }
 
-/**
- * System prompt for focus-related LLM calls.
- * Keeps responses concise and focused.
- */
-export const FOCUS_SYSTEM_PROMPT = `You are a focus analysis assistant. Your responses must be:
-- Extremely concise (2-3 words maximum for focus items)
-- Factual and based only on the provided data
-- Free of explanations, punctuation, or additional commentary
-- In lowercase when returning single words like "yes" or "no"`;

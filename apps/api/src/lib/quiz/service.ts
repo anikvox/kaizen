@@ -12,6 +12,7 @@ import type { UserSettings } from "@prisma/client";
 import type { QuizSettings, GeneratedQuiz, QuizGenerationContext, QuizJob } from "./types.js";
 import { DEFAULT_QUIZ_SETTINGS } from "./types.js";
 import { QUIZ_SYSTEM_PROMPT, createQuizPrompt, parseQuizResponse } from "./prompts.js";
+import { LLM_CONFIG } from "../llm/index.js";
 
 const QUESTION_COUNT = 10;
 
@@ -147,8 +148,8 @@ async function doGenerateQuiz(userId: string): Promise<GeneratedQuiz | null> {
   const response = await provider.generate({
     messages: [{ role: "user", content: prompt }],
     systemPrompt: QUIZ_SYSTEM_PROMPT,
-    maxTokens: 2000,
-    temperature: 0.9, // Higher temperature for more variety
+    maxTokens: LLM_CONFIG.quizGeneration.maxTokens,
+    temperature: LLM_CONFIG.quizGeneration.temperature,
   });
 
   await provider.flush();

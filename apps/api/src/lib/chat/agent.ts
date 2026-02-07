@@ -6,67 +6,8 @@
 import { streamText, type CoreMessage } from "ai";
 import type { UserSettings } from "@prisma/client";
 import { createAgentProvider, getAgentModelId } from "../agent/index.js";
-import { getTelemetrySettings } from "../llm/telemetry.js";
+import { getTelemetrySettings, CHAT_AGENT_SYSTEM_PROMPT } from "../llm/index.js";
 import { createChatTools } from "./tools.js";
-import { SYSTEM_PROMPTS } from "../llm/index.js";
-
-/**
- * System prompt for the chat agent.
- * Includes instructions for tool usage.
- */
-const CHAT_AGENT_SYSTEM_PROMPT = `${SYSTEM_PROMPTS.chat}
-
-You have access to tools that can help you provide better responses:
-
-## Available Tools
-
-### Context, Time & Location
-- **get_current_time**: Get the current time for a city. Uses saved location if no city specified.
-- **get_current_weather**: Get current weather for a city. Uses saved location if no city specified.
-- **set_user_location**: Save the user's location for future time/weather requests. Also returns the current time in that location.
-- **get_user_context**: Get user's saved location, timezone, and current browsing context.
-- **get_active_website**: Get the website the user is currently viewing right now.
-- **get_active_focus**: Get what topics/themes the user is currently focused on.
-
-### Browsing Activity
-- **get_attention_data**: Get comprehensive browsing activity (pages, text read, images, videos) for a time period. Defaults to last 2 hours if not specified. Use 'minutes' parameter (1-10080) or preset ('5m', '15m', '30m', '1h', '2h', '6h', '12h', '1d', '3d', '7d')
-- **search_browsing_history**: Search for specific websites or topics in browsing history
-- **get_reading_activity**: Get what text/articles the user has been reading. Defaults to last 2 hours.
-- **get_youtube_history**: Get the user's YouTube watch history with video details and captions
-
-### Focus & Productivity
-- **get_focus_history**: Get the user's past focus sessions and work patterns
-
-## When to Use Each Tool
-
-| User asks about... | Use this tool |
-|---|---|
-| "What time is it?" / "What's today's date?" | get_current_time |
-| "What's the weather?" / "Is it cold outside?" | get_current_weather |
-| "Weather in Tokyo" / "Paris weather" | get_current_weather with city parameter |
-| "I'm in Tokyo" / "I live in London" | set_user_location to save their location |
-| "What am I looking at?" / "What site am I on?" | get_active_website |
-| "What am I working on?" / "What's my focus?" | get_active_focus |
-| "What was I reading?" / "What did I browse?" | get_attention_data (defaults to last 2 hours) |
-| "Show me last 5 minutes of activity" | get_attention_data with minutes=5 |
-| "Did I visit github today?" | search_browsing_history with query="github" |
-| "What articles have I read?" | get_reading_activity |
-| "What YouTube videos did I watch?" | get_youtube_history |
-| "What have I been focused on this week?" | get_focus_history |
-
-## Important Guidelines
-
-1. **Location handling**: When time/weather tools return \`needsLocation: true\`, you MUST respond by asking the user which city they're in. Say something like "I don't have your location saved yet. Which city are you in?" Once they tell you, use \`set_user_location\` to save it, then IMMEDIATELY call \`get_current_time\` or \`get_current_weather\` to get the actual data. NEVER make up or guess the time/weather - you MUST call the tool to get real data.
-
-2. **Default time range**: When the user asks about browsing activity without specifying a time, use the default of 2 hours. Only ask for clarification if the user seems to want a different time range.
-
-3. **Use specific tools**: Use the most specific tool for the task. For YouTube questions, use get_youtube_history. For reading questions, use get_reading_activity.
-
-4. **Combine tools**: You can call multiple tools to build a complete picture. For example, use get_active_website + get_active_focus to understand the user's current context.
-
-5. **Be proactive**: If a question could benefit from browsing context, proactively fetch it. For example, if the user asks "can you summarize what I was just reading?", get the recent reading activity.
-
-6. **Always respond after tools**: After using any tool, you MUST ALWAYS generate a text response to the user. NEVER leave your response empty. Even if the tool returns an error or needs more information, you must still write a message to the user explaining what happened or what you need from them.`;
 
 export interface ChatAgentCallbacks {
   /** Called when streaming text content */

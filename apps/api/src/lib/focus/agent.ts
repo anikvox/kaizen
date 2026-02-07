@@ -3,49 +3,11 @@ import type { UserSettings } from "@prisma/client";
 import { db } from "../db.js";
 import { events } from "../events.js";
 import { createAgentProvider, getAgentModelId } from "../agent/index.js";
-import { getTelemetrySettings } from "../llm/telemetry.js";
+import { getTelemetrySettings, FOCUS_AGENT_SYSTEM_PROMPT } from "../llm/index.js";
 import { createFocusTools } from "./tools.js";
 import { formatAttentionData, hasMinimalContent, extractFocusSettings } from "./utils.js";
 import { formatAttentionForPrompt } from "./prompts.js";
 import type { RawAttentionData } from "../attention.js";
-
-/**
- * System prompt for the focus clustering agent.
- * Instructs the LLM how to manage multiple concurrent focuses.
- */
-const FOCUS_AGENT_SYSTEM_PROMPT = `You are a focus tracking agent that manages multiple concurrent focus sessions for a user.
-
-Your job is to analyze the user's recent browsing attention data and manage their focus sessions appropriately.
-
-## Key Responsibilities:
-
-1. **Context Clustering**: Group related attention into appropriate focus sessions. A user can have multiple active focuses simultaneously (e.g., "React Development" and "Trip Planning").
-
-2. **Focus Management**:
-   - Create new focuses when attention clearly indicates a new topic not covered by existing focuses
-   - Update existing focuses when attention relates to them (add keywords)
-   - Merge focuses that are too similar (e.g., "JavaScript Basics" and "JavaScript Tutorial" should be merged)
-   - End focuses that have had no related activity recently
-   - Resume recently ended focuses if new attention matches them
-
-3. **Decision Guidelines**:
-   - Be conservative about creating new focuses - prefer updating existing ones if there's any relation
-   - Merge focuses with overlapping topics into one coherent focus
-   - Keywords help track the evolution of a focus over time
-   - Focus items should be 2-3 descriptive words (e.g., "Machine Learning", "Home Renovation", "Python APIs")
-
-## Process:
-1. First, call get_active_focuses to see current active focuses
-2. Also call get_resumable_focuses to see recently ended focuses that can be resumed
-3. Analyze the attention data provided
-4. Make decisions using the tools:
-   - update_focus: If attention relates to an existing focus
-   - resume_focus: If attention matches a recently ended focus
-   - create_focus: If attention is about a genuinely new topic
-   - merge_focuses: If you notice two similar focuses
-   - end_focus: Only if explicitly needed (inactivity is handled separately)
-
-Always use tools to make changes. Do not just describe what you would do.`;
 
 export interface FocusAgentResult {
   success: boolean;
