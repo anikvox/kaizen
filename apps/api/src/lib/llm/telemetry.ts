@@ -1,6 +1,7 @@
 import { env } from "../env.js";
 
 let initialized = false;
+let opikExporter: unknown = null;
 
 /**
  * Initialize telemetry for LLM tracing.
@@ -17,18 +18,36 @@ export async function initTelemetry(): Promise<void> {
     return;
   }
 
-  // Dynamically import opik-vercel only when API key is available
-  // This prevents errors when the package tries to validate config on import
   try {
+    // Import OpenTelemetry SDK and Opik exporter
+    const { NodeSDK } = await import("@opentelemetry/sdk-node");
+    const { SimpleSpanProcessor } = await import("@opentelemetry/sdk-trace-node");
     const { OpikExporter } = await import("opik-vercel");
-    new OpikExporter({
+
+    // Create the Opik exporter
+    const exporter = new OpikExporter({
       tags: ["kaizen"],
       metadata: {
         environment: process.env.NODE_ENV || "development",
       },
     });
+
+    opikExporter = exporter;
+
+    // Initialize the OpenTelemetry SDK with the Opik exporter
+    const sdk = new NodeSDK({
+      spanProcessors: [new SimpleSpanProcessor(exporter as any)],
+    });
+
+    sdk.start();
+
     initialized = true;
-    console.log("[Telemetry] Opik tracing initialized");
+    console.log("[Telemetry] Opik tracing initialized with OpenTelemetry SDK");
+
+    // Handle graceful shutdown
+    process.on("SIGTERM", async () => {
+      await sdk.shutdown();
+    });
   } catch (error) {
     console.warn("[Telemetry] Failed to initialize:", error);
     initialized = true;
@@ -43,7 +62,7 @@ export function getTelemetrySettings(options?: {
   name?: string;
   userId?: string;
   metadata?: Record<string, unknown>;
-}): { isEnabled: boolean } {
+}): { isEnabled: boolean; functionId?: string; metadata?: Record<string, string> } {
   // If Opik is not configured, just return disabled
   if (!env.opikApiKey) {
     return { isEnabled: false };
@@ -63,18 +82,18 @@ export function getTelemetrySettings(options?: {
     metadata.userId = options.userId;
   }
 
-  // Return basic telemetry settings
-  // The OpikExporter handles the rest when initialized
   return {
     isEnabled: true,
     functionId: options?.name,
     metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
-  } as { isEnabled: boolean };
+  };
 }
 
 /**
  * Shutdown telemetry gracefully.
  */
 export async function shutdownTelemetry(): Promise<void> {
-  // Opik exporter handles its own cleanup
+  if (opikExporter && typeof (opikExporter as any).shutdown === "function") {
+    await (opikExporter as any).shutdown();
+  }
 }
