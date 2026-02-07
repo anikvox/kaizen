@@ -18,7 +18,7 @@ export type {
 } from "./attention.js";
 
 // Bot exports
-export { bot, fakeBot, geminiBot, GeminiBot, FakeBot, LLMBot, createLLMBot } from "./bot/index.js";
+export { bot, fakeBot, FakeBot, LLMBot, createLLMBot } from "./bot/index.js";
 export type { BotInterface, BotMessage, BotMediaPart, BotCallbacks, LLMBotOptions } from "./bot/index.js";
 
 // LLM exports
@@ -67,5 +67,8 @@ export type {
   LLMGenerateOptions,
   LLMStreamOptions,
   LLMResponse,
+  LLMTool,
+  LLMToolCall,
+  LLMToolResult,
   ModelInfo,
 } from "./llm/index.js";
