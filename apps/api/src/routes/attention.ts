@@ -41,6 +41,7 @@ app.post("/image", deviceAuthMiddleware, async (c) => {
     hoverDuration: number;
     confidence: number;
     timestamp: number;
+    kaizenId?: string;
   }>();
 
   // Get user settings for LLM configuration
@@ -58,6 +59,7 @@ app.post("/image", deviceAuthMiddleware, async (c) => {
         body.title,
         settings
       );
+      console.log(`[Image Attention] Generated summary for kaizen-id: ${body.kaizenId}`);
     } catch (error) {
       console.error("Failed to generate image summary:", error);
     }
@@ -80,7 +82,7 @@ app.post("/image", deviceAuthMiddleware, async (c) => {
     },
   });
 
-  return c.json({ ...attention, summary });
+  return c.json({ ...attention, summary, kaizenId: body.kaizenId });
 });
 
 // Audio Attention - internal tracking only

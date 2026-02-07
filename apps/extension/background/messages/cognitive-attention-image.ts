@@ -22,12 +22,14 @@ export type ImageAttentionEvent = {
   hoverDuration: number
   confidence: number
   timestamp: number
+  kaizenId: string
 }
 
 export type ImageAttentionResponse = {
   success: boolean
   error?: string
   summary?: string | null
+  kaizenId?: string
 }
 
 const handler: PlasmoMessaging.MessageHandler<ImageAttentionEvent, ImageAttentionResponse> = async (req, res) => {
@@ -56,9 +58,10 @@ const handler: PlasmoMessaging.MessageHandler<ImageAttentionEvent, ImageAttentio
       height: body.height,
       hoverDuration: body.hoverDuration,
       confidence: body.confidence,
-      timestamp: body.timestamp
+      timestamp: body.timestamp,
+      kaizenId: body.kaizenId
     })
-    res.send({ success: true, summary: response.summary })
+    res.send({ success: true, summary: response.summary, kaizenId: body.kaizenId })
   } catch (error) {
     console.error("Failed to send image attention data:", error)
     res.send({ success: false, error: String(error) })

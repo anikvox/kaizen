@@ -66,8 +66,16 @@ const initImageTracker = async () => {
       const loadingIndicator = showLoadingIndicator(data.imageElement)
 
       try {
+        // Get or ensure kaizen-id exists
+        const kaizenId = data.imageElement.getAttribute("data-kaizen-id") || `kaizen-img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        if (!data.imageElement.getAttribute("data-kaizen-id")) {
+          data.imageElement.setAttribute("data-kaizen-id", kaizenId)
+        }
+
+        console.log(`[Kaizen] Sending image attention for ID: ${kaizenId}`, { src: data.src })
+
         const response = await sendToBackground<
-          typeof data & { url: string; timestamp: number },
+          typeof data & { url: string; timestamp: number; kaizenId: string },
           ImageAttentionResponse
         >({
           name: COGNITIVE_ATTENTION_IMAGE_MESSAGE_NAME,
@@ -80,17 +88,32 @@ const initImageTracker = async () => {
             height: data.height,
             hoverDuration: data.hoverDuration,
             confidence: data.confidence,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            kaizenId
           }
         })
 
         loadingIndicator.remove()
 
-        if (response?.success && response.summary) {
-          cachedImageSummaries.set(data.src, response.summary)
-          drawCaption(data.imageElement, response.summary)
+        console.log(`[Kaizen] Received response for ID: ${kaizenId}`, {
+          success: response?.success,
+          hasSummary: !!response?.summary,
+          returnedKaizenId: response?.kaizenId
+        })
+
+        if (response?.success && response.summary && response.kaizenId) {
+          // Find the image by kaizen-id
+          const targetImage = document.querySelector(`img[data-kaizen-id="${response.kaizenId}"]`) as HTMLImageElement
+          if (targetImage) {
+            cachedImageSummaries.set(data.src, response.summary)
+            drawCaption(targetImage, response.summary)
+            console.log(`[Kaizen] Displayed summary for ID: ${response.kaizenId}`)
+          } else {
+            console.warn(`[Kaizen] Could not find image with ID: ${response.kaizenId}`)
+          }
         }
-      } catch {
+      } catch (error) {
+        console.error("[Kaizen] Error sending image attention:", error)
         loadingIndicator.remove()
         // Ignore errors when sending to background
       }
