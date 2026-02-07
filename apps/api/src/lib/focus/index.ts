@@ -28,6 +28,8 @@ export {
   hasMinimalContent,
   getEarliestTimestamp,
   getLatestTimestamp,
+  focusToEventData,
+  emitFocusChange,
 } from "./utils.js";
 
 // Prompts
@@ -41,9 +43,14 @@ export {
 
 // Service
 export {
+  getActiveFocuses,
   getActiveFocus,
   processUserFocus,
   processAllUsersFocus,
   getUserFocusHistory,
   endUserFocus,
 } from "./service.js";
+
+// Agent
+export { runFocusAgent, checkAndEndInactiveFocuses, type FocusAgentResult } from "./agent.js";
+export { createFocusTools, type FocusTools } from "./tools.js";
