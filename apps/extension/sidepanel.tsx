@@ -806,19 +806,54 @@ function ChatTab({
   )
 }
 
+// Format tool result for display
+function formatToolResult(toolName: string | null | undefined, content: string): string {
+  try {
+    const result = JSON.parse(content)
+
+    if (toolName === "get_current_utc_time") {
+      return `Current time: ${result.time} (${result.format})`
+    }
+
+    if (toolName === "get_user_attention_data") {
+      if (!result.found) {
+        return result.message || "No browsing activity found"
+      }
+      return `Fetched browsing activity (${result.timeRange}): ${result.summary}`
+    }
+
+    return `Tool result: ${JSON.stringify(result).slice(0, 80)}...`
+  } catch {
+    return content.slice(0, 80) + (content.length > 80 ? "..." : "")
+  }
+}
+
 // Message Bubble Component
 function MessageBubble({ message }: { message: ChatMessage }) {
-  const isBot = message.role === "bot"
+  const isBot = message.role === "assistant"
+  const isTool = message.role === "tool"
+  const isUser = message.role === "user"
   const isStreaming = message.status === "streaming" || message.status === "typing"
   const isError = message.status === "error"
+
+  // Render tool messages as compact agentic lines
+  if (isTool) {
+    const text = formatToolResult(message.toolName, message.content)
+    return (
+      <div style={styles.agentLine}>
+        <span style={styles.agentIcon}>●</span>
+        <span style={styles.agentText}>{text}</span>
+      </div>
+    )
+  }
 
   return (
     <div
       style={{
         ...styles.messageBubble,
-        alignSelf: isBot ? "flex-start" : "flex-end",
-        background: isBot ? "#f0f0f0" : "#007bff",
-        color: isBot ? "#333" : "#fff"
+        alignSelf: isUser ? "flex-end" : "flex-start",
+        background: isUser ? "#007bff" : "#f0f0f0",
+        color: isUser ? "#fff" : "#333"
       }}
     >
       {message.status === "typing" ? (
@@ -1250,6 +1285,22 @@ const styles: Record<string, React.CSSProperties> = {
     display: "block",
     marginTop: 4,
     fontSize: 10,
+    color: "#666"
+  },
+  // Agent/tool message styles
+  agentLine: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "4px 0",
+    alignSelf: "flex-start"
+  },
+  agentIcon: {
+    fontSize: 8,
+    color: "#999"
+  },
+  agentText: {
+    fontSize: 11,
     color: "#666"
   },
   inputContainer: {

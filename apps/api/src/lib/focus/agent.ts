@@ -1,18 +1,13 @@
 import { generateText, stepCountIs } from "ai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createAnthropic } from "@ai-sdk/anthropic";
-import { createOpenAI } from "@ai-sdk/openai";
 import type { UserSettings } from "@prisma/client";
 import { db } from "../db.js";
 import { events } from "../events.js";
+import { createAgentProvider, getAgentModelId } from "../agent/index.js";
 import { getTelemetrySettings } from "../llm/telemetry.js";
 import { createFocusTools } from "./tools.js";
 import { formatAttentionData, hasMinimalContent, extractFocusSettings } from "./utils.js";
 import { formatAttentionForPrompt } from "./prompts.js";
 import type { RawAttentionData } from "../attention.js";
-import { decryptApiKey } from "../llm/encryption.js";
-import { SYSTEM_DEFAULT_MODEL } from "../llm/models.js";
-import { env } from "../env.js";
 
 /**
  * System prompt for the focus clustering agent.
@@ -52,68 +47,6 @@ Your job is to analyze the user's recent browsing attention data and manage thei
 
 Always use tools to make changes. Do not just describe what you would do.`;
 
-/**
- * Create an LLM provider instance for Vercel AI SDK based on user settings.
- */
-function createAIProvider(settings: UserSettings | null) {
-  // Check user's configured provider first
-  if (settings?.llmProvider) {
-    const providerType = settings.llmProvider;
-
-    switch (providerType) {
-      case "gemini": {
-        const apiKey = decryptApiKey(settings.geminiApiKeyEncrypted);
-        if (apiKey) {
-          return createGoogleGenerativeAI({ apiKey });
-        }
-        break;
-      }
-      case "anthropic": {
-        const apiKey = decryptApiKey(settings.anthropicApiKeyEncrypted);
-        if (apiKey) {
-          return createAnthropic({ apiKey });
-        }
-        break;
-      }
-      case "openai": {
-        const apiKey = decryptApiKey(settings.openaiApiKeyEncrypted);
-        if (apiKey) {
-          return createOpenAI({ apiKey });
-        }
-        break;
-      }
-    }
-  }
-
-  // Fall back to system Gemini
-  if (!env.geminiApiKey) {
-    throw new Error("No LLM provider available");
-  }
-  return createGoogleGenerativeAI({ apiKey: env.geminiApiKey });
-}
-
-/**
- * Get the model ID for the provider
- */
-function getModelId(settings: UserSettings | null): string {
-  if (settings?.llmModel) {
-    return settings.llmModel;
-  }
-
-  if (settings?.llmProvider) {
-    switch (settings.llmProvider) {
-      case "gemini":
-        return "gemini-2.0-flash";
-      case "anthropic":
-        return "claude-3-5-haiku-latest";
-      case "openai":
-        return "gpt-4o-mini";
-    }
-  }
-
-  return SYSTEM_DEFAULT_MODEL;
-}
-
 export interface FocusAgentResult {
   success: boolean;
   focusesCreated: number;
@@ -152,8 +85,8 @@ export async function runFocusAgent(
 
   try {
     // Create the AI provider and tools
-    const provider = createAIProvider(settings);
-    const modelId = getModelId(settings);
+    const provider = createAgentProvider(settings);
+    const modelId = getAgentModelId(settings);
     const tools = createFocusTools(userId, focusSettings.focusInactivityThresholdMs);
 
     // Format attention data for the prompt

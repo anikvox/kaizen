@@ -4,38 +4,10 @@ import type { UserSettings } from "@prisma/client";
 import {
   db,
   events,
-  createLLMBot,
   generateChatTitle,
-  getAttentionData,
-  serializeAttentionForLLM,
-  SYSTEM_PROMPTS,
+  runChatAgent,
 } from "../lib/index.js";
-import type { BotMessage, BotMediaPart } from "../lib/index.js";
-
-// Valid attention range values
-type ChatAttentionRange = "30m" | "2h" | "1d" | "all";
-
-const ATTENTION_RANGE_MS: Record<ChatAttentionRange, number> = {
-  "30m": 30 * 60 * 1000,
-  "2h": 2 * 60 * 60 * 1000,
-  "1d": 24 * 60 * 60 * 1000,
-  "all": 10 * 365 * 24 * 60 * 60 * 1000, // 10 years
-};
-
-function isValidAttentionRange(range: string): range is ChatAttentionRange {
-  return ["30m", "2h", "1d", "all"].includes(range);
-}
-
-/**
- * Build a system prompt that includes the user's attention context.
- */
-function buildSystemPromptWithAttention(attentionContext: string): string {
-  return `${SYSTEM_PROMPTS.chat}
-
-You have access to the user's recent browsing activity and attention data. Use this context to provide more personalized and relevant responses. The user may ask questions about what they were reading, watching, or doing online.
-
-${attentionContext}`;
-}
+import type { ChatAgentMessage } from "../lib/index.js";
 
 // Timeout for bot typing state (1 minute)
 const BOT_TYPING_TIMEOUT_MS = 60 * 1000;
@@ -155,7 +127,7 @@ app.get("/:sessionId", dualAuthMiddleware, async (c) => {
     where: { id: sessionId, userId },
     include: {
       messages: {
-        orderBy: { createdAt: "asc" },
+        orderBy: { updatedAt: "asc" }, // Order by updatedAt so tool results appear before assistant's final response
       },
     },
   });
@@ -192,32 +164,22 @@ app.post("/", dualAuthMiddleware, async (c) => {
   const body = await c.req.json<{
     sessionId?: string;
     content: string;
-    attentionRange: string;
   }>();
 
   if (!body.content?.trim()) {
     return c.json({ error: "Message content is required" }, 400);
   }
 
-  if (!body.attentionRange || !isValidAttentionRange(body.attentionRange)) {
-    return c.json({ error: "Valid attentionRange is required (30m, 2h, 1d, or all)" }, 400);
-  }
-
-  const attentionRange = body.attentionRange as ChatAttentionRange;
-
   let sessionId = body.sessionId;
   let isNewSession = false;
-  let sessionAttentionRange: ChatAttentionRange = attentionRange;
 
   // Create new session if not provided
   if (!sessionId) {
-    // Note: attentionRange field requires Prisma client regeneration after schema update
     const session = await db.chatSession.create({
       data: {
         userId,
-        title: "New Chat", // Hardcoded for now, bot will update later
-        attentionRange,
-      } as any,
+        title: "New Chat", // Will be updated by bot after first response
+      },
     });
     sessionId = session.id;
     isNewSession = true;
@@ -229,13 +191,13 @@ app.post("/", dualAuthMiddleware, async (c) => {
       session: {
         id: session.id,
         title: session.title,
-        attentionRange,
+        attentionRange: "2h", // Default for backwards compatibility
         createdAt: session.createdAt.toISOString(),
         updatedAt: session.updatedAt.toISOString(),
       },
     });
   } else {
-    // Verify session belongs to user and get its attention range
+    // Verify session belongs to user
     const existingSession = await db.chatSession.findFirst({
       where: { id: sessionId, userId },
     });
@@ -243,27 +205,6 @@ app.post("/", dualAuthMiddleware, async (c) => {
     if (!existingSession) {
       return c.json({ error: "Chat session not found" }, 404);
     }
-
-    // Use the session's stored attention range
-    sessionAttentionRange = ((existingSession as any).attentionRange || "2h") as ChatAttentionRange;
-  }
-
-  // Fetch attention data for the system prompt
-  const now = new Date();
-  const attentionTimeRange = {
-    from: new Date(now.getTime() - ATTENTION_RANGE_MS[sessionAttentionRange]),
-    to: now,
-  };
-
-  let attentionContext = "";
-  try {
-    const attentionData = await getAttentionData(userId, attentionTimeRange);
-    if (attentionData.pages.length > 0) {
-      attentionContext = serializeAttentionForLLM(attentionData);
-    }
-  } catch (error) {
-    console.error("Failed to fetch attention data:", error);
-    // Continue without attention context if fetch fails
   }
 
   // Create user message
@@ -290,42 +231,42 @@ app.post("/", dualAuthMiddleware, async (c) => {
     },
   });
 
-  // Create bot message placeholder with "typing" status
-  const botMessage = await db.chatMessage.create({
+  // Create assistant message placeholder with "typing" status
+  const assistantMessage = await db.chatMessage.create({
     data: {
       sessionId,
-      role: "bot",
+      role: "assistant",
       content: "",
       status: "typing",
     },
   });
 
-  // Emit bot message created event (typing state)
+  // Emit assistant message created event (typing state)
   events.emitChatMessageCreated({
     userId,
     sessionId,
     message: {
-      id: botMessage.id,
-      role: "bot",
+      id: assistantMessage.id,
+      role: "assistant",
       content: "",
       status: "typing",
-      createdAt: botMessage.createdAt.toISOString(),
-      updatedAt: botMessage.updatedAt.toISOString(),
+      createdAt: assistantMessage.createdAt.toISOString(),
+      updatedAt: assistantMessage.updatedAt.toISOString(),
     },
   });
 
-  // Set up timeout for bot response
+  // Set up timeout for assistant response
   const timeoutId = setTimeout(async () => {
-    activeBotResponses.delete(botMessage.id);
+    activeBotResponses.delete(assistantMessage.id);
 
     // Check if still in typing state
     const currentMessage = await db.chatMessage.findUnique({
-      where: { id: botMessage.id },
+      where: { id: assistantMessage.id },
     });
 
     if (currentMessage && currentMessage.status === "typing") {
       await db.chatMessage.update({
-        where: { id: botMessage.id },
+        where: { id: assistantMessage.id },
         data: {
           status: "error",
           errorMessage: "Response timed out",
@@ -335,7 +276,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
       events.emitChatMessageUpdated({
         userId,
         sessionId,
-        messageId: botMessage.id,
+        messageId: assistantMessage.id,
         updates: {
           status: "error",
           errorMessage: "Response timed out",
@@ -344,18 +285,19 @@ app.post("/", dualAuthMiddleware, async (c) => {
     }
   }, BOT_TYPING_TIMEOUT_MS);
 
-  activeBotResponses.set(botMessage.id, timeoutId);
+  activeBotResponses.set(assistantMessage.id, timeoutId);
 
-  // Get conversation history for bot
+  // Get conversation history for agent
   const allMessages = await db.chatMessage.findMany({
     where: { sessionId },
-    orderBy: { createdAt: "asc" },
+    orderBy: { updatedAt: "asc" },
   });
 
-  const botMessages: BotMessage[] = allMessages
-    .filter((m) => m.id !== botMessage.id) // Exclude the current bot placeholder
+  const agentMessages: ChatAgentMessage[] = allMessages
+    .filter((m) => m.id !== assistantMessage.id) // Exclude the current assistant placeholder
+    .filter((m) => m.role !== "tool") // Exclude tool messages - they were part of completed tool call flows
     .map((m) => ({
-      role: m.role as "user" | "bot",
+      role: (m.role === "bot" ? "assistant" : m.role) as "user" | "assistant",
       content: m.content,
     }));
 
@@ -364,15 +306,11 @@ app.post("/", dualAuthMiddleware, async (c) => {
     where: { userId },
   });
 
-  // Build system prompt with attention context
-  const systemPrompt = attentionContext
-    ? buildSystemPromptWithAttention(attentionContext)
-    : SYSTEM_PROMPTS.chat;
-
-  // Start bot response generation (non-blocking)
+  // Start agent response generation (non-blocking)
+  // The agent will use tools to get attention data when needed
   // Pass first user message for title generation if this is a new session
   const firstUserMessage = isNewSession ? body.content.trim() : undefined;
-  generateBotResponse(userId, sessionId, botMessage.id, botMessages, firstUserMessage, userSettings, systemPrompt);
+  generateAgentResponse(userId, sessionId, assistantMessage.id, agentMessages, firstUserMessage, userSettings);
 
   // Update session updatedAt
   await db.chatSession.update({
@@ -391,13 +329,13 @@ app.post("/", dualAuthMiddleware, async (c) => {
       createdAt: userMessage.createdAt.toISOString(),
       updatedAt: userMessage.updatedAt.toISOString(),
     },
-    botMessage: {
-      id: botMessage.id,
-      role: "bot",
+    assistantMessage: {
+      id: assistantMessage.id,
+      role: "assistant",
       content: "",
       status: "typing",
-      createdAt: botMessage.createdAt.toISOString(),
-      updatedAt: botMessage.updatedAt.toISOString(),
+      createdAt: assistantMessage.createdAt.toISOString(),
+      updatedAt: assistantMessage.updatedAt.toISOString(),
     },
   });
 });
@@ -432,184 +370,204 @@ app.delete("/:sessionId", dualAuthMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
-// Non-blocking bot response generation
-async function generateBotResponse(
+// Non-blocking agentic response generation with tool support
+async function generateAgentResponse(
   userId: string,
   sessionId: string,
-  botMessageId: string,
-  conversationHistory: BotMessage[],
-  firstUserMessage?: string, // If provided, generate title after bot response
+  assistantMessageId: string,
+  conversationHistory: ChatAgentMessage[],
+  firstUserMessage?: string, // If provided, generate title after response
   userSettings?: UserSettings | null,
   systemPrompt?: string
 ) {
-  // Create bot with user's LLM settings and custom system prompt
-  const bot = createLLMBot({
-    settings: userSettings,
-    systemPrompt,
-  });
-
   try {
-    await bot.generateResponse(conversationHistory, {
-      onTyping: async () => {
-        // Already in typing state, update to streaming when first chunk arrives
-      },
-
-      onChunk: async (chunk: string, fullContent: string) => {
-        // Clear timeout on first chunk
-        const timeoutId = activeBotResponses.get(botMessageId);
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          activeBotResponses.delete(botMessageId);
-        }
-
-        // Update message in database
-        await db.chatMessage.update({
-          where: { id: botMessageId },
-          data: {
-            content: fullContent,
-            status: "streaming",
-          },
-        });
-
-        // Emit update event
-        events.emitChatMessageUpdated({
-          userId,
-          sessionId,
-          messageId: botMessageId,
-          updates: {
-            content: fullContent,
-            status: "streaming",
-          },
-        });
-      },
-
-      onMedia: async (media: BotMediaPart) => {
-        // When media is received during streaming, we'll append it to the content
-        // as a data URL for immediate display
-        // The media will be properly included in onFinished
-        console.log(`Received ${media.type} media: ${media.mimeType}`);
-      },
-
-      onFinished: async (fullContent: string, media?: BotMediaPart[]) => {
-        // Clear timeout
-        const timeoutId = activeBotResponses.get(botMessageId);
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          activeBotResponses.delete(botMessageId);
-        }
-
-        // Build final content including any media as data URLs
-        let finalContent = fullContent;
-        if (media && media.length > 0) {
-          for (const m of media) {
-            if (m.type === "image") {
-              // Append image as markdown with data URL
-              const dataUrl = `data:${m.mimeType};base64,${m.data}`;
-              finalContent += `\n\n![Generated Image](${dataUrl})`;
-            } else if (m.type === "audio") {
-              // Append audio as HTML audio element
-              const dataUrl = `data:${m.mimeType};base64,${m.data}`;
-              finalContent += `\n\n<audio controls src="${dataUrl}"></audio>`;
-            } else if (m.type === "video") {
-              // Append video as HTML video element
-              const dataUrl = `data:${m.mimeType};base64,${m.data}`;
-              finalContent += `\n\n<video controls src="${dataUrl}"></video>`;
-            }
+    await runChatAgent(
+      userId,
+      conversationHistory,
+      userSettings || null,
+      systemPrompt,
+      {
+        onTextChunk: async (chunk: string, fullContent: string) => {
+          // Clear timeout on first chunk
+          const timeoutId = activeBotResponses.get(assistantMessageId);
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            activeBotResponses.delete(assistantMessageId);
           }
-        }
 
-        // Update message in database
-        await db.chatMessage.update({
-          where: { id: botMessageId },
-          data: {
-            content: finalContent,
-            status: "finished",
-          },
-        });
+          // Update message in database
+          await db.chatMessage.update({
+            where: { id: assistantMessageId },
+            data: {
+              content: fullContent,
+              status: "streaming",
+            },
+          });
 
-        // Emit update event
-        events.emitChatMessageUpdated({
-          userId,
-          sessionId,
-          messageId: botMessageId,
-          updates: {
-            content: finalContent,
-            status: "finished",
-          },
-        });
+          // Emit update event
+          events.emitChatMessageUpdated({
+            userId,
+            sessionId,
+            messageId: assistantMessageId,
+            updates: {
+              content: fullContent,
+              status: "streaming",
+            },
+          });
+        },
 
-        // Generate and update chat title if this is the first message
-        if (firstUserMessage) {
-          try {
-            const title = await generateChatTitle(firstUserMessage);
+        onToolCall: async (toolCallId: string, toolName: string, args: unknown) => {
+          // Clear timeout when tool is called
+          const timeoutId = activeBotResponses.get(assistantMessageId);
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            activeBotResponses.delete(assistantMessageId);
+          }
 
-            // Update session with new title
+          // Emit tool call started event (UI-only, not persisted to DB)
+          events.emitToolCallStarted({
+            userId,
+            sessionId,
+            toolCallId,
+            toolName,
+          });
+
+          console.log(`[Chat] Tool called: ${toolName} (${toolCallId})`, args);
+        },
+
+        onToolResult: async (toolCallId: string, toolName: string, result: unknown) => {
+          // Create tool message in database (only when we have the result)
+          const toolMessage = await db.chatMessage.create({
+            data: {
+              sessionId,
+              role: "tool",
+              content: JSON.stringify(result),
+              status: "finished",
+              toolCallId,
+              toolName,
+            },
+          });
+
+          // Emit tool message created event
+          events.emitChatMessageCreated({
+            userId,
+            sessionId,
+            message: {
+              id: toolMessage.id,
+              role: "tool",
+              content: toolMessage.content,
+              status: "finished",
+              toolCallId,
+              toolName,
+              createdAt: toolMessage.createdAt.toISOString(),
+              updatedAt: toolMessage.updatedAt.toISOString(),
+            },
+          });
+
+          console.log(`[Chat] Tool result: ${toolName} (${toolCallId})`, result);
+        },
+
+        onFinished: async (fullContent: string) => {
+          // Clear timeout
+          const timeoutId = activeBotResponses.get(assistantMessageId);
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            activeBotResponses.delete(assistantMessageId);
+          }
+
+          // Update message in database
+          await db.chatMessage.update({
+            where: { id: assistantMessageId },
+            data: {
+              content: fullContent,
+              status: "finished",
+            },
+          });
+
+          // Emit update event
+          events.emitChatMessageUpdated({
+            userId,
+            sessionId,
+            messageId: assistantMessageId,
+            updates: {
+              content: fullContent,
+              status: "finished",
+            },
+          });
+
+          // Generate and update chat title if this is the first message
+          if (firstUserMessage) {
+            try {
+              const title = await generateChatTitle(firstUserMessage);
+
+              // Update session with new title
+              await db.chatSession.update({
+                where: { id: sessionId },
+                data: { title, updatedAt: new Date() },
+              });
+
+              // Emit session updated event for title change
+              events.emitChatSessionUpdated({
+                userId,
+                sessionId,
+                updates: { title },
+              });
+            } catch (error) {
+              console.error("Failed to generate chat title:", error);
+            }
+          } else {
+            // Just update session updatedAt
             await db.chatSession.update({
               where: { id: sessionId },
-              data: { title, updatedAt: new Date() },
+              data: { updatedAt: new Date() },
             });
-
-            // Emit session updated event for title change
-            events.emitChatSessionUpdated({
-              userId,
-              sessionId,
-              updates: { title },
-            });
-          } catch (error) {
-            console.error("Failed to generate chat title:", error);
           }
-        } else {
-          // Just update session updatedAt
-          await db.chatSession.update({
-            where: { id: sessionId },
-            data: { updatedAt: new Date() },
+        },
+
+        onError: async (error: Error) => {
+          // Clear timeout
+          const timeoutId = activeBotResponses.get(assistantMessageId);
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            activeBotResponses.delete(assistantMessageId);
+          }
+
+          // Update message in database
+          await db.chatMessage.update({
+            where: { id: assistantMessageId },
+            data: {
+              status: "error",
+              errorMessage: error.message,
+            },
           });
-        }
-      },
 
-      onError: async (error: Error) => {
-        // Clear timeout
-        const timeoutId = activeBotResponses.get(botMessageId);
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          activeBotResponses.delete(botMessageId);
-        }
-
-        // Update message in database
-        await db.chatMessage.update({
-          where: { id: botMessageId },
-          data: {
-            status: "error",
-            errorMessage: error.message,
-          },
-        });
-
-        // Emit update event
-        events.emitChatMessageUpdated({
-          userId,
-          sessionId,
-          messageId: botMessageId,
-          updates: {
-            status: "error",
-            errorMessage: error.message,
-          },
-        });
-      },
-    });
+          // Emit update event
+          events.emitChatMessageUpdated({
+            userId,
+            sessionId,
+            messageId: assistantMessageId,
+            updates: {
+              status: "error",
+              errorMessage: error.message,
+            },
+          });
+        },
+      }
+    );
   } catch (error) {
-    console.error("Bot response error:", error);
+    console.error("Agent response error:", error);
 
     // Clear timeout
-    const timeoutId = activeBotResponses.get(botMessageId);
+    const timeoutId = activeBotResponses.get(assistantMessageId);
     if (timeoutId) {
       clearTimeout(timeoutId);
-      activeBotResponses.delete(botMessageId);
+      activeBotResponses.delete(assistantMessageId);
     }
 
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
 
     await db.chatMessage.update({
-      where: { id: botMessageId },
+      where: { id: assistantMessageId },
       data: {
         status: "error",
         errorMessage,
@@ -619,7 +577,7 @@ async function generateBotResponse(
     events.emitChatMessageUpdated({
       userId,
       sessionId,
-      messageId: botMessageId,
+      messageId: assistantMessageId,
       updates: {
         status: "error",
         errorMessage,
@@ -734,6 +692,16 @@ chatSSE.get("/", async (c) => {
       }
     });
 
+    const cleanupToolCallStarted = events.onToolCallStarted(async (data) => {
+      if (data.userId === userId) {
+        await stream.writeSSE({
+          data: JSON.stringify(data),
+          event: "tool-call-started",
+          id: String(id++),
+        });
+      }
+    });
+
     // Keep connection alive with periodic pings
     try {
       while (true) {
@@ -750,6 +718,7 @@ chatSSE.get("/", async (c) => {
       cleanupSessionDeleted();
       cleanupMessageCreated();
       cleanupMessageUpdated();
+      cleanupToolCallStarted();
     }
   });
 });
@@ -863,6 +832,16 @@ chatSSE.get("/:sessionId", async (c) => {
       }
     });
 
+    const cleanupToolCallStarted = events.onToolCallStarted(async (data) => {
+      if (data.userId === userId && data.sessionId === sessionId) {
+        await stream.writeSSE({
+          data: JSON.stringify(data),
+          event: "tool-call-started",
+          id: String(id++),
+        });
+      }
+    });
+
     // Keep connection alive with periodic pings
     try {
       while (true) {
@@ -878,6 +857,7 @@ chatSSE.get("/:sessionId", async (c) => {
       cleanupSessionDeleted();
       cleanupMessageCreated();
       cleanupMessageUpdated();
+      cleanupToolCallStarted();
     }
   });
 });

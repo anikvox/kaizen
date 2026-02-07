@@ -104,8 +104,8 @@ describe("Chat API E2E Tests", () => {
       expect(data.userMessage.content).toBe("Hello, bot!");
       expect(data.userMessage.role).toBe("user");
       expect(data.userMessage.status).toBe("sent");
-      expect(data.botMessage.role).toBe("bot");
-      expect(data.botMessage.status).toBe("typing");
+      expect(data.assistantMessage.role).toBe("assistant");
+      expect(data.assistantMessage.status).toBe("typing");
 
       // Save for later tests
       testSessionId = data.sessionId;
@@ -196,14 +196,14 @@ describe("Chat API E2E Tests", () => {
       while (elapsed < maxWait && !botFinished) {
         const res = await authFetch(`/chats/${testSessionId}`);
         const data = await res.json();
-        const botMessages = data.messages.filter((m: any) => m.role === "bot");
+        const assistantMessages = data.messages.filter((m: any) => m.role === "assistant");
 
         // Check if any bot message is finished
-        const finishedBot = botMessages.find((m: any) => m.status === "finished");
-        if (finishedBot) {
+        const finishedAssistant = assistantMessages.find((m: any) => m.status === "finished");
+        if (finishedAssistant) {
           botFinished = true;
-          expect(finishedBot.content).toBeTruthy();
-          expect(finishedBot.content.length).toBeGreaterThan(0);
+          expect(finishedAssistant.content).toBeTruthy();
+          expect(finishedAssistant.content.length).toBeGreaterThan(0);
         } else {
           await new Promise((resolve) => setTimeout(resolve, pollInterval));
           elapsed += pollInterval;

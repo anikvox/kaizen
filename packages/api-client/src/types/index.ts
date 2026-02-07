@@ -387,7 +387,7 @@ export interface SSESettingsChangedData {
 }
 
 // Chat Types
-export type ChatMessageRole = "user" | "bot";
+export type ChatMessageRole = "user" | "assistant" | "tool";
 export type ChatMessageStatus = "sending" | "sent" | "typing" | "streaming" | "finished" | "error";
 
 /**
@@ -405,6 +405,10 @@ export interface ChatMessage {
   content: string;
   status: ChatMessageStatus;
   errorMessage?: string | null;
+  /** Tool call ID for tool messages */
+  toolCallId?: string | null;
+  /** Tool name for tool messages */
+  toolName?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -433,18 +437,13 @@ export interface ChatSessionListItem {
 export interface SendMessageRequest {
   sessionId?: string;
   content: string;
-  /**
-   * Required attention time range for chat context.
-   * Determines how much of the user's recent activity data is included as context.
-   */
-  attentionRange: ChatAttentionRange;
 }
 
 export interface SendMessageResponse {
   sessionId: string;
   isNewSession: boolean;
   userMessage: ChatMessage;
-  botMessage: ChatMessage;
+  assistantMessage: ChatMessage;
 }
 
 // Chat SSE Types
@@ -487,6 +486,14 @@ export interface SSEChatMessageUpdatedData {
     status?: ChatMessageStatus;
     errorMessage?: string | null;
   };
+}
+
+// Tool call started event (UI-only, not persisted)
+export interface SSEToolCallStartedData {
+  userId: string;
+  sessionId: string;
+  toolCallId: string;
+  toolName: string;
 }
 
 // Focus Types

@@ -72,3 +72,7 @@ export type {
   LLMToolResult,
   ModelInfo,
 } from "./llm/index.js";
+
+// Chat agent exports
+export { runChatAgent } from "./chat/index.js";
+export type { ChatAgentCallbacks, ChatAgentMessage } from "./chat/index.js";

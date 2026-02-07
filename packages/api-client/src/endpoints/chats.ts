@@ -10,6 +10,7 @@ import type {
   SSEChatSessionDeletedData,
   SSEChatMessageCreatedData,
   SSEChatMessageUpdatedData,
+  SSEToolCallStartedData,
 } from "../types/index.js";
 
 export interface ChatSSECallbacks {
@@ -19,6 +20,7 @@ export interface ChatSSECallbacks {
   onSessionDeleted?: (data: SSEChatSessionDeletedData) => void;
   onMessageCreated?: (data: SSEChatMessageCreatedData) => void;
   onMessageUpdated?: (data: SSEChatMessageUpdatedData) => void;
+  onToolCallStarted?: (data: SSEToolCallStartedData) => void;
   onError?: (error: Event) => void;
 }
 
@@ -82,6 +84,11 @@ export class ChatsEndpoint {
       callbacks.onMessageUpdated?.(data);
     });
 
+    eventSource.addEventListener("tool-call-started", (e) => {
+      const data = JSON.parse((e as MessageEvent).data);
+      callbacks.onToolCallStarted?.(data);
+    });
+
     if (callbacks.onError) {
       eventSource.onerror = callbacks.onError;
     }
@@ -124,6 +131,11 @@ export class ChatsEndpoint {
     eventSource.addEventListener("chat-message-updated", (e) => {
       const data = JSON.parse((e as MessageEvent).data);
       callbacks.onMessageUpdated?.(data);
+    });
+
+    eventSource.addEventListener("tool-call-started", (e) => {
+      const data = JSON.parse((e as MessageEvent).data);
+      callbacks.onToolCallStarted?.(data);
     });
 
     if (callbacks.onError) {
