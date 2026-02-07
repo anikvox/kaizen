@@ -145,6 +145,10 @@ model UserSettings {
   id                            String   @id @default(cuid())
   userId                        String   @unique
   user                          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Current Active Tab (synced from extension)
+  currentActiveUrl              String?
+  currentActiveTitle            String?
+  currentActiveAt               DateTime?
   // Cognitive Attention Settings
   cognitiveAttentionDebugMode   Boolean  @default(false)
   cognitiveAttentionShowOverlay Boolean  @default(false)

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { db } from "../lib/index.js";
+import { db, events } from "../lib/index.js";
 import { deviceAuthMiddleware, type DeviceAuthVariables } from "../middleware/index.js";
 
 const app = new Hono<{ Variables: DeviceAuthVariables }>();
@@ -120,6 +120,41 @@ app.post("/youtube", deviceAuthMiddleware, async (c) => {
   });
 
   return c.json(attention);
+});
+
+// Active Tab - sync currently focused website
+app.post("/active-tab", deviceAuthMiddleware, async (c) => {
+  const userId = c.get("userId");
+  const body = await c.req.json<{
+    url: string | null;
+    title: string | null;
+    timestamp: number;
+  }>();
+
+  const settings = await db.userSettings.upsert({
+    where: { userId },
+    create: {
+      userId,
+      currentActiveUrl: body.url,
+      currentActiveTitle: body.title,
+      currentActiveAt: body.url ? new Date(body.timestamp) : null,
+    },
+    update: {
+      currentActiveUrl: body.url,
+      currentActiveTitle: body.title,
+      currentActiveAt: body.url ? new Date(body.timestamp) : null,
+    },
+  });
+
+  // Emit SSE event for active tab change
+  events.emitActiveTabChanged({
+    userId,
+    url: body.url,
+    title: body.title,
+    timestamp: body.timestamp,
+  });
+
+  return c.json({ success: true, url: settings.currentActiveUrl });
 });
 
 export default app;

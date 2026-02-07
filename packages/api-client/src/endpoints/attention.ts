@@ -8,6 +8,8 @@ import type {
   AudioAttentionRequest,
   YoutubeAttention,
   YoutubeAttentionRequest,
+  ActiveTabRequest,
+  ActiveTabResponse,
 } from "../types/index.js";
 
 export class AttentionEndpoint {
@@ -27,5 +29,9 @@ export class AttentionEndpoint {
 
   async youtube(data: YoutubeAttentionRequest): Promise<YoutubeAttention> {
     return this.http.post<YoutubeAttention>("/attention/youtube", data, true);
+  }
+
+  async activeTab(data: ActiveTabRequest): Promise<ActiveTabResponse> {
+    return this.http.post<ActiveTabResponse>("/attention/active-tab", data, true);
   }
 }

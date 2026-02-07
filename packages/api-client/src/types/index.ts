@@ -534,3 +534,27 @@ export interface SSEFocusChangedData {
   focus: Focus | null;
   changeType: "created" | "updated" | "ended";
 }
+
+// Active Tab Types
+export interface ActiveTabRequest {
+  url: string | null;
+  title: string | null;
+  timestamp: number;
+}
+
+export interface ActiveTabResponse {
+  success: boolean;
+  url: string | null;
+}
+
+export interface ActiveTabData {
+  url: string | null;
+  title: string | null;
+  timestamp: number | null;
+}
+
+export interface SSEActiveTabChangedData {
+  url: string | null;
+  title: string | null;
+  timestamp: number;
+}
