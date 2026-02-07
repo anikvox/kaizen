@@ -86,15 +86,27 @@ export {
   serializeAttentionCompact,
 } from "./prompts.js";
 
-// Telemetry (Opik via OpenTelemetry)
-export { initTelemetry, getTelemetrySettings, shutdownTelemetry } from "./telemetry.js";
+// Telemetry (Opik tracing)
+export {
+  initTelemetry,
+  shutdownTelemetry,
+  startTrace,
+  traceOperation,
+  isTracingEnabled,
+  type TraceContext,
+  type SpanContext,
+  type TraceOptions,
+  type SpanOptions,
+} from "./telemetry.js";
 
 // Opik Prompt Library
 export {
   getPrompt,
+  getPromptWithMetadata,
   getAllLocalPrompts,
   PROMPT_NAMES,
   type PromptName,
+  type PromptWithMetadata,
 } from "./prompt-provider.js";
 export {
   syncPromptToOpik,

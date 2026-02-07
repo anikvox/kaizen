@@ -3,7 +3,7 @@ import type { UserSettings } from "@prisma/client";
 import { db } from "../db.js";
 import { events } from "../events.js";
 import { createAgentProvider, getAgentModelId } from "../agent/index.js";
-import { getTelemetrySettings, getPrompt, PROMPT_NAMES } from "../llm/index.js";
+import { startTrace, getPromptWithMetadata, PROMPT_NAMES } from "../llm/index.js";
 import { createFocusTools } from "./tools.js";
 import { formatAttentionData, hasMinimalContent, extractFocusSettings } from "./utils.js";
 import { formatAttentionForPrompt } from "./prompts.js";
@@ -45,6 +45,23 @@ export async function runFocusAgent(
 
   const focusSettings = extractFocusSettings(settings);
 
+  // Fetch prompt from Opik (with local fallback)
+  const promptData = await getPromptWithMetadata(PROMPT_NAMES.FOCUS_AGENT);
+
+  // Start trace for this agent run
+  const trace = startTrace({
+    name: "focus-agent",
+    input: {
+      userId,
+      pageCount: attentionData.pages?.length || 0,
+    },
+    metadata: {
+      promptName: promptData.promptName,
+      promptVersion: promptData.promptVersion,
+      promptSource: promptData.source,
+    },
+  });
+
   try {
     // Create the AI provider and tools
     const provider = createAgentProvider(settings);
@@ -55,16 +72,20 @@ export async function runFocusAgent(
     const formattedItems = formatAttentionData(attentionData);
     const formattedAttention = formatAttentionForPrompt(formattedItems);
 
-    // Get Opik telemetry settings
-    const telemetry = getTelemetrySettings({ name: "focus-agent", userId });
-
-    // Fetch prompt from Opik (with local fallback)
-    const systemPrompt = await getPrompt(PROMPT_NAMES.FOCUS_AGENT);
+    // Create span for the LLM call
+    const llmSpan = trace?.span({
+      name: "generateText",
+      type: "llm",
+      input: {
+        model: modelId,
+        attentionLength: formattedAttention.length,
+      },
+    });
 
     // Run the agent with tool calling
     const { steps } = await generateText({
       model: provider(modelId),
-      system: systemPrompt,
+      system: promptData.content,
       prompt: `Here is the user's recent attention data. Analyze it and manage their focus sessions appropriately using the available tools.
 
 ATTENTION DATA:
@@ -78,14 +99,22 @@ Remember to:
 3. Merge any similar focuses you notice
 4. Use the tools to make changes, don't just describe them`,
       tools,
-      stopWhen: stepCountIs(10), // Allow up to 10 tool call steps
-      experimental_telemetry: telemetry as any,
+      stopWhen: stepCountIs(10),
     });
+
+    llmSpan?.end({ stepCount: steps.length });
 
     // Count the operations from tool calls
     for (const step of steps) {
       if (step.toolCalls) {
         for (const toolCall of step.toolCalls) {
+          // Create a span for each tool call
+          const toolSpan = trace?.span({
+            name: `tool:${toolCall.toolName}`,
+            type: "tool",
+            input: { args: toolCall.args },
+          });
+
           switch (toolCall.toolName) {
             case "create_focus":
               result.focusesCreated++;
@@ -103,15 +132,31 @@ Remember to:
               result.focusesResumed++;
               break;
           }
+
+          toolSpan?.end({ toolName: toolCall.toolName });
         }
       }
     }
 
     result.success = true;
+
+    // End trace with output
+    await trace?.end({
+      success: true,
+      ...result,
+    });
+
     return result;
   } catch (error) {
     console.error("[FocusAgent] Error running agent:", error);
     result.error = error instanceof Error ? error.message : "Unknown error";
+
+    // End trace with error
+    await trace?.end({
+      success: false,
+      error: result.error,
+    });
+
     return result;
   }
 }

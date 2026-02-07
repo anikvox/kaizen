@@ -6,7 +6,7 @@
 import { streamText, type CoreMessage } from "ai";
 import type { UserSettings } from "@prisma/client";
 import { createAgentProvider, getAgentModelId } from "../agent/index.js";
-import { getTelemetrySettings, getPrompt, PROMPT_NAMES } from "../llm/index.js";
+import { startTrace, getPromptWithMetadata, PROMPT_NAMES } from "../llm/index.js";
 import { createChatTools } from "./tools.js";
 
 export interface ChatAgentCallbacks {
@@ -40,7 +40,6 @@ export async function runChatAgent(
   const provider = createAgentProvider(settings);
   const modelId = getAgentModelId(settings);
   const tools = createChatTools(userId);
-  const telemetry = getTelemetrySettings({ name: "chat-agent", userId });
 
   // Convert messages to CoreMessage format (only user and assistant messages)
   const coreMessages: CoreMessage[] = messages.map((msg) => ({
@@ -48,36 +47,66 @@ export async function runChatAgent(
     content: msg.content,
   }));
 
-  // Fetch prompt from Opik (with local fallback)
-  const systemPrompt = systemPromptOverride || await getPrompt(PROMPT_NAMES.CHAT_AGENT);
+  // Fetch prompt from Opik (with local fallback) and get metadata for trace linking
+  const promptData = await getPromptWithMetadata(PROMPT_NAMES.CHAT_AGENT);
+  const systemPrompt = systemPromptOverride || promptData.content;
+
+  // Start trace for this agent run
+  const trace = startTrace({
+    name: "chat-agent",
+    input: {
+      userId,
+      messageCount: messages.length,
+      lastMessage: messages[messages.length - 1]?.content?.slice(0, 200),
+    },
+    metadata: {
+      model: modelId,
+      promptName: promptData.promptName,
+      promptVersion: promptData.promptVersion,
+      promptSource: promptData.source,
+    },
+  });
+
   let fullContent = "";
   const toolCallsResult: Array<{ id: string; name: string; args: unknown; result: unknown }> = [];
 
   console.log(`[Agent] Using model: ${modelId}`);
 
   try {
+    // Create span for the main LLM call
+    const llmSpan = trace?.span({
+      name: "streamText",
+      type: "llm",
+      input: {
+        model: modelId,
+        messageCount: coreMessages.length,
+        systemPromptLength: systemPrompt.length,
+      },
+    });
+
     const result = streamText({
       model: provider(modelId),
       system: systemPrompt,
       messages: coreMessages,
       tools,
-      maxSteps: 5, // Allow up to 5 steps for multi-step tool calling
-      experimental_telemetry: telemetry as any,
+      maxSteps: 5,
       onStepFinish: (step) => {
-        console.log(`[Agent] onStepFinish:`, {
-          stepType: step.stepType,
-          finishReason: step.finishReason,
-          isContinued: step.isContinued,
-          text: step.text?.slice(0, 100),
-          toolCalls: step.toolCalls?.length || 0,
-          toolResults: step.toolResults?.length || 0,
-        });
+        // Create a span for each step
+        if (step.toolCalls && step.toolCalls.length > 0) {
+          for (const toolCall of step.toolCalls) {
+            const toolSpan = trace?.span({
+              name: `tool:${toolCall.toolName}`,
+              type: "tool",
+              input: { args: toolCall.args },
+            });
+            toolSpan?.end({ result: (step.toolResults as any)?.find((r: any) => r.toolCallId === toolCall.toolCallId)?.result });
+          }
+        }
       },
     });
 
     // Process the stream
     for await (const part of result.fullStream) {
-      console.log(`[Agent] Stream part: ${part.type}`);
       switch (part.type) {
         case "text-delta":
           fullContent += part.text;
@@ -87,16 +116,13 @@ export async function runChatAgent(
           break;
 
         case "tool-call":
-          console.log(`[Agent] Tool call: ${part.toolName}`, part);
           if (callbacks?.onToolCall) {
-            // AI SDK v6 uses 'input' instead of 'args'
             const args = (part as any).args ?? (part as any).input;
             await callbacks.onToolCall(part.toolCallId, part.toolName, args);
           }
           break;
 
         case "tool-result":
-          // AI SDK v6 uses 'output' instead of 'result'
           const toolResult = (part as any).result ?? (part as any).output;
           toolCallsResult.push({
             id: part.toolCallId,
@@ -114,31 +140,27 @@ export async function runChatAgent(
             await callbacks.onError(new Error(String(part.error)));
           }
           break;
-
-        case "step-finish":
-          console.log(`[Agent] Step finished. Reason: ${(part as any).finishReason}, isContinued: ${(part as any).isContinued}`);
-          break;
-
-        case "finish":
-          console.log(`[Agent] Stream finished. Reason: ${(part as any).finishReason}`);
-          break;
       }
     }
 
-    // Get final text from result (in case fullContent wasn't accumulated properly)
-    const finalText = await result.text;
-    console.log(`[Agent] Final text: "${finalText?.slice(0, 100)}"`);
-    console.log(`[Agent] Accumulated content: "${fullContent?.slice(0, 100)}"`);
-    console.log(`[Agent] Tool calls: ${toolCallsResult.length}`);
+    // End the LLM span
+    llmSpan?.end({
+      contentLength: fullContent.length,
+      toolCallCount: toolCallsResult.length,
+    });
 
+    // Get final text from result
+    const finalText = await result.text;
     let responseContent = fullContent || finalText || "";
 
     // Workaround: If there are tool results but no text, make a follow-up call
-    // This handles models (like Gemini) that don't automatically continue after tool calls
     if (!responseContent && toolCallsResult.length > 0) {
-      console.log(`[Agent] No text after tool calls, making follow-up request...`);
+      const followUpSpan = trace?.span({
+        name: "followUp-streamText",
+        type: "llm",
+        input: { reason: "no-text-after-tools", toolCallCount: toolCallsResult.length },
+      });
 
-      // Build a simple follow-up prompt that includes the tool results
       const toolResultsSummary = toolCallsResult.map(tc =>
         `Tool "${tc.name}" returned: ${JSON.stringify(tc.result)}`
       ).join("\n");
@@ -155,12 +177,10 @@ export async function runChatAgent(
         },
       ];
 
-      // Make a second call without tools to force text generation
       const followUpResult = streamText({
         model: provider(modelId),
         system: systemPrompt,
         messages: followUpMessages,
-        // No tools - force the model to generate text
       });
 
       for await (const part of followUpResult.fullStream) {
@@ -172,16 +192,30 @@ export async function runChatAgent(
         }
       }
 
-      console.log(`[Agent] Follow-up response: "${responseContent?.slice(0, 100)}"`);
+      followUpSpan?.end({ contentLength: responseContent.length });
     }
 
     if (callbacks?.onFinished) {
       await callbacks.onFinished(responseContent);
     }
 
+    // End the trace with output
+    await trace?.end({
+      content: responseContent.slice(0, 500),
+      contentLength: responseContent.length,
+      toolCallCount: toolCallsResult.length,
+    });
+
     return { content: responseContent, toolCalls: toolCallsResult };
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
+
+    // End trace with error
+    await trace?.end({
+      error: err.message,
+      success: false,
+    });
+
     if (callbacks?.onError) {
       await callbacks.onError(err);
     }

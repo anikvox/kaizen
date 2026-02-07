@@ -3,7 +3,7 @@
  * This is the main interface for getting prompts throughout the application.
  */
 
-import { getPromptFromOpik, isOpikPromptsEnabled, PROMPT_NAMES, type PromptName } from "./prompts-opik.js";
+import { getPromptFromOpik, isOpikPromptsEnabled, PROMPT_NAMES, type PromptName, type OpikPromptResult } from "./prompts-opik.js";
 import * as LocalPrompts from "./system-prompts.js";
 
 // Map Opik prompt names to local prompt constants
@@ -19,21 +19,57 @@ const LOCAL_PROMPT_MAP: Record<PromptName, string> = {
   [PROMPT_NAMES.QUIZ_GENERATION]: LocalPrompts.QUIZ_GENERATION_SYSTEM_PROMPT,
 };
 
+export interface PromptWithMetadata {
+  content: string;
+  /** Prompt name in Opik */
+  promptName: string;
+  /** Prompt version/commit hash from Opik (undefined if using local) */
+  promptVersion?: string;
+  /** Whether this prompt was fetched from Opik or is local fallback */
+  source: "opik" | "local";
+}
+
 /**
- * Get a prompt by name.
+ * Get a prompt by name with metadata for trace linking.
  * Tries Opik first if enabled, falls back to local prompts.
  */
-export async function getPrompt(name: PromptName): Promise<string> {
+export async function getPromptWithMetadata(name: PromptName): Promise<PromptWithMetadata> {
   // Try Opik first if enabled
   if (isOpikPromptsEnabled()) {
     const opikPrompt = await getPromptFromOpik(name);
-    if (opikPrompt) {
-      return opikPrompt;
+    if (opikPrompt && opikPrompt.content) {
+      return {
+        content: opikPrompt.content,
+        promptName: opikPrompt.name,
+        promptVersion: opikPrompt.commit,
+        source: "opik",
+      };
     }
+    // Opik enabled but fetch failed - fall through to local
+    console.log(`[Prompts] Using local fallback for ${name}`);
   }
 
   // Fallback to local prompt
-  return LOCAL_PROMPT_MAP[name];
+  const localContent = LOCAL_PROMPT_MAP[name];
+  if (!localContent) {
+    throw new Error(`No prompt found for ${name}`);
+  }
+
+  return {
+    content: localContent,
+    promptName: name,
+    promptVersion: undefined,
+    source: "local",
+  };
+}
+
+/**
+ * Get a prompt by name (content only, for simple use cases).
+ * Tries Opik first if enabled, falls back to local prompts.
+ */
+export async function getPrompt(name: PromptName): Promise<string> {
+  const result = await getPromptWithMetadata(name);
+  return result.content;
 }
 
 /**

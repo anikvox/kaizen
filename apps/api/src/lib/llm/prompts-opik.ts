@@ -49,20 +49,42 @@ export function isOpikPromptsEnabled(): boolean {
   return !!env.opikApiKey;
 }
 
+export interface OpikPromptResult {
+  content: string;
+  name: string;
+  commit?: string;
+}
+
 /**
  * Fetch a prompt from Opik's prompt library.
  * Always fetches fresh from Opik - no caching.
  * Returns null if Opik is not enabled or fetch fails.
  */
-export async function getPromptFromOpik(name: PromptName): Promise<string | null> {
+export async function getPromptFromOpik(name: PromptName): Promise<OpikPromptResult | null> {
   const client = getOpikClient();
   if (!client) {
     return null;
   }
 
   try {
-    const prompt = await client.getPrompt({ name });
-    return prompt.text;
+    const promptObj = await client.getPrompt({ name });
+
+    // Opik SDK stores content in 'prompt' property, name in '_name'
+    const content = (promptObj as any).prompt;
+    const promptName = (promptObj as any)._name || name;
+    const commit = (promptObj as any).commit;
+
+    if (!content) {
+      console.warn(`[Opik] Prompt ${name} has no content`);
+      return null;
+    }
+
+    console.log(`[Opik] Loaded prompt: ${promptName} (${commit})`);
+    return {
+      content,
+      name: promptName,
+      commit,
+    };
   } catch (error) {
     console.warn(`[Opik] Failed to fetch prompt ${name}:`, error);
     return null;
