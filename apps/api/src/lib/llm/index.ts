@@ -99,6 +99,16 @@ export {
   type SpanOptions,
 } from "./telemetry.js";
 
+// Anonymizer (PII protection)
+export {
+  anonymizeText,
+  anonymizeData,
+  anonymizeInput,
+  anonymizeOutput,
+  addAnonymizeRules,
+  clearAnonymizeRules,
+} from "./anonymizer.js";
+
 // Opik Prompt Library
 export {
   getPrompt,

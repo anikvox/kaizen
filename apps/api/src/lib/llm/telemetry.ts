@@ -5,6 +5,7 @@
 
 import { Opik } from "opik";
 import { env } from "../env.js";
+import { anonymizeInput, anonymizeOutput } from "./anonymizer.js";
 
 let opikClient: Opik | null = null;
 
@@ -77,9 +78,10 @@ export function startTrace(options: TraceOptions): TraceContext | null {
     return null;
   }
 
+  // Anonymize input data before sending to Opik (removes PII from user messages)
   const trace = client.trace({
     name: options.name,
-    input: options.input,
+    input: options.input ? anonymizeInput(options.input) : undefined,
     metadata: {
       ...options.metadata,
       environment: process.env.NODE_ENV || "development",
@@ -92,24 +94,51 @@ export function startTrace(options: TraceOptions): TraceContext | null {
     traceId: (trace as any).id || "unknown",
 
     span: (spanOptions: SpanOptions): SpanContext => {
+      // Anonymize span input data (user messages, tool arguments)
       const span = trace.span({
         name: spanOptions.name,
         type: spanOptions.type || "general",
-        input: spanOptions.input,
+        input: spanOptions.input ? anonymizeInput(spanOptions.input) : undefined,
         metadata: spanOptions.metadata,
       });
 
       return {
         spanId: (span as any).id || "unknown",
         end: (output?: Record<string, unknown>) => {
-          span.end({ output });
+          try {
+            // Don't anonymize outputs - we want to see LLM responses
+            const processedOutput = output ? anonymizeOutput(output) : undefined;
+            console.log(`[Telemetry] Ending span ${spanOptions.name} with output:`, processedOutput);
+            // Set output and endTime together in one update call
+            span.update({
+              output: processedOutput,
+              endTime: new Date(),
+            });
+            console.log(`[Telemetry] Span ${spanOptions.name} ended successfully`);
+          } catch (error) {
+            console.error(`[Telemetry] Error ending span ${spanOptions.name}:`, error);
+            throw error;
+          }
         },
       };
     },
 
     end: async (output?: Record<string, unknown>) => {
-      trace.end({ output });
-      await client.flush();
+      try {
+        // Don't anonymize outputs - we want to see LLM responses and metrics
+        const processedOutput = output ? anonymizeOutput(output) : undefined;
+        console.log(`[Telemetry] Ending trace ${options.name} with output:`, processedOutput);
+        // Set output and endTime together in one update call
+        trace.update({
+          output: processedOutput,
+          endTime: new Date(),
+        });
+        await client.flush();
+        console.log(`[Telemetry] Trace ${options.name} ended successfully`);
+      } catch (error) {
+        console.error(`[Telemetry] Error ending trace ${options.name}:`, error);
+        throw error;
+      }
     },
   };
 }
@@ -127,9 +156,10 @@ export async function traceOperation<T>(
     return options.operation();
   }
 
+  // Anonymize input data
   const trace = client.trace({
     name: options.name,
-    input: options.input,
+    input: options.input ? anonymizeInput(options.input) : undefined,
     metadata: {
       ...options.metadata,
       environment: process.env.NODE_ENV || "development",
@@ -140,11 +170,15 @@ export async function traceOperation<T>(
 
   try {
     const result = await options.operation();
-    trace.end({ output: { success: true, result: typeof result === "object" ? result : { value: result } } });
+    // Preserve output data (don't anonymize results)
+    const output = anonymizeOutput({ success: true, result: typeof result === "object" ? result : { value: result } });
+    trace.update({ output, endTime: new Date() });
     await client.flush();
     return result;
   } catch (error) {
-    trace.end({ output: { success: false, error: String(error) } });
+    // Preserve error messages for debugging
+    const output = anonymizeOutput({ success: false, error: String(error) });
+    trace.update({ output, endTime: new Date() });
     await client.flush();
     throw error;
   }

@@ -17,6 +17,14 @@ export interface FocusAgentResult {
   focusesEnded: number;
   focusesResumed: number;
   error?: string;
+  // Details for tracing
+  focusDetails?: {
+    created?: Array<{ item: string; keywords: string[] }>;
+    updated?: Array<{ id: string; item: string }>;
+    merged?: Array<{ sourceId: string; targetId: string }>;
+    ended?: Array<{ id: string; item: string }>;
+    resumed?: Array<{ id: string; item: string }>;
+  };
 }
 
 /**
@@ -35,6 +43,13 @@ export async function runFocusAgent(
     focusesMerged: 0,
     focusesEnded: 0,
     focusesResumed: 0,
+    focusDetails: {
+      created: [],
+      updated: [],
+      merged: [],
+      ended: [],
+      resumed: [],
+    },
   };
 
   // Check if there's enough data to process
@@ -48,12 +63,21 @@ export async function runFocusAgent(
   // Fetch prompt from Opik (with local fallback)
   const promptData = await getPromptWithMetadata(PROMPT_NAMES.FOCUS_AGENT);
 
-  // Start trace for this agent run
+  // Format attention data for the prompt
+  const formattedItems = formatAttentionData(attentionData);
+  const formattedAttention = formatAttentionForPrompt(formattedItems);
+
+  // Start trace for this agent run (don't include userId for privacy)
   const trace = startTrace({
     name: "focus-agent",
     input: {
-      userId,
       pageCount: attentionData.pages?.length || 0,
+      attention: formattedAttention, // Include the actual attention data
+      attentionItems: formattedItems.map((item) => ({
+        title: item.title,
+        url: item.url,
+        focusType: item.focusType,
+      })),
     },
     metadata: {
       promptName: promptData.promptName,
@@ -67,10 +91,6 @@ export async function runFocusAgent(
     const provider = createAgentProvider(settings);
     const modelId = getAgentModelId(settings);
     const tools = createFocusTools(userId, focusSettings.focusInactivityThresholdMs);
-
-    // Format attention data for the prompt
-    const formattedItems = formatAttentionData(attentionData);
-    const formattedAttention = formatAttentionForPrompt(formattedItems);
 
     // Create span for the LLM call
     const llmSpan = trace?.span({
@@ -104,10 +124,13 @@ Remember to:
 
     llmSpan?.end({ stepCount: steps.length });
 
-    // Count the operations from tool calls
+    // Count the operations from tool calls and capture focus details
     for (const step of steps) {
       if (step.toolCalls) {
         for (const toolCall of step.toolCalls) {
+          // Find the corresponding tool result
+          const toolResult = (step.toolResults as any)?.find((r: any) => r.toolCallId === toolCall.toolCallId)?.result;
+
           // Create a span for each tool call
           const toolSpan = trace?.span({
             name: `tool:${toolCall.toolName}`,
@@ -118,22 +141,52 @@ Remember to:
           switch (toolCall.toolName) {
             case "create_focus":
               result.focusesCreated++;
+              if (toolCall.args && toolResult?.focus) {
+                result.focusDetails?.created?.push({
+                  item: toolResult.focus.item || toolCall.args.item,
+                  keywords: toolResult.focus.keywords || toolCall.args.keywords,
+                });
+              }
               break;
             case "update_focus":
               result.focusesUpdated++;
+              if (toolCall.args && toolResult?.focus) {
+                result.focusDetails?.updated?.push({
+                  id: toolResult.focus.id || toolCall.args.focusId,
+                  item: toolResult.focus.item,
+                });
+              }
               break;
             case "merge_focuses":
               result.focusesMerged++;
+              if (toolCall.args) {
+                result.focusDetails?.merged?.push({
+                  sourceId: toolCall.args.sourceFocusId,
+                  targetId: toolCall.args.targetFocusId,
+                });
+              }
               break;
             case "end_focus":
               result.focusesEnded++;
+              if (toolCall.args && toolResult?.focus) {
+                result.focusDetails?.ended?.push({
+                  id: toolCall.args.focusId,
+                  item: toolResult.focus.item,
+                });
+              }
               break;
             case "resume_focus":
               result.focusesResumed++;
+              if (toolCall.args && toolResult?.focus) {
+                result.focusDetails?.resumed?.push({
+                  id: toolCall.args.focusId,
+                  item: toolResult.focus.item,
+                });
+              }
               break;
           }
 
-          toolSpan?.end({ toolName: toolCall.toolName });
+          toolSpan?.end({ toolName: toolCall.toolName, result: toolResult });
         }
       }
     }

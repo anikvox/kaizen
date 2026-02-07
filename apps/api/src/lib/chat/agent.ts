@@ -51,11 +51,10 @@ export async function runChatAgent(
   const promptData = await getPromptWithMetadata(PROMPT_NAMES.CHAT_AGENT);
   const systemPrompt = systemPromptOverride || promptData.content;
 
-  // Start trace for this agent run
+  // Start trace for this agent run (don't include userId for privacy)
   const trace = startTrace({
     name: "chat-agent",
     input: {
-      userId,
       messageCount: messages.length,
       lastMessage: messages[messages.length - 1]?.content?.slice(0, 200),
     },
