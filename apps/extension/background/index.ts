@@ -123,6 +123,30 @@ function stopActiveTabTracking() {
   lastSyncedUrl = null
 }
 
+// Sync user's locale and timezone to backend
+async function syncLocale() {
+  const token = await storage.get<string>("deviceToken")
+  if (!token) return
+
+  try {
+    // Get locale from browser
+    const locale = navigator.language || "en-US"
+
+    // Get timezone using Intl API
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+
+    const api = getApiClient()
+    await api.attention.locale({
+      locale,
+      timezone
+    })
+
+    console.log("[locale] Synced:", { locale, timezone })
+  } catch (error) {
+    console.error("[locale] Failed to sync:", error)
+  }
+}
+
 // Track sidepanel connections per window
 const sidepanelPorts = new Map<number, chrome.runtime.Port>()
 
@@ -137,6 +161,8 @@ async function updateActionBehavior() {
     startSettingsSync()
     // Start active tab tracking
     startActiveTabTracking()
+    // Sync locale once on login
+    syncLocale()
   } else {
     // User is not logged in - enable popup for login
     await chrome.action.setPopup({ popup: "popup.html" })

@@ -148,6 +148,8 @@ app.get("/:sessionId", dualAuthMiddleware, async (c) => {
       content: m.content,
       status: m.status,
       errorMessage: m.errorMessage,
+      toolCallId: m.toolCallId,
+      toolName: m.toolName,
       createdAt: m.createdAt.toISOString(),
       updatedAt: m.updatedAt.toISOString(),
     })),
@@ -432,7 +434,6 @@ async function generateAgentResponse(
             toolName,
           });
 
-          console.log(`[Chat] Tool called: ${toolName} (${toolCallId})`, args);
         },
 
         onToolResult: async (toolCallId: string, toolName: string, result: unknown) => {
@@ -463,8 +464,6 @@ async function generateAgentResponse(
               updatedAt: toolMessage.updatedAt.toISOString(),
             },
           });
-
-          console.log(`[Chat] Tool result: ${toolName} (${toolCallId})`, result);
         },
 
         onFinished: async (fullContent: string) => {

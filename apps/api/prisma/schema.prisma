@@ -149,6 +149,9 @@ model UserSettings {
   currentActiveUrl              String?
   currentActiveTitle            String?
   currentActiveAt               DateTime?
+  // User Locale (synced from extension, not shown in UI)
+  locale                        String?  // e.g., "en-US", "fr-FR"
+  timezone                      String?  // e.g., "America/New_York", "Europe/Paris"
   // Cognitive Attention Settings
   cognitiveAttentionDebugMode   Boolean  @default(false)
   cognitiveAttentionShowOverlay Boolean  @default(false)

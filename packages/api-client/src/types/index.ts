@@ -558,3 +558,15 @@ export interface SSEActiveTabChangedData {
   title: string | null;
   timestamp: number;
 }
+
+// Locale Types
+export interface LocaleRequest {
+  locale: string;    // e.g., "en-US", "fr-FR"
+  timezone: string;  // e.g., "America/New_York", "Europe/Paris"
+}
+
+export interface LocaleResponse {
+  success: boolean;
+  locale: string | null;
+  timezone: string | null;
+}

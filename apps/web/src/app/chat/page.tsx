@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth, SignInButton, useUser } from "@clerk/nextjs";
 import {
   createApiClient,
+  formatToolResultMessage,
+  getToolDisplayInfo,
   type ChatSessionListItem,
   type ChatMessage,
   type ChatMessageStatus,
@@ -45,6 +47,10 @@ export default function ChatPage() {
   const eventSourceRef = useRef<EventSource | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
+  // Helper to sort sessions by updatedAt descending
+  const sortSessionsByDate = (sessions: ChatSessionListItem[]) =>
+    [...sessions].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
   const getTokenFn = useCallback(async () => {
     return getToken();
   }, [getToken]);
@@ -69,7 +75,7 @@ export default function ChatPage() {
       });
 
       const result = await api.chats.list();
-      setSessions(result);
+      setSessions(sortSessionsByDate(result));
       setError("");
     } catch (err) {
       console.error("Fetch sessions error:", err);
@@ -134,24 +140,28 @@ export default function ChatPage() {
             console.log("Chat SSE connected");
           },
           onSessionCreated: (data) => {
-            setSessions((prev) => [
-              {
-                id: data.session.id,
-                title: data.session.title,
-                attentionRange: data.session.attentionRange as ChatAttentionRange,
-                messageCount: 0,
-                createdAt: data.session.createdAt,
-                updatedAt: data.session.updatedAt,
-              },
-              ...prev,
-            ]);
+            setSessions((prev) =>
+              sortSessionsByDate([
+                {
+                  id: data.session.id,
+                  title: data.session.title,
+                  attentionRange: data.session.attentionRange as ChatAttentionRange,
+                  messageCount: 0,
+                  createdAt: data.session.createdAt,
+                  updatedAt: data.session.updatedAt,
+                },
+                ...prev,
+              ])
+            );
           },
           onSessionUpdated: (data) => {
             setSessions((prev) =>
-              prev.map((s) =>
-                s.id === data.sessionId
-                  ? { ...s, ...data.updates }
-                  : s
+              sortSessionsByDate(
+                prev.map((s) =>
+                  s.id === data.sessionId
+                    ? { ...s, ...data.updates }
+                    : s
+                )
               )
             );
           },
@@ -172,12 +182,14 @@ export default function ChatPage() {
                 );
               }
             }
-            // Update message count in session list
+            // Update message count in session list and re-sort
             setSessions((prev) =>
-              prev.map((s) =>
-                s.id === data.sessionId
-                  ? { ...s, messageCount: s.messageCount + 1 }
-                  : s
+              sortSessionsByDate(
+                prev.map((s) =>
+                  s.id === data.sessionId
+                    ? { ...s, messageCount: s.messageCount + 1, updatedAt: new Date().toISOString() }
+                    : s
+                )
               )
             );
           },
@@ -436,46 +448,10 @@ export default function ChatPage() {
 }
 
 /**
- * Get human-readable tool display info
- */
-function getToolInfo(toolName: string | null | undefined): { label: string; loadingText: string } {
-  const info: Record<string, { label: string; loadingText: string }> = {
-    get_current_utc_time: { label: "Current time", loadingText: "Getting current time" },
-    get_user_attention_data: { label: "Browsing activity", loadingText: "Fetching browsing activity" },
-  };
-  return info[toolName || ""] || { label: toolName || "Tool", loadingText: `Running ${toolName || "tool"}` };
-}
-
-/**
- * Format tool result for display
- */
-function formatToolResult(toolName: string | null | undefined, content: string): string {
-  try {
-    const result = JSON.parse(content);
-
-    if (toolName === "get_current_utc_time") {
-      return `Current time: ${result.time} (${result.format})`;
-    }
-
-    if (toolName === "get_user_attention_data") {
-      if (!result.found) {
-        return result.message || "No browsing activity found";
-      }
-      return `Fetched browsing activity (${result.timeRange}): ${result.summary}`;
-    }
-
-    // Generic fallback
-    return `Tool result: ${JSON.stringify(result).slice(0, 100)}...`;
-  } catch {
-    return content.slice(0, 100) + (content.length > 100 ? "..." : "");
-  }
-}
-
-/**
  * Pending tool call line (shown while tool is executing)
  */
 function PendingToolLine({ toolName }: { toolName: string }) {
-  const { loadingText } = getToolInfo(toolName);
+  const { loadingText } = getToolDisplayInfo(toolName);
   return (
     <div style={styles.agentLine}>
       <span style={styles.agentIcon}>○</span>
@@ -496,7 +472,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
   // Render tool messages as compact agentic status lines
   if (isTool) {
-    const text = formatToolResult(message.toolName, message.content);
+    const text = formatToolResultMessage(message.toolName, message.content);
     return (
       <div style={styles.agentLine}>
         <span style={styles.agentIcon}>●</span>

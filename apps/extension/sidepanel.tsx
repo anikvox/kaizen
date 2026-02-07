@@ -3,6 +3,7 @@ import { Storage } from "@plasmohq/storage"
 import { sendToBackground } from "@plasmohq/messaging"
 import {
   createApiClient,
+  formatToolResultMessage,
   type UserSettings,
   type ChatSessionListItem,
   type ChatMessage,
@@ -50,6 +51,10 @@ function SidePanel() {
   const [inputValue, setInputValue] = useState("")
   const [sending, setSending] = useState(false)
   const [showSessionList, setShowSessionList] = useState(true)
+
+  // Helper to sort sessions by updatedAt descending
+  const sortSessionsByDate = (sessions: ChatSessionListItem[]) =>
+    [...sessions].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
 
   // Refs
   const eventSourceRef = useRef<EventSource | null>(null)
@@ -144,7 +149,7 @@ function SidePanel() {
     const api = createApiClient(apiUrl, getTokenFn)
     try {
       const result = await api.chats.list()
-      setSessions(result)
+      setSessions(sortSessionsByDate(result))
     } catch (error) {
       console.error("Failed to fetch sessions:", error)
     }
@@ -427,23 +432,27 @@ function SidePanel() {
           },
           onSessionCreated: (data) => {
             if (!cancelled) {
-              setSessions((prev) => [
-                {
-                  id: data.session.id,
-                  title: data.session.title,
-                  messageCount: 0,
-                  createdAt: data.session.createdAt,
-                  updatedAt: data.session.updatedAt
-                },
-                ...prev
-              ])
+              setSessions((prev) =>
+                sortSessionsByDate([
+                  {
+                    id: data.session.id,
+                    title: data.session.title,
+                    messageCount: 0,
+                    createdAt: data.session.createdAt,
+                    updatedAt: data.session.updatedAt
+                  },
+                  ...prev
+                ])
+              )
             }
           },
           onSessionUpdated: (data) => {
             if (!cancelled) {
               setSessions((prev) =>
-                prev.map((s) =>
-                  s.id === data.sessionId ? { ...s, ...data.updates } : s
+                sortSessionsByDate(
+                  prev.map((s) =>
+                    s.id === data.sessionId ? { ...s, ...data.updates } : s
+                  )
                 )
               )
             }
@@ -463,10 +472,12 @@ function SidePanel() {
               setMessages((prev) => [...prev, data.message])
             }
             setSessions((prev) =>
-              prev.map((s) =>
-                s.id === data.sessionId
-                  ? { ...s, messageCount: s.messageCount + 1 }
-                  : s
+              sortSessionsByDate(
+                prev.map((s) =>
+                  s.id === data.sessionId
+                    ? { ...s, messageCount: s.messageCount + 1, updatedAt: new Date().toISOString() }
+                    : s
+                )
               )
             )
           },
@@ -806,28 +817,6 @@ function ChatTab({
   )
 }
 
-// Format tool result for display
-function formatToolResult(toolName: string | null | undefined, content: string): string {
-  try {
-    const result = JSON.parse(content)
-
-    if (toolName === "get_current_utc_time") {
-      return `Current time: ${result.time} (${result.format})`
-    }
-
-    if (toolName === "get_user_attention_data") {
-      if (!result.found) {
-        return result.message || "No browsing activity found"
-      }
-      return `Fetched browsing activity (${result.timeRange}): ${result.summary}`
-    }
-
-    return `Tool result: ${JSON.stringify(result).slice(0, 80)}...`
-  } catch {
-    return content.slice(0, 80) + (content.length > 80 ? "..." : "")
-  }
-}
-
 // Message Bubble Component
 function MessageBubble({ message }: { message: ChatMessage }) {
   const isBot = message.role === "assistant"
@@ -838,7 +827,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
   // Render tool messages as compact agentic lines
   if (isTool) {
-    const text = formatToolResult(message.toolName, message.content)
+    const text = formatToolResultMessage(message.toolName, message.content)
     return (
       <div style={styles.agentLine}>
         <span style={styles.agentIcon}>●</span>
