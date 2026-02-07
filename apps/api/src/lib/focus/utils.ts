@@ -1,13 +1,44 @@
 import { createHash } from "crypto";
-import type { UserSettings } from "@prisma/client";
+import type { UserSettings, Focus } from "@prisma/client";
 import type { RawAttentionData } from "../attention.js";
 import { extractDomain } from "../attention.js";
+import { events, type FocusData } from "../events.js";
 import {
   DEFAULT_FOCUS_SETTINGS,
   NON_ANSWER_PATTERNS,
   type FocusSettings,
   type FormattedAttentionItem,
 } from "./types.js";
+
+/**
+ * Convert Focus model to FocusData for events
+ */
+export function focusToEventData(focus: Focus): FocusData {
+  return {
+    id: focus.id,
+    item: focus.item,
+    keywords: focus.keywords,
+    isActive: focus.isActive,
+    startedAt: focus.startedAt.toISOString(),
+    endedAt: focus.endedAt?.toISOString() || null,
+    lastActivityAt: focus.lastActivityAt.toISOString(),
+  };
+}
+
+/**
+ * Emit focus changed event
+ */
+export function emitFocusChange(
+  userId: string,
+  focus: Focus | null,
+  changeType: "created" | "updated" | "ended"
+): void {
+  events.emitFocusChanged({
+    userId,
+    focus: focus ? focusToEventData(focus) : null,
+    changeType,
+  });
+}
 
 /**
  * Extract focus settings from UserSettings, using defaults where needed.

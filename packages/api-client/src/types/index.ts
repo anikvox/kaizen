@@ -520,7 +520,7 @@ export interface FocusSettings {
 // Focus SSE Types
 export interface SSEFocusConnectedData {
   connected: true;
-  focus: Focus | null;
+  focuses: Focus[];
 }
 
 export interface SSEFocusChangedData {

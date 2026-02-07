@@ -14,7 +14,7 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [time, setTime] = useState("");
   const [user, setUser] = useState<User | null>(null);
-  const [focus, setFocus] = useState<Focus | null>(null);
+  const [focuses, setFocuses] = useState<Focus[]>([]);
   const [error, setError] = useState("");
   const eventSourceRef = useRef<EventSource | null>(null);
   const focusEventSourceRef = useRef<EventSource | null>(null);
@@ -99,13 +99,24 @@ export default function Home() {
       const api = createApiClient(apiUrl);
       focusEventSourceRef.current = api.focus.subscribeFocus(
         (data) => {
-          setFocus(data.focus);
+          setFocuses(data.focuses);
         },
         (data) => {
           if (data.changeType === "ended") {
-            setFocus(null);
+            // Remove the ended focus from the list
+            setFocuses((prev) => prev.filter((f) => f.id !== data.focus?.id));
+          } else if (data.changeType === "created") {
+            // Add new focus to the list
+            if (data.focus) {
+              setFocuses((prev) => [data.focus!, ...prev]);
+            }
           } else {
-            setFocus(data.focus);
+            // Update existing focus
+            if (data.focus) {
+              setFocuses((prev) =>
+                prev.map((f) => (f.id === data.focus!.id ? data.focus! : f))
+              );
+            }
           }
         },
         () => console.error("Focus SSE connection error"),
@@ -135,42 +146,51 @@ export default function Home() {
             margin: "1rem 0",
             padding: "1rem",
             borderRadius: "8px",
-            background: focus ? "#f0f7ff" : "#f5f5f5",
-            border: focus ? "2px solid #007bff" : "1px solid #ddd"
+            background: focuses.length > 0 ? "#f0f7ff" : "#f5f5f5",
+            border: focuses.length > 0 ? "2px solid #007bff" : "1px solid #ddd"
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
               <span style={{
                 width: "10px",
                 height: "10px",
                 borderRadius: "50%",
-                background: focus ? "#28a745" : "#6c757d",
+                background: focuses.length > 0 ? "#28a745" : "#6c757d",
                 display: "inline-block"
               }} />
               <strong style={{ fontSize: "0.9rem", color: "#333" }}>
-                Current Focus
+                Active Focuses {focuses.length > 0 && `(${focuses.length})`}
               </strong>
             </div>
-            {focus ? (
-              <>
-                <p style={{
-                  margin: "0 0 0.5rem 0",
-                  fontSize: "1.5rem",
-                  fontWeight: "600",
-                  color: "#007bff"
-                }}>
-                  {focus.item}
-                </p>
-                <p style={{
-                  margin: 0,
-                  fontSize: "0.8rem",
-                  color: "#666"
-                }}>
-                  Since {new Date(focus.startedAt).toLocaleTimeString()}
-                  {focus.keywords.length > 1 && (
-                    <span> • Keywords: {focus.keywords.slice(0, 5).join(", ")}</span>
-                  )}
-                </p>
-              </>
+            {focuses.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                {focuses.map((focus) => (
+                  <div key={focus.id} style={{
+                    padding: "0.5rem",
+                    background: "white",
+                    borderRadius: "4px",
+                    borderLeft: "3px solid #007bff"
+                  }}>
+                    <p style={{
+                      margin: "0 0 0.25rem 0",
+                      fontSize: "1.1rem",
+                      fontWeight: "600",
+                      color: "#007bff"
+                    }}>
+                      {focus.item}
+                    </p>
+                    <p style={{
+                      margin: 0,
+                      fontSize: "0.75rem",
+                      color: "#666"
+                    }}>
+                      Since {new Date(focus.startedAt).toLocaleTimeString()}
+                      {focus.keywords.length > 1 && (
+                        <span> • {focus.keywords.slice(0, 3).join(", ")}</span>
+                      )}
+                    </p>
+                  </div>
+                ))}
+              </div>
             ) : (
               <p style={{ margin: 0, color: "#666", fontStyle: "italic" }}>
                 No active focus detected

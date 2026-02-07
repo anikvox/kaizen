@@ -24,11 +24,11 @@ export class FocusEndpoints {
   }
 
   /**
-   * Get the current active focus
+   * Get all current active focuses
    */
-  async getActive(): Promise<Focus | null> {
-    const response = await this.http.get<FocusResponse>("/focus/active");
-    return response.focus;
+  async getActive(): Promise<Focus[]> {
+    const response = await this.http.get<FocusListResponse>("/focus/active");
+    return response.focuses;
   }
 
   /**

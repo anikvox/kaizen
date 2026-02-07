@@ -36,8 +36,8 @@ function SidePanel() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>("chat")
 
-  // Focus state
-  const [focus, setFocus] = useState<Focus | null>(null)
+  // Focus state (multiple active focuses)
+  const [focuses, setFocuses] = useState<Focus[]>([])
 
   // Settings state
   const [settings, setSettings] = useState<UserSettings | null>(null)
@@ -76,7 +76,7 @@ function SidePanel() {
     await storage.remove("deviceToken")
     setUser(null)
     setSettings(null)
-    setFocus(null)
+    setFocuses([])
     setSessions([])
     setMessages([])
   }
@@ -352,7 +352,7 @@ function SidePanel() {
 
       const token = await storage.get<string>("deviceToken")
       if (!token || !user) {
-        setFocus(null)
+        setFocuses([])
         return
       }
 
@@ -360,15 +360,26 @@ function SidePanel() {
       const eventSource = api.focus.subscribeFocus(
         (data) => {
           if (!cancelled) {
-            setFocus(data.focus)
+            setFocuses(data.focuses)
           }
         },
         (data) => {
           if (!cancelled) {
             if (data.changeType === "ended") {
-              setFocus(null)
+              // Remove the ended focus from the list
+              setFocuses((prev) => prev.filter((f) => f.id !== data.focus?.id))
+            } else if (data.changeType === "created") {
+              // Add new focus to the list
+              if (data.focus) {
+                setFocuses((prev) => [data.focus!, ...prev])
+              }
             } else {
-              setFocus(data.focus)
+              // Update existing focus
+              if (data.focus) {
+                setFocuses((prev) =>
+                  prev.map((f) => (f.id === data.focus!.id ? data.focus! : f))
+                )
+              }
             }
           }
         },
@@ -528,7 +539,7 @@ function SidePanel() {
                 await storage.remove("deviceToken")
                 setUser(null)
                 setSettings(null)
-                setFocus(null)
+                setFocuses([])
                 setSessions([])
                 setMessages([])
               }
@@ -537,7 +548,7 @@ function SidePanel() {
               await storage.remove("deviceToken")
               setUser(null)
               setSettings(null)
-              setFocus(null)
+              setFocuses([])
               setSessions([])
               setMessages([])
             },
@@ -547,7 +558,7 @@ function SidePanel() {
         } else {
           setUser(null)
           setSettings(null)
-          setFocus(null)
+          setFocuses([])
           setSessions([])
           setMessages([])
         }
@@ -600,16 +611,23 @@ function SidePanel() {
         <div style={styles.focusHeader}>
           <span style={{
             ...styles.focusIndicator,
-            background: focus ? "#28a745" : "#6c757d"
+            background: focuses.length > 0 ? "#28a745" : "#6c757d"
           }} />
-          <span style={styles.focusLabel}>Focus</span>
+          <span style={styles.focusLabel}>
+            Active Focuses {focuses.length > 0 && `(${focuses.length})`}
+          </span>
         </div>
-        {focus ? (
-          <div style={styles.focusContent}>
-            <span style={styles.focusItem}>{focus.item}</span>
-            <span style={styles.focusMeta}>
-              Since {new Date(focus.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
+        {focuses.length > 0 ? (
+          <div style={styles.focusList}>
+            {focuses.map((focus) => (
+              <div key={focus.id} style={styles.focusContent}>
+                <span style={styles.focusItem}>{focus.item}</span>
+                <span style={styles.focusMeta}>
+                  Since {new Date(focus.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {focus.keywords.length > 0 && ` · ${focus.keywords.slice(0, 2).join(", ")}`}
+                </span>
+              </div>
+            ))}
           </div>
         ) : (
           <span style={styles.focusEmpty}>No active focus</span>
@@ -1384,10 +1402,19 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: "uppercase" as const,
     letterSpacing: "0.5px"
   },
+  focusList: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: 6
+  },
   focusContent: {
     display: "flex",
     flexDirection: "column" as const,
-    gap: 2
+    gap: 2,
+    padding: "4px 8px",
+    background: "#fff",
+    borderRadius: 4,
+    borderLeft: "2px solid #007bff"
   },
   focusItem: {
     fontSize: 14,

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { db, events } from "../lib/index.js";
-import { getActiveFocus, getUserFocusHistory, endUserFocus } from "../lib/focus/index.js";
+import { getActiveFocuses, getUserFocusHistory, endUserFocus } from "../lib/focus/index.js";
 
 // Combined variables type for routes that support both auth methods
 type CombinedAuthVariables = {
@@ -100,7 +100,7 @@ app.get("/", dualAuthMiddleware, async (c) => {
   });
 });
 
-// Get current active focus
+// Get all current active focuses
 app.get("/active", dualAuthMiddleware, async (c) => {
   const userId = await getUserIdFromContext(c);
 
@@ -108,24 +108,20 @@ app.get("/active", dualAuthMiddleware, async (c) => {
     return c.json({ error: "User not found" }, 404);
   }
 
-  const activeFocus = await getActiveFocus(userId);
-
-  if (!activeFocus) {
-    return c.json({ focus: null });
-  }
+  const activeFocuses = await getActiveFocuses(userId);
 
   return c.json({
-    focus: {
-      id: activeFocus.id,
-      item: activeFocus.item,
-      keywords: activeFocus.keywords,
-      isActive: activeFocus.isActive,
-      startedAt: activeFocus.startedAt.toISOString(),
-      endedAt: activeFocus.endedAt?.toISOString() || null,
-      lastActivityAt: activeFocus.lastActivityAt.toISOString(),
-      createdAt: activeFocus.createdAt.toISOString(),
-      updatedAt: activeFocus.updatedAt.toISOString(),
-    },
+    focuses: activeFocuses.map((focus) => ({
+      id: focus.id,
+      item: focus.item,
+      keywords: focus.keywords,
+      isActive: focus.isActive,
+      startedAt: focus.startedAt.toISOString(),
+      endedAt: focus.endedAt?.toISOString() || null,
+      lastActivityAt: focus.lastActivityAt.toISOString(),
+      createdAt: focus.createdAt.toISOString(),
+      updatedAt: focus.updatedAt.toISOString(),
+    })),
   });
 });
 
@@ -241,24 +237,22 @@ focusSSE.get("/", async (c) => {
   return streamSSE(c, async (stream) => {
     let id = 0;
 
-    // Get current active focus
-    const activeFocus = await getActiveFocus(userId);
+    // Get all current active focuses
+    const activeFocuses = await getActiveFocuses(userId);
 
-    // Send initial connection with current focus
+    // Send initial connection with all active focuses
     await stream.writeSSE({
       data: JSON.stringify({
         connected: true,
-        focus: activeFocus
-          ? {
-              id: activeFocus.id,
-              item: activeFocus.item,
-              keywords: activeFocus.keywords,
-              isActive: activeFocus.isActive,
-              startedAt: activeFocus.startedAt.toISOString(),
-              endedAt: activeFocus.endedAt?.toISOString() || null,
-              lastActivityAt: activeFocus.lastActivityAt.toISOString(),
-            }
-          : null,
+        focuses: activeFocuses.map((focus) => ({
+          id: focus.id,
+          item: focus.item,
+          keywords: focus.keywords,
+          isActive: focus.isActive,
+          startedAt: focus.startedAt.toISOString(),
+          endedAt: focus.endedAt?.toISOString() || null,
+          lastActivityAt: focus.lastActivityAt.toISOString(),
+        })),
       }),
       event: "connected",
       id: String(id++),
