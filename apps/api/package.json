@@ -35,7 +35,6 @@
     "openai": "^6.18.0",
     "opik": "^1.0.6",
     "opik-vercel": "^1.10.8",
-    "p-queue": "^9.1.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

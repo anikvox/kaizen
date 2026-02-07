@@ -118,6 +118,17 @@ export interface ActiveTabChangedEvent {
   timestamp: number;
 }
 
+// Task queue events
+export interface TaskQueueChangedEvent {
+  userId: string;
+  taskId: string;
+  type: string;
+  status: string;
+  changeType: "created" | "started" | "completed" | "failed" | "cancelled";
+  result?: unknown;
+  error?: string;
+}
+
 class AppEvents extends EventEmitter {
   emitDeviceTokenRevoked(data: DeviceTokenRevokedEvent) {
     this.emit("deviceTokenRevoked", data);
@@ -221,6 +232,16 @@ class AppEvents extends EventEmitter {
   onActiveTabChanged(callback: (data: ActiveTabChangedEvent) => void) {
     this.on("activeTabChanged", callback);
     return () => this.off("activeTabChanged", callback);
+  }
+
+  // Task Queue Events
+  emitTaskQueueChanged(data: TaskQueueChangedEvent) {
+    this.emit("taskQueueChanged", data);
+  }
+
+  onTaskQueueChanged(callback: (data: TaskQueueChangedEvent) => void) {
+    this.on("taskQueueChanged", callback);
+    return () => this.off("taskQueueChanged", callback);
   }
 }
 

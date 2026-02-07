@@ -608,3 +608,69 @@ export interface QuizHistoryResponse {
     totalCorrect: number;
   };
 }
+
+// Task Queue Types
+export type TaskType = "focus_calculation" | "quiz_generation" | "summarization" | "image_summarization";
+export type TaskStatus = "pending" | "processing" | "completed" | "failed" | "cancelled";
+
+export interface TaskQueueItem {
+  id: string;
+  type: TaskType;
+  status: TaskStatus;
+  priority: number;
+  payload: Record<string, unknown>;
+  scheduledFor?: string;
+  startedAt?: string;
+  completedAt?: string;
+  attempts: number;
+  maxAttempts: number;
+  result?: Record<string, unknown>;
+  error?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface TaskHistoryItem {
+  id: string;
+  type: TaskType;
+  status: TaskStatus;
+  priority: number;
+  payload: Record<string, unknown>;
+  scheduledFor?: string;
+  startedAt?: string;
+  completedAt?: string;
+  attempts: number;
+  durationMs?: number;
+  result?: Record<string, unknown>;
+  error?: string;
+  archivedAt?: string;
+}
+
+export interface TaskQueueStats {
+  pendingCount: number;
+  processingCount: number;
+  completedToday: number;
+  failedToday: number;
+}
+
+export interface UserTaskQueueStatus {
+  pending: TaskQueueItem[];
+  processing: TaskQueueItem[];
+  history: TaskHistoryItem[];
+  stats: TaskQueueStats;
+}
+
+export interface TaskCreatedResponse {
+  taskId: string;
+  status: TaskStatus;
+  type: TaskType;
+}
+
+export interface SSETaskQueueChangedData {
+  taskId: string;
+  type: TaskType;
+  status: TaskStatus;
+  changeType: "created" | "started" | "completed" | "failed" | "cancelled";
+  result?: Record<string, unknown>;
+  error?: string;
+}

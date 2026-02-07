@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { db } from "../lib/index.js";
-import { startQuizGeneration, getJobStatus, getQueueStatus } from "../lib/quiz/index.js";
+import { startQuizGeneration, getQuizTaskStatus, getQueueStatus } from "../lib/quiz/index.js";
+import { getTask, TASK_STATUS } from "../lib/task-queue/index.js";
 
 // Combined variables type for routes that support both auth methods
 type CombinedAuthVariables = {
@@ -70,8 +71,8 @@ async function dualAuthMiddleware(c: any, next: () => Promise<void>) {
 
 /**
  * POST /quiz/generate
- * Start quiz generation - returns job ID immediately.
- * Client should poll GET /quiz/job/:jobId for status.
+ * Start quiz generation via task queue.
+ * Client should poll GET /quiz/job/:taskId for status.
  */
 app.post("/generate", dualAuthMiddleware, async (c) => {
   const userId = await getUserIdFromContext(c);
@@ -80,16 +81,22 @@ app.post("/generate", dualAuthMiddleware, async (c) => {
     return c.json({ error: "User not found" }, 404);
   }
 
-  const job = startQuizGeneration(userId);
-  return c.json({
-    jobId: job.id,
-    status: job.status,
-  });
+  try {
+    const result = await startQuizGeneration(userId);
+    return c.json({
+      jobId: result.taskId, // Keep 'jobId' for backward compatibility
+      taskId: result.taskId,
+      status: result.status,
+    });
+  } catch (error) {
+    console.error("[Quiz] Error starting generation:", error);
+    return c.json({ error: "Failed to start quiz generation" }, 500);
+  }
 });
 
 /**
  * GET /quiz/job/:jobId
- * Get the status of a quiz generation job.
+ * Get the status of a quiz generation task.
  * Returns the quiz when completed.
  */
 app.get("/job/:jobId", dualAuthMiddleware, async (c) => {
@@ -99,32 +106,45 @@ app.get("/job/:jobId", dualAuthMiddleware, async (c) => {
     return c.json({ error: "User not found" }, 404);
   }
 
-  const jobId = c.req.param("jobId");
-  const job = getJobStatus(jobId, userId);
+  const taskId = c.req.param("jobId");
 
-  if (!job) {
-    return c.json({ error: "Job not found" }, 404);
-  }
+  try {
+    // Get task from the task queue
+    const task = await getTask(taskId);
 
-  // Return full result if completed, otherwise just status
-  if (job.status === "completed" && job.result) {
+    if (!task || task.userId !== userId) {
+      return c.json({ error: "Job not found" }, 404);
+    }
+
+    // Return full result if completed, otherwise just status
+    if (task.status === TASK_STATUS.COMPLETED && task.result) {
+      return c.json({
+        status: "completed",
+        quiz: task.result,
+      });
+    }
+
+    if (task.status === TASK_STATUS.FAILED) {
+      return c.json({
+        status: "failed",
+        error: task.error || "Quiz generation failed",
+        code: task.error?.includes("Not enough activity") ? "INSUFFICIENT_DATA" : "INTERNAL_ERROR",
+      });
+    }
+
+    // Map task status to legacy job status
+    const statusMap: Record<string, string> = {
+      [TASK_STATUS.PENDING]: "pending",
+      [TASK_STATUS.PROCESSING]: "processing",
+    };
+
     return c.json({
-      status: job.status,
-      quiz: job.result,
+      status: statusMap[task.status] || task.status,
     });
+  } catch (error) {
+    console.error("[Quiz] Error getting job status:", error);
+    return c.json({ error: "Failed to get job status" }, 500);
   }
-
-  if (job.status === "failed") {
-    return c.json({
-      status: job.status,
-      error: job.error || "Quiz generation failed",
-      code: job.error?.includes("Not enough activity") ? "INSUFFICIENT_DATA" : "INTERNAL_ERROR",
-    });
-  }
-
-  return c.json({
-    status: job.status,
-  });
 });
 
 /**
@@ -205,8 +225,10 @@ app.get("/history", dualAuthMiddleware, async (c) => {
  * GET /quiz/status
  * Get the current queue status (for debugging).
  */
-app.get("/status", async (c) => {
-  return c.json(getQueueStatus());
+app.get("/status", dualAuthMiddleware, async (c) => {
+  const userId = await getUserIdFromContext(c);
+  const status = await getQueueStatus(userId || undefined);
+  return c.json(status);
 });
 
 export default app;

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth, SignInButton, useUser } from "@clerk/nextjs";
-import { createApiClient, type UserSettings, type LLMModels, type LLMProviderType, type ModelInfo } from "@kaizen/api-client";
+import { createApiClient, type UserSettings, type LLMModels, type LLMProviderType, type ModelInfo, type UserTaskQueueStatus, type TaskQueueItem, type TaskHistoryItem, type SSETaskQueueChangedData } from "@kaizen/api-client";
 import Link from "next/link";
 
 const apiUrl =
@@ -14,6 +14,40 @@ const PROVIDER_LABELS: Record<LLMProviderType, string> = {
   openai: "OpenAI",
 };
 
+const TASK_TYPE_LABELS: Record<string, string> = {
+  focus_calculation: "Focus Calculation",
+  quiz_generation: "Quiz Generation",
+  summarization: "Summarization",
+  image_summarization: "Image Summarization",
+};
+
+const TASK_STATUS_COLORS: Record<string, string> = {
+  pending: "#ffc107",
+  processing: "#17a2b8",
+  completed: "#28a745",
+  failed: "#dc3545",
+  cancelled: "#6c757d",
+};
+
+function formatTaskDuration(ms: number | undefined): string {
+  if (!ms) return "-";
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${(ms / 60000).toFixed(1)}m`;
+}
+
+function formatTimeAgo(dateStr: string | undefined): string {
+  if (!dateStr) return "-";
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+
+  if (diff < 60000) return "just now";
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  return `${Math.floor(diff / 86400000)}d ago`;
+}
+
 export default function Settings() {
   const { isSignedIn, isLoaded, getToken } = useAuth();
   const { user: clerkUser } = useUser();
@@ -22,6 +56,7 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const eventSourceRef = useRef<EventSource | null>(null);
+  const taskEventSourceRef = useRef<EventSource | null>(null);
 
   // Ignore list state
   const [ignoreListValue, setIgnoreListValue] = useState("");
@@ -38,6 +73,11 @@ export default function Settings() {
 
   // Keep llmModels for backward compatibility (static fallback)
   const [llmModels, setLlmModels] = useState<LLMModels | null>(null);
+
+  // Task queue state
+  const [taskQueueStatus, setTaskQueueStatus] = useState<UserTaskQueueStatus | null>(null);
+  const [loadingTasks, setLoadingTasks] = useState(false);
+  const [taskSSEConnected, setTaskSSEConnected] = useState(false);
 
   const getTokenFn = useCallback(async () => {
     return getToken();
@@ -106,6 +146,9 @@ export default function Settings() {
             });
         }
       }
+
+      // Fetch task queue status
+      fetchTaskQueue();
     } catch (err) {
       console.error("Fetch settings error:", err);
       setError("Failed to fetch settings");
@@ -113,6 +156,22 @@ export default function Settings() {
       setLoading(false);
     }
   }, [isSignedIn, clerkUser, getTokenFn]);
+
+  const fetchTaskQueue = useCallback(async () => {
+    if (!isSignedIn) return;
+
+    const api = createApiClient(apiUrl, getTokenFn);
+    setLoadingTasks(true);
+
+    try {
+      const status = await api.tasks.getStatus();
+      setTaskQueueStatus(status);
+    } catch (err) {
+      console.error("Fetch task queue error:", err);
+    } finally {
+      setLoadingTasks(false);
+    }
+  }, [isSignedIn, getTokenFn]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -162,6 +221,109 @@ export default function Settings() {
       eventSourceRef.current = null;
     };
   }, [isSignedIn, clerkUser, getToken, getTokenFn]);
+
+  // Subscribe to task queue changes via SSE
+  useEffect(() => {
+    if (!isSignedIn || !clerkUser) return;
+
+    const setupTaskSSE = async () => {
+      const token = await getToken();
+      if (!token) return;
+
+      const api = createApiClient(apiUrl, getTokenFn);
+      taskEventSourceRef.current = api.tasks.subscribeTasks(
+        (data) => {
+          // Initial connection with task status
+          setTaskQueueStatus((prev) => ({
+            pending: data.pending,
+            processing: data.processing,
+            history: prev?.history || [],
+            stats: data.stats,
+          }));
+          setLoadingTasks(false);
+          setTaskSSEConnected(true);
+        },
+        (event) => {
+          // Task changed - update state based on change type
+          setTaskQueueStatus((prev) => {
+            if (!prev) return prev;
+
+            const { taskId, type, status, changeType } = event;
+
+            // Create a new task item for adding to lists
+            const newTask: TaskQueueItem = {
+              id: taskId,
+              type: type as any,
+              status: status as any,
+              priority: 0,
+              payload: {},
+              attempts: 0,
+              maxAttempts: 3,
+              createdAt: new Date().toISOString(),
+            };
+
+            let pending = [...prev.pending];
+            let processing = [...prev.processing];
+            let stats = { ...prev.stats };
+
+            switch (changeType) {
+              case "created":
+                // Add to pending
+                pending = [newTask, ...pending];
+                stats.pendingCount++;
+                break;
+
+              case "started":
+                // Move from pending to processing
+                pending = pending.filter((t) => t.id !== taskId);
+                processing = [{ ...newTask, startedAt: new Date().toISOString() }, ...processing];
+                stats.pendingCount = Math.max(0, stats.pendingCount - 1);
+                stats.processingCount++;
+                break;
+
+              case "completed":
+                // Remove from processing, increment completed
+                processing = processing.filter((t) => t.id !== taskId);
+                stats.processingCount = Math.max(0, stats.processingCount - 1);
+                stats.completedToday++;
+                // Refetch to get updated history
+                fetchTaskQueue();
+                break;
+
+              case "failed":
+                // Remove from processing, increment failed
+                processing = processing.filter((t) => t.id !== taskId);
+                stats.processingCount = Math.max(0, stats.processingCount - 1);
+                stats.failedToday++;
+                // Refetch to get updated history
+                fetchTaskQueue();
+                break;
+
+              case "cancelled":
+                // Remove from pending
+                pending = pending.filter((t) => t.id !== taskId);
+                stats.pendingCount = Math.max(0, stats.pendingCount - 1);
+                break;
+            }
+
+            return { ...prev, pending, processing, stats };
+          });
+        },
+        (error) => {
+          console.error("Tasks SSE error:", error);
+        },
+        token
+      );
+    };
+
+    setupTaskSSE();
+
+    return () => {
+      taskEventSourceRef.current?.close();
+      taskEventSourceRef.current = null;
+      setTaskSSEConnected(false);
+    };
+  }, [isSignedIn, clerkUser, getToken, getTokenFn, fetchTaskQueue]);
 
   const handleToggle = async (key: keyof UserSettings) => {
     if (!settings) return;
@@ -1114,6 +1276,219 @@ export default function Settings() {
               </Link>
             </div>
           </div>
+        )}
+      </section>
+
+      {/* Task Queue Section */}
+      <section style={{ marginBottom: "2rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem" }}>
+          <h2 style={{ fontSize: "1.25rem", margin: 0 }}>Background Tasks</h2>
+          {taskSSEConnected && (
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.25rem",
+                padding: "0.125rem 0.5rem",
+                background: "#d4edda",
+                color: "#155724",
+                borderRadius: "12px",
+                fontSize: "0.7rem",
+                fontWeight: "500",
+              }}
+            >
+              <span
+                style={{
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  background: "#28a745",
+                  animation: "pulse 2s infinite",
+                }}
+              />
+              Live
+            </span>
+          )}
+        </div>
+        <style>{`
+          @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+          }
+          @keyframes processingPulse {
+            0%, 100% { background-color: #e3f2fd; }
+            50% { background-color: #bbdefb; }
+          }
+        `}</style>
+        <p style={{ color: "#666", fontSize: "0.9rem", marginBottom: "1rem" }}>
+          View the status of background tasks like focus calculations, summarizations, and quiz generation.
+        </p>
+
+        {loadingTasks ? (
+          <p style={{ color: "#888" }}>Loading tasks...</p>
+        ) : taskQueueStatus ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {/* Stats */}
+            <div
+              style={{
+                padding: "1rem",
+                border: "1px solid #ddd",
+                borderRadius: "8px",
+                display: "flex",
+                justifyContent: "space-around",
+                textAlign: "center",
+              }}
+            >
+              <div>
+                <p style={{ margin: 0, fontSize: "1.5rem", fontWeight: "bold", color: "#ffc107" }}>
+                  {taskQueueStatus.stats.pendingCount}
+                </p>
+                <p style={{ margin: 0, fontSize: "0.8rem", color: "#666" }}>Pending</p>
+              </div>
+              <div>
+                <p style={{ margin: 0, fontSize: "1.5rem", fontWeight: "bold", color: "#17a2b8" }}>
+                  {taskQueueStatus.stats.processingCount}
+                </p>
+                <p style={{ margin: 0, fontSize: "0.8rem", color: "#666" }}>Processing</p>
+              </div>
+              <div>
+                <p style={{ margin: 0, fontSize: "1.5rem", fontWeight: "bold", color: "#28a745" }}>
+                  {taskQueueStatus.stats.completedToday}
+                </p>
+                <p style={{ margin: 0, fontSize: "0.8rem", color: "#666" }}>Completed Today</p>
+              </div>
+              <div>
+                <p style={{ margin: 0, fontSize: "1.5rem", fontWeight: "bold", color: "#dc3545" }}>
+                  {taskQueueStatus.stats.failedToday}
+                </p>
+                <p style={{ margin: 0, fontSize: "0.8rem", color: "#666" }}>Failed Today</p>
+              </div>
+            </div>
+
+            {/* Active Tasks */}
+            {(taskQueueStatus.pending.length > 0 || taskQueueStatus.processing.length > 0) && (
+              <div
+                style={{
+                  padding: "1rem",
+                  border: "1px solid #ddd",
+                  borderRadius: "8px",
+                }}
+              >
+                <p style={{ margin: "0 0 0.5rem", fontWeight: "bold" }}>Active Tasks</p>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  {[...taskQueueStatus.processing, ...taskQueueStatus.pending].map((task) => (
+                    <div
+                      key={task.id}
+                      style={{
+                        padding: "0.5rem",
+                        background: task.status === "processing" ? "#e3f2fd" : "#f8f9fa",
+                        borderRadius: "4px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        animation: task.status === "processing" ? "processingPulse 2s ease-in-out infinite" : "none",
+                      }}
+                    >
+                      <div>
+                        <span style={{ fontWeight: "500" }}>
+                          {TASK_TYPE_LABELS[task.type] || task.type}
+                        </span>
+                        <span
+                          style={{
+                            marginLeft: "0.5rem",
+                            padding: "0.125rem 0.375rem",
+                            borderRadius: "4px",
+                            fontSize: "0.75rem",
+                            background: TASK_STATUS_COLORS[task.status],
+                            color: "white",
+                          }}
+                        >
+                          {task.status}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: "0.8rem", color: "#888" }}>
+                        {formatTimeAgo(task.createdAt)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recent History */}
+            {taskQueueStatus.history.length > 0 && (
+              <div
+                style={{
+                  padding: "1rem",
+                  border: "1px solid #ddd",
+                  borderRadius: "8px",
+                }}
+              >
+                <p style={{ margin: "0 0 0.5rem", fontWeight: "bold" }}>Recent History</p>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  {taskQueueStatus.history.slice(0, 10).map((task) => (
+                    <div
+                      key={task.id}
+                      style={{
+                        padding: "0.5rem",
+                        background: "#f8f9fa",
+                        borderRadius: "4px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div>
+                        <span style={{ fontWeight: "500" }}>
+                          {TASK_TYPE_LABELS[task.type] || task.type}
+                        </span>
+                        <span
+                          style={{
+                            marginLeft: "0.5rem",
+                            padding: "0.125rem 0.375rem",
+                            borderRadius: "4px",
+                            fontSize: "0.75rem",
+                            background: TASK_STATUS_COLORS[task.status],
+                            color: "white",
+                          }}
+                        >
+                          {task.status}
+                        </span>
+                        {task.durationMs && (
+                          <span style={{ marginLeft: "0.5rem", fontSize: "0.8rem", color: "#888" }}>
+                            ({formatTaskDuration(task.durationMs)})
+                          </span>
+                        )}
+                      </div>
+                      <span style={{ fontSize: "0.8rem", color: "#888" }}>
+                        {formatTimeAgo(task.completedAt)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Refresh Button */}
+            <button
+              onClick={() => fetchTaskQueue()}
+              disabled={loadingTasks}
+              style={{
+                padding: "0.5rem 1rem",
+                background: "#6c757d",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                cursor: loadingTasks ? "not-allowed" : "pointer",
+                opacity: loadingTasks ? 0.6 : 1,
+                alignSelf: "flex-start",
+              }}
+            >
+              {loadingTasks ? "Refreshing..." : "Refresh Tasks"}
+            </button>
+          </div>
+        ) : (
+          <p style={{ color: "#888" }}>No task data available</p>
         )}
       </section>
     </main>

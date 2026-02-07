@@ -24,6 +24,8 @@ model User {
   chatSessions    ChatSession[]
   focuses         Focus[]
   quizResults     QuizResult[]
+  taskQueue       TaskQueue[]
+  taskHistory     TaskHistory[]
 
   @@map("users")
 }
@@ -252,5 +254,81 @@ model QuizResult {
   @@index([userId])
   @@index([userId, completedAt])
   @@map("quiz_results")
+}
+
+// Task Queue - Persistent per-user task queue for background processing
+model TaskQueue {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Task definition
+  type      String   // "focus_calculation" | "quiz_generation" | "summarization" | etc.
+  priority  Int      @default(0) // Higher = more urgent (0 = normal, 10 = high, -10 = low)
+  payload   Json     @default("{}") // Task-specific input data
+
+  // Scheduling
+  status    String   @default("pending") // "pending" | "processing" | "completed" | "failed" | "cancelled"
+  scheduledFor DateTime @default(now()) // When the task should run (for delayed tasks)
+
+  // Execution tracking
+  startedAt   DateTime? // When processing began
+  completedAt DateTime? // When processing finished
+  attempts    Int      @default(0) // Retry counter
+  maxAttempts Int      @default(3) // Max retries before failing
+
+  // Results/errors
+  result    Json?    // Task output (for completed tasks)
+  error     String?  @db.Text // Error message (for failed tasks)
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([status, scheduledFor]) // For worker to find ready tasks
+  @@index([userId, type, status]) // For finding pending tasks of specific type
+  @@map("task_queue")
+}
+
+// Task History - Completed/failed tasks moved here for visibility (read-only archive)
+model TaskHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Task definition (copied from TaskQueue)
+  type      String
+  priority  Int
+  payload   Json     @default("{}")
+
+  // Execution info (copied from TaskQueue)
+  status    String   // "completed" | "failed" | "cancelled"
+  attempts  Int
+
+  // Timing (copied from TaskQueue)
+  scheduledFor DateTime
+  startedAt    DateTime?
+  completedAt  DateTime
+
+  // Results (copied from TaskQueue)
+  result    Json?
+  error     String?  @db.Text
+
+  // Duration calculation (derived)
+  durationMs Int? // completedAt - startedAt in milliseconds
+
+  // Original task reference
+  originalTaskId String // ID from TaskQueue before archival
+
+  // Archive metadata
+  archivedAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, type])
+  @@index([userId, completedAt])
+  @@index([userId, status])
+  @@map("task_history")
 }
 
