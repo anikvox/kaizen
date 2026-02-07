@@ -9,6 +9,6 @@ export const env = {
   geminiApiKey: process.env.GEMINI_API_KEY,
   // Opik
   opikApiKey: process.env.OPIK_API_KEY,
-  opikWorkspace: process.env.OPIK_WORKSPACE,
+  opikWorkspace: process.env.OPIK_WORKSPACE_NAME,
   opikProjectName: process.env.OPIK_PROJECT_NAME || "kaizen",
 } as const;

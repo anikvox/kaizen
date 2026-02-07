@@ -1,31 +1,14 @@
 import { db } from "./db.js";
 import { createLLMService } from "./llm/service.js";
+import {
+  TEXT_SUMMARIZATION_SYSTEM_PROMPT,
+  IMAGE_SUMMARIZATION_SYSTEM_PROMPT,
+  INDIVIDUAL_IMAGE_SYSTEM_PROMPT,
+  LLM_CONFIG,
+  validateSummary,
+} from "./llm/index.js";
 import { fetchImageAsBase64 } from "./image-fetcher.js";
 import type { UserSettings } from "@prisma/client";
-
-const TEXT_SUMMARIZATION_SYSTEM_PROMPT = `You are a helpful assistant that creates concise summaries of web page content.
-Based on the text the user has been reading on a webpage, create a brief summary that captures:
-- The main topic or subject of the page
-- Key points or information the user focused on
-- Any important details or takeaways
-
-Keep summaries concise (2-4 sentences) and informative.`;
-
-const IMAGE_SUMMARIZATION_SYSTEM_PROMPT = `You are a helpful assistant that creates concise summaries of images a user viewed on a webpage.
-Based on the image descriptions (alt text, titles) and viewing patterns, create a brief summary that captures:
-- The types of images the user looked at
-- Common themes or subjects in the images
-- Any notable images that received significant attention
-
-Keep summaries concise (2-4 sentences) and informative.`;
-
-const INDIVIDUAL_IMAGE_SUMMARIZATION_SYSTEM_PROMPT = `You are a helpful assistant that describes images.
-When shown an image, provide a brief, accurate description that captures:
-- The main subject or content of the image
-- Any notable details, text, or elements visible
-- The type/category of image (photo, diagram, screenshot, etc.)
-
-Keep descriptions concise (1-2 sentences) and factual.`;
 
 /**
  * Generate a summary for text attention data from a website visit.
@@ -51,13 +34,13 @@ Provide a concise summary (2-4 sentences) of what the user was reading about.`;
     const response = await provider.generate({
       messages: [{ role: "user", content: prompt }],
       systemPrompt: TEXT_SUMMARIZATION_SYSTEM_PROMPT,
-      maxTokens: 200,
-      temperature: 0.3,
+      maxTokens: LLM_CONFIG.summarization.maxTokens,
+      temperature: LLM_CONFIG.summarization.temperature,
     });
 
     await provider.flush();
 
-    return response.content.trim();
+    return validateSummary(response.content);
   } catch (error) {
     console.error("Failed to generate text summary:", error);
     throw error;
@@ -96,13 +79,13 @@ Provide a concise summary (2-4 sentences) describing what types of images the us
     const response = await provider.generate({
       messages: [{ role: "user", content: prompt }],
       systemPrompt: IMAGE_SUMMARIZATION_SYSTEM_PROMPT,
-      maxTokens: 200,
-      temperature: 0.3,
+      maxTokens: LLM_CONFIG.summarization.maxTokens,
+      temperature: LLM_CONFIG.summarization.temperature,
     });
 
     await provider.flush();
 
-    return response.content.trim();
+    return validateSummary(response.content);
   } catch (error) {
     console.error("Failed to generate image summary:", error);
     throw error;
@@ -155,14 +138,14 @@ export async function generateIndividualImageSummary(
           ],
         },
       ],
-      systemPrompt: INDIVIDUAL_IMAGE_SUMMARIZATION_SYSTEM_PROMPT,
-      maxTokens: 150,
-      temperature: 0.3,
+      systemPrompt: INDIVIDUAL_IMAGE_SYSTEM_PROMPT,
+      maxTokens: LLM_CONFIG.imageDescription.maxTokens,
+      temperature: LLM_CONFIG.imageDescription.temperature,
     });
 
     await provider.flush();
 
-    return response.content.trim();
+    return validateSummary(response.content, 200);
   } catch (error) {
     console.error("Failed to generate individual image summary:", error);
     return null;

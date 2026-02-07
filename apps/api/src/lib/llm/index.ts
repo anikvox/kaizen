@@ -49,9 +49,38 @@ export {
   fetchModelsForProvider,
 } from "./model-fetcher.js";
 
-// Prompts
+// System Prompts (centralized)
 export {
   SYSTEM_PROMPTS,
+  CHAT_SYSTEM_PROMPT,
+  CHAT_AGENT_SYSTEM_PROMPT,
+  TITLE_GENERATION_SYSTEM_PROMPT,
+  FOCUS_ANALYSIS_SYSTEM_PROMPT,
+  FOCUS_AGENT_SYSTEM_PROMPT,
+  TEXT_SUMMARIZATION_SYSTEM_PROMPT,
+  IMAGE_SUMMARIZATION_SYSTEM_PROMPT,
+  INDIVIDUAL_IMAGE_SYSTEM_PROMPT,
+  QUIZ_GENERATION_SYSTEM_PROMPT,
+} from "./system-prompts.js";
+
+// LLM Config
+export { LLM_CONFIG, type LLMCallConfig, type LLMConfigKey } from "./config.js";
+
+// Response Validators
+export {
+  validateYesNo,
+  validateFocusItem,
+  validateTitle,
+  validateJson,
+  validateQuizResponse,
+  validateSummary,
+  type JsonValidationResult,
+  type QuizQuestion,
+  type QuizValidationResult,
+} from "./validators.js";
+
+// Prompts (serialization utilities)
+export {
   generateChatTitle,
   serializeAttentionForLLM,
   serializeAttentionCompact,

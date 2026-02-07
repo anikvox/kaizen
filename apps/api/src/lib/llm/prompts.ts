@@ -1,17 +1,13 @@
+/**
+ * Attention data serialization and chat title generation utilities.
+ */
+
 import type { LLMProvider } from "./interface.js";
 import { getSystemProvider } from "./service.js";
+import { TITLE_GENERATION_SYSTEM_PROMPT } from "./system-prompts.js";
+import { LLM_CONFIG } from "./config.js";
+import { validateTitle } from "./validators.js";
 import type { AttentionDataResponse, AttentionSummary } from "../attention.js";
-
-/**
- * System prompts for different use cases.
- */
-export const SYSTEM_PROMPTS = {
-  chat: `You are Kaizen, a helpful AI assistant. You are friendly, concise, and helpful.
-Keep your responses clear and to the point unless the user asks for more detail.`,
-
-  titleGeneration: `You are a helpful assistant that generates short, descriptive titles.
-Generate titles that are concise and capture the essence of the content.`,
-} as const;
 
 /**
  * Serialize attention data for a single page into LLM-friendly format
@@ -277,20 +273,14 @@ Title:`;
   try {
     const response = await llm.generate({
       messages: [{ role: "user", content: prompt }],
-      systemPrompt: SYSTEM_PROMPTS.titleGeneration,
-      maxTokens: 20,
-      temperature: 0.7,
+      systemPrompt: TITLE_GENERATION_SYSTEM_PROMPT,
+      maxTokens: LLM_CONFIG.titleGeneration.maxTokens,
+      temperature: LLM_CONFIG.titleGeneration.temperature,
     });
-
-    const title = response.content.trim() || "New Chat";
-
-    // Ensure max 4 words
-    const words = title.split(/\s+/).slice(0, 4);
-    const finalTitle = words.join(" ");
 
     await llm.flush();
 
-    return finalTitle || "New Chat";
+    return validateTitle(response.content, 4);
   } catch (error) {
     console.error("Failed to generate chat title:", error);
     return "New Chat";
