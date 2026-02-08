@@ -6,7 +6,11 @@
 import { streamText, type CoreMessage } from "ai";
 import type { UserSettings } from "@prisma/client";
 import { createAgentProvider, getAgentModelId } from "../agent/index.js";
-import { startTrace, getPromptWithMetadata, PROMPT_NAMES } from "../llm/index.js";
+import {
+  startTrace,
+  getPromptWithMetadata,
+  PROMPT_NAMES,
+} from "../llm/index.js";
 import { createChatTools } from "./tools.js";
 import { db } from "../db.js";
 
@@ -32,7 +36,9 @@ async function buildUserContext(userId: string): Promise<string> {
     contextParts.push(`- Timezone: ${settings.timezone}`);
   }
   if (settings?.preferredTranslationLanguage) {
-    contextParts.push(`- Preferred translation language: ${settings.preferredTranslationLanguage}`);
+    contextParts.push(
+      `- Preferred translation language: ${settings.preferredTranslationLanguage}`,
+    );
   }
 
   if (contextParts.length === 0) {
@@ -46,9 +52,17 @@ export interface ChatAgentCallbacks {
   /** Called when streaming text content */
   onTextChunk: (chunk: string, fullContent: string) => Promise<void>;
   /** Called when a tool is being called */
-  onToolCall: (toolCallId: string, toolName: string, args: unknown) => Promise<void>;
+  onToolCall: (
+    toolCallId: string,
+    toolName: string,
+    args: unknown,
+  ) => Promise<void>;
   /** Called when a tool returns a result */
-  onToolResult: (toolCallId: string, toolName: string, result: unknown) => Promise<void>;
+  onToolResult: (
+    toolCallId: string,
+    toolName: string,
+    result: unknown,
+  ) => Promise<void>;
   /** Called when the response is finished */
   onFinished: (fullContent: string) => Promise<void>;
   /** Called on error */
@@ -68,8 +82,16 @@ export async function runChatAgent(
   messages: ChatAgentMessage[],
   settings: UserSettings | null,
   additionalContext?: string,
-  callbacks?: ChatAgentCallbacks
-): Promise<{ content: string; toolCalls: Array<{ id: string; name: string; args: unknown; result: unknown }> }> {
+  callbacks?: ChatAgentCallbacks,
+): Promise<{
+  content: string;
+  toolCalls: Array<{
+    id: string;
+    name: string;
+    args: unknown;
+    result: unknown;
+  }>;
+}> {
   const provider = createAgentProvider(settings);
   const modelId = getAgentModelId(settings);
   const tools = createChatTools(userId);
@@ -85,7 +107,8 @@ export async function runChatAgent(
 
   // Build user context and append to system prompt
   const userContext = await buildUserContext(userId);
-  const systemPrompt = promptData.content + userContext + (additionalContext || "");
+  const systemPrompt =
+    promptData.content + userContext + (additionalContext || "");
 
   // Start trace for this agent run (don't include userId for privacy)
   const trace = startTrace({
@@ -103,7 +126,12 @@ export async function runChatAgent(
   });
 
   let fullContent = "";
-  const toolCallsResult: Array<{ id: string; name: string; args: unknown; result: unknown }> = [];
+  const toolCallsResult: Array<{
+    id: string;
+    name: string;
+    args: unknown;
+    result: unknown;
+  }> = [];
 
   console.log(`[Agent] Using model: ${modelId}`);
 
@@ -134,7 +162,11 @@ export async function runChatAgent(
               type: "tool",
               input: { args: toolCall.args },
             });
-            toolSpan?.end({ result: (step.toolResults as any)?.find((r: any) => r.toolCallId === toolCall.toolCallId)?.result });
+            toolSpan?.end({
+              result: (step.toolResults as any)?.find(
+                (r: any) => r.toolCallId === toolCall.toolCallId,
+              )?.result,
+            });
           }
         }
       },
@@ -166,7 +198,11 @@ export async function runChatAgent(
             result: toolResult,
           });
           if (callbacks?.onToolResult) {
-            await callbacks.onToolResult(part.toolCallId, part.toolName, toolResult);
+            await callbacks.onToolResult(
+              part.toolCallId,
+              part.toolName,
+              toolResult,
+            );
           }
           break;
 
@@ -193,12 +229,15 @@ export async function runChatAgent(
       const followUpSpan = trace?.span({
         name: "followUp-streamText",
         type: "llm",
-        input: { reason: "no-text-after-tools", toolCallCount: toolCallsResult.length },
+        input: {
+          reason: "no-text-after-tools",
+          toolCallCount: toolCallsResult.length,
+        },
       });
 
-      const toolResultsSummary = toolCallsResult.map(tc =>
-        `Tool "${tc.name}" returned: ${JSON.stringify(tc.result)}`
-      ).join("\n");
+      const toolResultsSummary = toolCallsResult
+        .map((tc) => `Tool "${tc.name}" returned: ${JSON.stringify(tc.result)}`)
+        .join("\n");
 
       const followUpMessages: CoreMessage[] = [
         ...coreMessages,
@@ -208,7 +247,8 @@ export async function runChatAgent(
         },
         {
           role: "user" as const,
-          content: "Based on the tool results above, please provide your response.",
+          content:
+            "Based on the tool results above, please provide your response.",
         },
       ];
 

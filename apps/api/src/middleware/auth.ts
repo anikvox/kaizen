@@ -8,7 +8,7 @@ export type AuthVariables = {
 
 export async function authMiddleware(
   c: Context<{ Variables: AuthVariables }>,
-  next: Next
+  next: Next,
 ) {
   const authHeader = c.req.header("Authorization");
   const queryToken = c.req.query("token");

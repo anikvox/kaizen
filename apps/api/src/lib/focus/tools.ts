@@ -11,7 +11,12 @@ import { sendPulseGeneration } from "../jobs/service.js";
  * @param earliestAttentionTime - The earliest timestamp from the attention data being processed (used as startedAt for new focuses)
  * @param latestAttentionTime - The latest timestamp from the attention data being processed (used as lastActivityAt)
  */
-export function createFocusTools(userId: string, inactivityThresholdMs: number, earliestAttentionTime?: Date, latestAttentionTime?: Date) {
+export function createFocusTools(
+  userId: string,
+  inactivityThresholdMs: number,
+  earliestAttentionTime?: Date,
+  latestAttentionTime?: Date,
+) {
   // Calculate activity time - use latest attention time or now
   const activityTime = latestAttentionTime || new Date();
   return {
@@ -19,7 +24,8 @@ export function createFocusTools(userId: string, inactivityThresholdMs: number, 
      * Get all active focuses for the user
      */
     get_active_focuses: {
-      description: "Get all currently active focus sessions for the user. Use this to understand what the user is currently working on before making decisions.",
+      description:
+        "Get all currently active focus sessions for the user. Use this to understand what the user is currently working on before making decisions.",
       inputSchema: z.object({}),
       execute: async () => {
         const focuses = await db.focus.findMany({
@@ -47,12 +53,25 @@ export function createFocusTools(userId: string, inactivityThresholdMs: number, 
      * Create a new focus
      */
     create_focus: {
-      description: "Create a new focus session when the attention data indicates a topic that doesn't match any existing active focus. Only create if no similar focus exists.",
+      description:
+        "Create a new focus session when the attention data indicates a topic that doesn't match any existing active focus. Only create if no similar focus exists.",
       inputSchema: z.object({
-        item: z.string().describe("2-3 word description of the focus topic (e.g., 'React Development', 'Machine Learning')"),
-        keywords: z.array(z.string()).describe("Initial keywords for this focus"),
+        item: z
+          .string()
+          .describe(
+            "2-3 word description of the focus topic (e.g., 'React Development', 'Machine Learning')",
+          ),
+        keywords: z
+          .array(z.string())
+          .describe("Initial keywords for this focus"),
       }),
-      execute: async ({ item, keywords }: { item: string; keywords: string[] }) => {
+      execute: async ({
+        item,
+        keywords,
+      }: {
+        item: string;
+        keywords: string[];
+      }) => {
         // Check for existing active focus with similar item name
         const existingFocuses = await db.focus.findMany({
           where: {
@@ -63,14 +82,16 @@ export function createFocusTools(userId: string, inactivityThresholdMs: number, 
 
         // Check for duplicate by comparing item names (case-insensitive)
         const normalizedItem = item.toLowerCase().trim();
-        const duplicateFocus = existingFocuses.find((f) =>
-          f.item.toLowerCase().trim() === normalizedItem
+        const duplicateFocus = existingFocuses.find(
+          (f) => f.item.toLowerCase().trim() === normalizedItem,
         );
 
         if (duplicateFocus) {
           // Instead of creating a duplicate, update the existing focus
           const now = new Date();
-          const mergedKeywords = [...new Set([...keywords, ...duplicateFocus.keywords])].slice(0, 20);
+          const mergedKeywords = [
+            ...new Set([...keywords, ...duplicateFocus.keywords]),
+          ].slice(0, 20);
 
           const updatedFocus = await db.focus.update({
             where: { id: duplicateFocus.id },
@@ -139,13 +160,29 @@ export function createFocusTools(userId: string, inactivityThresholdMs: number, 
      * Update an existing focus with new activity
      */
     update_focus: {
-      description: "Update an existing focus session with new keywords from recent attention. Use this when attention data relates to an existing focus.",
+      description:
+        "Update an existing focus session with new keywords from recent attention. Use this when attention data relates to an existing focus.",
       inputSchema: z.object({
         focusId: z.string().describe("The ID of the focus to update"),
-        newKeywords: z.array(z.string()).describe("New keywords to add to the focus"),
-        newItem: z.string().optional().describe("Optional updated 2-3 word description if the focus has evolved"),
+        newKeywords: z
+          .array(z.string())
+          .describe("New keywords to add to the focus"),
+        newItem: z
+          .string()
+          .optional()
+          .describe(
+            "Optional updated 2-3 word description if the focus has evolved",
+          ),
       }),
-      execute: async ({ focusId, newKeywords, newItem }: { focusId: string; newKeywords: string[]; newItem?: string }) => {
+      execute: async ({
+        focusId,
+        newKeywords,
+        newItem,
+      }: {
+        focusId: string;
+        newKeywords: string[];
+        newItem?: string;
+      }) => {
         const existingFocus = await db.focus.findUnique({
           where: { id: focusId },
         });
@@ -155,7 +192,9 @@ export function createFocusTools(userId: string, inactivityThresholdMs: number, 
         }
 
         const now = new Date();
-        const mergedKeywords = [...new Set([...newKeywords, ...existingFocus.keywords])].slice(0, 20);
+        const mergedKeywords = [
+          ...new Set([...newKeywords, ...existingFocus.keywords]),
+        ].slice(0, 20);
 
         const updatedFocus = await db.focus.update({
           where: { id: focusId },
@@ -187,24 +226,46 @@ export function createFocusTools(userId: string, inactivityThresholdMs: number, 
      * Merge similar focuses together
      */
     merge_focuses: {
-      description: "Merge two similar focus sessions into one. Use this when you detect that two active focuses are essentially about the same topic.",
+      description:
+        "Merge two similar focus sessions into one. Use this when you detect that two active focuses are essentially about the same topic.",
       inputSchema: z.object({
-        primaryFocusId: z.string().describe("The focus to keep (will absorb keywords from secondary)"),
-        secondaryFocusId: z.string().describe("The focus to merge into primary and then end"),
-        mergedItem: z.string().describe("The new 2-3 word description for the merged focus"),
+        primaryFocusId: z
+          .string()
+          .describe("The focus to keep (will absorb keywords from secondary)"),
+        secondaryFocusId: z
+          .string()
+          .describe("The focus to merge into primary and then end"),
+        mergedItem: z
+          .string()
+          .describe("The new 2-3 word description for the merged focus"),
       }),
-      execute: async ({ primaryFocusId, secondaryFocusId, mergedItem }: { primaryFocusId: string; secondaryFocusId: string; mergedItem: string }) => {
+      execute: async ({
+        primaryFocusId,
+        secondaryFocusId,
+        mergedItem,
+      }: {
+        primaryFocusId: string;
+        secondaryFocusId: string;
+        mergedItem: string;
+      }) => {
         const [primary, secondary] = await Promise.all([
           db.focus.findUnique({ where: { id: primaryFocusId } }),
           db.focus.findUnique({ where: { id: secondaryFocusId } }),
         ]);
 
-        if (!primary || !secondary || primary.userId !== userId || secondary.userId !== userId) {
+        if (
+          !primary ||
+          !secondary ||
+          primary.userId !== userId ||
+          secondary.userId !== userId
+        ) {
           return { success: false, error: "One or both focuses not found" };
         }
 
         const now = new Date();
-        const mergedKeywords = [...new Set([...primary.keywords, ...secondary.keywords])].slice(0, 20);
+        const mergedKeywords = [
+          ...new Set([...primary.keywords, ...secondary.keywords]),
+        ].slice(0, 20);
 
         // Update primary with merged data
         const updatedPrimary = await db.focus.update({
@@ -247,12 +308,24 @@ export function createFocusTools(userId: string, inactivityThresholdMs: number, 
      * End a focus due to inactivity
      */
     end_focus: {
-      description: "End a focus session. Use this when a focus has had no related activity for a significant time.",
+      description:
+        "End a focus session. Use this when a focus has had no related activity for a significant time.",
       inputSchema: z.object({
         focusId: z.string().describe("The ID of the focus to end"),
-        reason: z.string().optional().describe("Optional reason for ending (e.g., 'inactivity', 'completed')"),
+        reason: z
+          .string()
+          .optional()
+          .describe(
+            "Optional reason for ending (e.g., 'inactivity', 'completed')",
+          ),
       }),
-      execute: async ({ focusId, reason }: { focusId: string; reason?: string }) => {
+      execute: async ({
+        focusId,
+        reason,
+      }: {
+        focusId: string;
+        reason?: string;
+      }) => {
         const focus = await db.focus.findUnique({
           where: { id: focusId },
         });
@@ -286,9 +359,18 @@ export function createFocusTools(userId: string, inactivityThresholdMs: number, 
       description: `Resume a recently ended focus if it ended within the inactivity threshold (${inactivityThresholdMs}ms). Use this when attention data matches a recently ended focus.`,
       inputSchema: z.object({
         focusId: z.string().describe("The ID of the focus to resume"),
-        newKeywords: z.array(z.string()).optional().describe("Optional new keywords to add"),
+        newKeywords: z
+          .array(z.string())
+          .optional()
+          .describe("Optional new keywords to add"),
       }),
-      execute: async ({ focusId, newKeywords }: { focusId: string; newKeywords?: string[] }) => {
+      execute: async ({
+        focusId,
+        newKeywords,
+      }: {
+        focusId: string;
+        newKeywords?: string[];
+      }) => {
         const focus = await db.focus.findUnique({
           where: { id: focusId },
         });
@@ -306,7 +388,10 @@ export function createFocusTools(userId: string, inactivityThresholdMs: number, 
         if (focus.endedAt) {
           const timeSinceEnded = now.getTime() - focus.endedAt.getTime();
           if (timeSinceEnded > inactivityThresholdMs) {
-            return { success: false, error: "Focus ended too long ago to resume" };
+            return {
+              success: false,
+              error: "Focus ended too long ago to resume",
+            };
           }
         }
 
@@ -345,7 +430,8 @@ export function createFocusTools(userId: string, inactivityThresholdMs: number, 
      * Get recently ended focuses that can still be resumed
      */
     get_resumable_focuses: {
-      description: "Get focuses that ended recently and can still be resumed. Useful for checking if new attention data matches a recently ended focus.",
+      description:
+        "Get focuses that ended recently and can still be resumed. Useful for checking if new attention data matches a recently ended focus.",
       inputSchema: z.object({}),
       execute: async () => {
         const now = new Date();

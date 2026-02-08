@@ -33,7 +33,11 @@ export {
 } from "./models.js";
 
 // Providers
-export { GeminiProvider, AnthropicProvider, OpenAIProvider } from "./providers/index.js";
+export {
+  GeminiProvider,
+  AnthropicProvider,
+  OpenAIProvider,
+} from "./providers/index.js";
 
 // Service
 export { LLMService, createLLMService, getSystemProvider } from "./service.js";

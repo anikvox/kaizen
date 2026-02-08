@@ -2,7 +2,11 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth, SignInButton, useUser } from "@clerk/nextjs";
-import { createApiClient, type DeviceToken, type UnifiedSSEData } from "@kaizen/api-client";
+import {
+  createApiClient,
+  type DeviceToken,
+  type UnifiedSSEData,
+} from "@kaizen/api-client";
 import Link from "next/link";
 import {
   Button,
@@ -89,7 +93,7 @@ export default function Extensions() {
         (error) => {
           console.error("SSE error:", error);
         },
-        token
+        token,
       );
     };
 
@@ -101,7 +105,11 @@ export default function Extensions() {
   }, [isSignedIn, clerkUser, getToken, fetchTokens]);
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to unlink this extension? It will no longer be able to access your account.")) {
+    if (
+      !confirm(
+        "Are you sure you want to unlink this extension? It will no longer be able to access your account.",
+      )
+    ) {
       return;
     }
 
@@ -153,7 +161,9 @@ export default function Extensions() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground mb-4">Sign in to manage your linked extensions.</p>
+            <p className="text-muted-foreground mb-4">
+              Sign in to manage your linked extensions.
+            </p>
             <SignInButton mode="modal">
               <Button>Sign In</Button>
             </SignInButton>
@@ -170,7 +180,10 @@ export default function Extensions() {
           <Logo size="md" />
           <h1 className="text-2xl font-bold">Linked Extensions</h1>
         </div>
-        <Link href="/" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+        <Link
+          href="/"
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
           <ArrowLeft className="w-4 h-4" />
           Back to Home
         </Link>
@@ -190,7 +203,8 @@ export default function Extensions() {
             </div>
             <h2 className="text-lg font-semibold mb-2">No extensions linked</h2>
             <p className="text-muted-foreground max-w-sm mx-auto">
-              Open the Kaizen Chrome extension and click &quot;Link Extension&quot; to connect it to your account.
+              Open the Kaizen Chrome extension and click &quot;Link
+              Extension&quot; to connect it to your account.
             </p>
           </CardContent>
         </Card>

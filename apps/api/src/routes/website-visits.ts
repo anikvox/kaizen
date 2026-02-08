@@ -1,6 +1,9 @@
 import { Hono } from "hono";
 import { db } from "../lib/index.js";
-import { deviceAuthMiddleware, type DeviceAuthVariables } from "../middleware/index.js";
+import {
+  deviceAuthMiddleware,
+  type DeviceAuthVariables,
+} from "../middleware/index.js";
 
 const app = new Hono<{ Variables: DeviceAuthVariables }>();
 

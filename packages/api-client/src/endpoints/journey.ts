@@ -11,10 +11,13 @@ export class JourneyEndpoint {
     return this.http.get<JourneyResponse>(`/journey?days=${days}`, true);
   }
 
-  async getDomain(domain: string, days: number = 30): Promise<JourneyDomainDetailResponse> {
+  async getDomain(
+    domain: string,
+    days: number = 30,
+  ): Promise<JourneyDomainDetailResponse> {
     return this.http.get<JourneyDomainDetailResponse>(
       `/journey/${encodeURIComponent(domain)}?days=${days}`,
-      true
+      true,
     );
   }
 }

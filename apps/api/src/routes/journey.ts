@@ -52,17 +52,20 @@ app.get("/", authMiddleware, async (c) => {
   });
 
   // Group visits by domain
-  const domainMap = new Map<string, {
-    domain: string;
-    visits: typeof visits;
-    totalVisits: number;
-    totalActiveTime: number;
-    titles: Set<string>;
-    summaries: string[];
-    referrers: Map<string, number>;
-    lastVisitedAt: Date;
-    firstVisitedAt: Date;
-  }>();
+  const domainMap = new Map<
+    string,
+    {
+      domain: string;
+      visits: typeof visits;
+      totalVisits: number;
+      totalActiveTime: number;
+      titles: Set<string>;
+      summaries: string[];
+      referrers: Map<string, number>;
+      lastVisitedAt: Date;
+      firstVisitedAt: Date;
+    }
+  >();
 
   for (const visit of visits) {
     const domain = extractDomain(visit.url);
@@ -94,7 +97,10 @@ app.get("/", authMiddleware, async (c) => {
     // Track referrer domains
     const referrerDomain = extractReferrerDomain(visit.referrer);
     if (referrerDomain && referrerDomain !== domain) {
-      data.referrers.set(referrerDomain, (data.referrers.get(referrerDomain) || 0) + 1);
+      data.referrers.set(
+        referrerDomain,
+        (data.referrers.get(referrerDomain) || 0) + 1,
+      );
     }
 
     // Update time range
@@ -148,7 +154,10 @@ app.get("/", authMiddleware, async (c) => {
   // Calculate summary stats
   const totalSites = sites.length;
   const totalVisits = visits.length;
-  const totalActiveTimeMs = sites.reduce((sum, s) => sum + s.totalActiveTimeMs, 0);
+  const totalActiveTimeMs = sites.reduce(
+    (sum, s) => sum + s.totalActiveTimeMs,
+    0,
+  );
 
   return c.json({
     period: {
@@ -160,7 +169,8 @@ app.get("/", authMiddleware, async (c) => {
       totalSites,
       totalVisits,
       totalActiveTimeMs,
-      avgVisitsPerSite: totalSites > 0 ? Math.round(totalVisits / totalSites * 10) / 10 : 0,
+      avgVisitsPerSite:
+        totalSites > 0 ? Math.round((totalVisits / totalSites) * 10) / 10 : 0,
     },
     sites: sites.slice(0, 50),
     referrerFlows: referrerFlows.slice(0, 20),
@@ -199,14 +209,17 @@ app.get("/:domain", authMiddleware, async (c) => {
   const domainVisits = visits.filter((v) => extractDomain(v.url) === domain);
 
   // Group by page (URL path)
-  const pageMap = new Map<string, {
-    url: string;
-    title: string;
-    visits: number;
-    totalActiveTime: number;
-    summary: string | null;
-    lastVisited: Date;
-  }>();
+  const pageMap = new Map<
+    string,
+    {
+      url: string;
+      title: string;
+      visits: number;
+      totalActiveTime: number;
+      summary: string | null;
+      lastVisited: Date;
+    }
+  >();
 
   for (const visit of domainVisits) {
     if (!pageMap.has(visit.url)) {
@@ -242,7 +255,10 @@ app.get("/:domain", authMiddleware, async (c) => {
   for (const visit of domainVisits) {
     const referrerDomain = extractReferrerDomain(visit.referrer);
     if (referrerDomain && referrerDomain !== domain) {
-      referrerCounts.set(referrerDomain, (referrerCounts.get(referrerDomain) || 0) + 1);
+      referrerCounts.set(
+        referrerDomain,
+        (referrerCounts.get(referrerDomain) || 0) + 1,
+      );
     }
   }
 
@@ -251,7 +267,10 @@ app.get("/:domain", authMiddleware, async (c) => {
     .map(([domain, count]) => ({ domain, count }));
 
   // Activity by day
-  const dailyActivity = new Map<string, { date: string; visits: number; activeTimeMs: number }>();
+  const dailyActivity = new Map<
+    string,
+    { date: string; visits: number; activeTimeMs: number }
+  >();
   for (const visit of domainVisits) {
     const dateKey = visit.openedAt.toISOString().split("T")[0]!;
     if (!dailyActivity.has(dateKey)) {
@@ -262,7 +281,9 @@ app.get("/:domain", authMiddleware, async (c) => {
     day.activeTimeMs += visit.activeTime;
   }
 
-  const activity = Array.from(dailyActivity.values()).sort((a, b) => a.date.localeCompare(b.date));
+  const activity = Array.from(dailyActivity.values()).sort((a, b) =>
+    a.date.localeCompare(b.date),
+  );
 
   return c.json({
     domain,

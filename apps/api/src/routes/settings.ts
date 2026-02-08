@@ -1,8 +1,20 @@
 import { Hono } from "hono";
-import { db, events, encrypt, ALL_MODELS, decryptApiKey, fetchModelsForProvider } from "../lib/index.js";
+import {
+  db,
+  events,
+  encrypt,
+  ALL_MODELS,
+  decryptApiKey,
+  fetchModelsForProvider,
+} from "../lib/index.js";
 import type { LLMProviderType } from "../lib/index.js";
 import { env } from "../lib/env.js";
-import { authMiddleware, deviceAuthMiddleware, type AuthVariables, type DeviceAuthVariables } from "../middleware/index.js";
+import {
+  authMiddleware,
+  deviceAuthMiddleware,
+  type AuthVariables,
+  type DeviceAuthVariables,
+} from "../middleware/index.js";
 import { scheduleInitialJobs, rescheduleUserJobs } from "../lib/jobs/index.js";
 
 // Combined variables type for routes that support both auth methods
@@ -15,7 +27,9 @@ type CombinedAuthVariables = {
 const app = new Hono<{ Variables: CombinedAuthVariables }>();
 
 // Helper to get userId from either auth method
-async function getUserIdFromContext(c: { get: (key: string) => string | undefined }): Promise<string | null> {
+async function getUserIdFromContext(c: {
+  get: (key: string) => string | undefined;
+}): Promise<string | null> {
   // Check for device token auth first
   const deviceUserId = c.get("userId");
   if (deviceUserId) {
@@ -149,7 +163,10 @@ app.get("/llm/models/:provider", dualAuthMiddleware, async (c) => {
 
   switch (provider) {
     case "gemini":
-      apiKey = decryptApiKey(settings?.geminiApiKeyEncrypted) || env.geminiApiKey || null;
+      apiKey =
+        decryptApiKey(settings?.geminiApiKeyEncrypted) ||
+        env.geminiApiKey ||
+        null;
       break;
     case "anthropic":
       apiKey = decryptApiKey(settings?.anthropicApiKeyEncrypted);
@@ -240,8 +257,10 @@ app.post("/", dualAuthMiddleware, async (c) => {
     createData.cognitiveAttentionDebugMode = body.cognitiveAttentionDebugMode;
   }
   if (body.cognitiveAttentionShowOverlay !== undefined) {
-    updateData.cognitiveAttentionShowOverlay = body.cognitiveAttentionShowOverlay;
-    createData.cognitiveAttentionShowOverlay = body.cognitiveAttentionShowOverlay;
+    updateData.cognitiveAttentionShowOverlay =
+      body.cognitiveAttentionShowOverlay;
+    createData.cognitiveAttentionShowOverlay =
+      body.cognitiveAttentionShowOverlay;
   }
   if (body.attentionTrackingIgnoreList !== undefined) {
     updateData.attentionTrackingIgnoreList = body.attentionTrackingIgnoreList;
@@ -249,12 +268,16 @@ app.post("/", dualAuthMiddleware, async (c) => {
   }
   // Summarization settings
   if (body.attentionSummarizationEnabled !== undefined) {
-    updateData.attentionSummarizationEnabled = body.attentionSummarizationEnabled;
-    createData.attentionSummarizationEnabled = body.attentionSummarizationEnabled;
+    updateData.attentionSummarizationEnabled =
+      body.attentionSummarizationEnabled;
+    createData.attentionSummarizationEnabled =
+      body.attentionSummarizationEnabled;
   }
   if (body.attentionSummarizationIntervalMs !== undefined) {
-    updateData.attentionSummarizationIntervalMs = body.attentionSummarizationIntervalMs;
-    createData.attentionSummarizationIntervalMs = body.attentionSummarizationIntervalMs;
+    updateData.attentionSummarizationIntervalMs =
+      body.attentionSummarizationIntervalMs;
+    createData.attentionSummarizationIntervalMs =
+      body.attentionSummarizationIntervalMs;
   }
 
   // Focus calculation settings
@@ -293,16 +316,28 @@ app.post("/", dualAuthMiddleware, async (c) => {
 
   // API keys - encrypt before storing, null clears the key
   if (body.geminiApiKey !== undefined) {
-    updateData.geminiApiKeyEncrypted = body.geminiApiKey ? encrypt(body.geminiApiKey) : null;
-    createData.geminiApiKeyEncrypted = body.geminiApiKey ? encrypt(body.geminiApiKey) : null;
+    updateData.geminiApiKeyEncrypted = body.geminiApiKey
+      ? encrypt(body.geminiApiKey)
+      : null;
+    createData.geminiApiKeyEncrypted = body.geminiApiKey
+      ? encrypt(body.geminiApiKey)
+      : null;
   }
   if (body.anthropicApiKey !== undefined) {
-    updateData.anthropicApiKeyEncrypted = body.anthropicApiKey ? encrypt(body.anthropicApiKey) : null;
-    createData.anthropicApiKeyEncrypted = body.anthropicApiKey ? encrypt(body.anthropicApiKey) : null;
+    updateData.anthropicApiKeyEncrypted = body.anthropicApiKey
+      ? encrypt(body.anthropicApiKey)
+      : null;
+    createData.anthropicApiKeyEncrypted = body.anthropicApiKey
+      ? encrypt(body.anthropicApiKey)
+      : null;
   }
   if (body.openaiApiKey !== undefined) {
-    updateData.openaiApiKeyEncrypted = body.openaiApiKey ? encrypt(body.openaiApiKey) : null;
-    createData.openaiApiKeyEncrypted = body.openaiApiKey ? encrypt(body.openaiApiKey) : null;
+    updateData.openaiApiKeyEncrypted = body.openaiApiKey
+      ? encrypt(body.openaiApiKey)
+      : null;
+    createData.openaiApiKeyEncrypted = body.openaiApiKey
+      ? encrypt(body.openaiApiKey)
+      : null;
   }
 
   // Quiz settings
@@ -355,7 +390,8 @@ app.post("/", dualAuthMiddleware, async (c) => {
       cognitiveAttentionShowOverlay: settings.cognitiveAttentionShowOverlay,
       attentionTrackingIgnoreList: settings.attentionTrackingIgnoreList,
       attentionSummarizationEnabled: settings.attentionSummarizationEnabled,
-      attentionSummarizationIntervalMs: settings.attentionSummarizationIntervalMs,
+      attentionSummarizationIntervalMs:
+        settings.attentionSummarizationIntervalMs,
       focusCalculationEnabled: settings.focusCalculationEnabled,
       focusCalculationIntervalMs: settings.focusCalculationIntervalMs,
       focusInactivityThresholdMs: settings.focusInactivityThresholdMs,

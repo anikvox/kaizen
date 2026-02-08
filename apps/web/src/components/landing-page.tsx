@@ -44,8 +44,9 @@ export function LandingPage() {
             </span>
           </h1>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Kaizen tracks your browsing, understands what you&apos;re learning, and helps you
-            retain knowledge with AI-powered summaries, quizzes, and insights.
+            Kaizen tracks your browsing, understands what you&apos;re learning,
+            and helps you retain knowledge with AI-powered summaries, quizzes,
+            and insights.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <SignInButton mode="modal">
@@ -62,7 +63,6 @@ export function LandingPage() {
 
         {/* Bento Grid Features */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 auto-rows-[minmax(180px,auto)]">
-
           {/* Focus Tracking - Large */}
           <div className="md:col-span-2 row-span-1 rounded-2xl bg-gradient-to-br from-focus/20 to-focus/5 border border-focus/20 p-8 relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-48 h-48 bg-focus/10 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform duration-500" />
@@ -70,10 +70,12 @@ export function LandingPage() {
               <div className="w-12 h-12 rounded-xl bg-focus/20 flex items-center justify-center mb-4">
                 <Target className="w-6 h-6 text-focus" />
               </div>
-              <h3 className="text-xl font-bold mb-2">Intelligent Focus Detection</h3>
+              <h3 className="text-xl font-bold mb-2">
+                Intelligent Focus Detection
+              </h3>
               <p className="text-muted-foreground max-w-md">
-                Automatically detects what you&apos;re researching based on your browsing patterns.
-                No manual tracking needed.
+                Automatically detects what you&apos;re researching based on your
+                browsing patterns. No manual tracking needed.
               </p>
               <div className="flex items-center gap-4 mt-6">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -133,8 +135,8 @@ export function LandingPage() {
                 </div>
                 <h3 className="text-xl font-bold mb-2">AI Chat Assistant</h3>
                 <p className="text-muted-foreground">
-                  Ask questions about anything you&apos;ve been reading. Get instant answers
-                  based on your browsing context.
+                  Ask questions about anything you&apos;ve been reading. Get
+                  instant answers based on your browsing context.
                 </p>
               </div>
               <div className="flex-shrink-0 w-full md:w-64 p-4 rounded-xl bg-background/50 border border-secondary/10">
@@ -143,7 +145,8 @@ export function LandingPage() {
                     <Sparkles className="w-3 h-3 text-secondary" />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Based on your reading, here&apos;s a summary of React hooks...
+                    Based on your reading, here&apos;s a summary of React
+                    hooks...
                   </p>
                 </div>
                 <div className="h-px bg-border/50 my-2" />
@@ -164,8 +167,12 @@ export function LandingPage() {
               AI generates quizzes from what you&apos;ve actually read
             </p>
             <div className="p-3 rounded-lg bg-background/50 border border-pulse/10">
-              <p className="text-xs text-muted-foreground mb-2">Sample question:</p>
-              <p className="text-sm font-medium">What is the main benefit of useCallback?</p>
+              <p className="text-xs text-muted-foreground mb-2">
+                Sample question:
+              </p>
+              <p className="text-sm font-medium">
+                What is the main benefit of useCallback?
+              </p>
             </div>
           </div>
 
@@ -181,15 +188,18 @@ export function LandingPage() {
             <div className="space-y-2">
               <div className="flex items-start gap-2">
                 <Sparkles className="w-3 h-3 text-amber-500 mt-1" />
-                <p className="text-xs text-muted-foreground">You learned about React patterns</p>
+                <p className="text-xs text-muted-foreground">
+                  You learned about React patterns
+                </p>
               </div>
               <div className="flex items-start gap-2">
                 <Sparkles className="w-3 h-3 text-amber-500 mt-1" />
-                <p className="text-xs text-muted-foreground">New topic: State management</p>
+                <p className="text-xs text-muted-foreground">
+                  New topic: State management
+                </p>
               </div>
             </div>
           </div>
-
         </div>
       </section>
 
@@ -197,7 +207,9 @@ export function LandingPage() {
       <section className="border-t border-border/50 bg-muted/20">
         <div className="max-w-7xl mx-auto px-6 py-24">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">How Kaizen Works</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              How Kaizen Works
+            </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Simple setup, powerful results. Get started in minutes.
             </p>
@@ -208,7 +220,9 @@ export function LandingPage() {
               <div className="w-16 h-16 rounded-2xl bg-secondary/10 flex items-center justify-center mx-auto mb-4">
                 <Chrome className="w-8 h-8 text-secondary" />
               </div>
-              <div className="text-sm font-semibold text-secondary mb-2">Step 1</div>
+              <div className="text-sm font-semibold text-secondary mb-2">
+                Step 1
+              </div>
               <h3 className="font-bold mb-2">Install Extension</h3>
               <p className="text-sm text-muted-foreground">
                 Add the Kaizen Chrome extension to your browser
@@ -219,7 +233,9 @@ export function LandingPage() {
               <div className="w-16 h-16 rounded-2xl bg-focus/10 flex items-center justify-center mx-auto mb-4">
                 <BookOpen className="w-8 h-8 text-focus" />
               </div>
-              <div className="text-sm font-semibold text-focus mb-2">Step 2</div>
+              <div className="text-sm font-semibold text-focus mb-2">
+                Step 2
+              </div>
               <h3 className="font-bold mb-2">Browse Normally</h3>
               <p className="text-sm text-muted-foreground">
                 Read articles, docs, tutorials - we track what you learn
@@ -230,7 +246,9 @@ export function LandingPage() {
               <div className="w-16 h-16 rounded-2xl bg-pulse/10 flex items-center justify-center mx-auto mb-4">
                 <Brain className="w-8 h-8 text-pulse" />
               </div>
-              <div className="text-sm font-semibold text-pulse mb-2">Step 3</div>
+              <div className="text-sm font-semibold text-pulse mb-2">
+                Step 3
+              </div>
               <h3 className="font-bold mb-2">Learn & Retain</h3>
               <p className="text-sm text-muted-foreground">
                 Get AI summaries, take quizzes, chat about what you learned
@@ -251,8 +269,8 @@ export function LandingPage() {
               Start Your Learning Journey
             </h2>
             <p className="text-primary-foreground/80 mb-8 max-w-lg mx-auto">
-              Join thousands of learners who use Kaizen to enhance their knowledge
-              retention and accelerate their growth.
+              Join thousands of learners who use Kaizen to enhance their
+              knowledge retention and accelerate their growth.
             </p>
             <SignInButton mode="modal">
               <Button
@@ -271,7 +289,8 @@ export function LandingPage() {
         <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <Logo size="sm" showText className="text-muted-foreground" />
           <p className="text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} Kaizen. Continuous improvement for your learning.
+            &copy; {new Date().getFullYear()} Kaizen. Continuous improvement for
+            your learning.
           </p>
         </div>
       </footer>

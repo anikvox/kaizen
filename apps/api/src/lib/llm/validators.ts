@@ -105,7 +105,7 @@ export interface JsonValidationResult<T> {
  */
 export function validateJson<T>(
   response: string,
-  validator?: (data: unknown) => data is T
+  validator?: (data: unknown) => data is T,
 ): JsonValidationResult<T> {
   try {
     // Clean the response - remove markdown code blocks
@@ -167,12 +167,15 @@ export interface QuizValidationResult {
 export function validateQuizResponse(
   response: string,
   expectedCount: number,
-  expectedOptions: number
+  expectedOptions: number,
 ): QuizValidationResult {
   const jsonResult = validateJson<unknown[]>(response);
 
   if (!jsonResult.success || !jsonResult.data) {
-    return { success: false, error: jsonResult.error || "Failed to parse JSON" };
+    return {
+      success: false,
+      error: jsonResult.error || "Failed to parse JSON",
+    };
   }
 
   const parsed = jsonResult.data;
@@ -182,7 +185,10 @@ export function validateQuizResponse(
   }
 
   if (parsed.length < expectedCount) {
-    return { success: false, error: `Expected ${expectedCount} questions, got ${parsed.length}` };
+    return {
+      success: false,
+      error: `Expected ${expectedCount} questions, got ${parsed.length}`,
+    };
   }
 
   const questions: QuizQuestion[] = [];
@@ -191,16 +197,31 @@ export function validateQuizResponse(
     const q = parsed[i] as Record<string, unknown>;
 
     if (!q.question || typeof q.question !== "string") {
-      return { success: false, error: `Question ${i + 1} missing question text` };
+      return {
+        success: false,
+        error: `Question ${i + 1} missing question text`,
+      };
     }
 
     if (!Array.isArray(q.options) || q.options.length !== expectedOptions) {
-      return { success: false, error: `Question ${i + 1} has wrong number of options` };
+      return {
+        success: false,
+        error: `Question ${i + 1} has wrong number of options`,
+      };
     }
 
-    const correctIndex = (q.correct_index ?? q.correctIndex ?? q.correct_answer) as number;
-    if (typeof correctIndex !== "number" || correctIndex < 0 || correctIndex >= expectedOptions) {
-      return { success: false, error: `Question ${i + 1} has invalid correct_index` };
+    const correctIndex = (q.correct_index ??
+      q.correctIndex ??
+      q.correct_answer) as number;
+    if (
+      typeof correctIndex !== "number" ||
+      correctIndex < 0 ||
+      correctIndex >= expectedOptions
+    ) {
+      return {
+        success: false,
+        error: `Question ${i + 1} has invalid correct_index`,
+      };
     }
 
     questions.push({
@@ -223,7 +244,7 @@ export function validateQuizResponse(
  */
 export function validateSummary(
   response: string,
-  maxLength: number = 500
+  maxLength: number = 500,
 ): string {
   let cleaned = response.trim();
 

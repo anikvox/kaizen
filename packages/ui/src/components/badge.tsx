@@ -14,22 +14,20 @@ const badgeVariants = cva(
         destructive:
           "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
         outline: "text-foreground",
-        focus:
-          "border-transparent bg-focus text-focus-foreground",
-        pomodoro:
-          "border-transparent bg-pomodoro text-pomodoro-foreground",
-        pulse:
-          "border-transparent bg-pulse text-pulse-foreground",
+        focus: "border-transparent bg-focus text-focus-foreground",
+        pomodoro: "border-transparent bg-pomodoro text-pomodoro-foreground",
+        pulse: "border-transparent bg-pulse text-pulse-foreground",
       },
     },
     defaultVariants: {
       variant: "default",
     },
-  }
+  },
 );
 
 export interface BadgeProps
-  extends React.HTMLAttributes<HTMLDivElement>,
+  extends
+    React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof badgeVariants> {}
 
 function Badge({ className, variant, ...props }: BadgeProps) {

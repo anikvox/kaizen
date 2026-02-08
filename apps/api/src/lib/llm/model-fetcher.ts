@@ -10,7 +10,8 @@ const ANTHROPIC_KNOWN_MODELS: ModelInfo[] = [
   {
     id: "claude-sonnet-4-20250514",
     name: "Claude Sonnet 4",
-    description: "Latest Sonnet model, excellent balance of speed and intelligence",
+    description:
+      "Latest Sonnet model, excellent balance of speed and intelligence",
     contextWindow: 200000,
     maxOutputTokens: 8192,
   },
@@ -57,11 +58,13 @@ export async function fetchGeminiModels(apiKey: string): Promise<ModelInfo[]> {
       const modelId = model.name.replace("models/", "");
 
       // Skip embedding, imagen, veo, aqa, and audio-only models
-      if (modelId.includes("embedding") ||
-          modelId.includes("imagen") ||
-          modelId.includes("veo") ||
-          modelId === "aqa" ||
-          modelId.includes("native-audio")) {
+      if (
+        modelId.includes("embedding") ||
+        modelId.includes("imagen") ||
+        modelId.includes("veo") ||
+        modelId === "aqa" ||
+        modelId.includes("native-audio")
+      ) {
         continue;
       }
 
@@ -106,13 +109,16 @@ export async function fetchOpenAIModels(apiKey: string): Promise<ModelInfo[]> {
   const chatModelPrefixes = ["gpt-4", "gpt-3.5", "o1", "o3", "chatgpt"];
 
   for (const model of response.data) {
-    const isChatModel = chatModelPrefixes.some(prefix => model.id.startsWith(prefix));
+    const isChatModel = chatModelPrefixes.some((prefix) =>
+      model.id.startsWith(prefix),
+    );
 
     // Skip instruct, audio, realtime, and search models
-    const isExcluded = model.id.includes("instruct") ||
-                       model.id.includes("audio") ||
-                       model.id.includes("realtime") ||
-                       model.id.includes("search");
+    const isExcluded =
+      model.id.includes("instruct") ||
+      model.id.includes("audio") ||
+      model.id.includes("realtime") ||
+      model.id.includes("search");
 
     if (isChatModel && !isExcluded) {
       // OpenAI doesn't return context window in list, use known defaults
@@ -147,7 +153,9 @@ export async function fetchOpenAIModels(apiKey: string): Promise<ModelInfo[]> {
  * Get models for Anthropic (verify API key, return known models)
  * Anthropic doesn't have a public models list API
  */
-export async function fetchAnthropicModels(apiKey: string): Promise<ModelInfo[]> {
+export async function fetchAnthropicModels(
+  apiKey: string,
+): Promise<ModelInfo[]> {
   // Verify the API key works by making a minimal request
   const client = new Anthropic({ apiKey });
 
@@ -168,7 +176,7 @@ export async function fetchAnthropicModels(apiKey: string): Promise<ModelInfo[]>
  */
 export async function fetchModelsForProvider(
   provider: LLMProviderType,
-  apiKey: string
+  apiKey: string,
 ): Promise<ModelInfo[]> {
   switch (provider) {
     case "gemini":
@@ -185,7 +193,8 @@ export async function fetchModelsForProvider(
 // Helper functions for OpenAI model metadata
 function getOpenAIContextWindow(modelId: string): number {
   if (modelId.includes("o1") || modelId.includes("o3")) return 200000;
-  if (modelId.includes("gpt-4o") || modelId.includes("gpt-4-turbo")) return 128000;
+  if (modelId.includes("gpt-4o") || modelId.includes("gpt-4-turbo"))
+    return 128000;
   if (modelId.includes("gpt-4-32k")) return 32768;
   if (modelId.includes("gpt-4")) return 8192;
   if (modelId.includes("gpt-3.5-turbo-16k")) return 16385;

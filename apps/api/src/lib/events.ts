@@ -324,7 +324,9 @@ class AppEvents extends EventEmitter {
     this.emit("pomodoroStatusChanged", data);
   }
 
-  onPomodoroStatusChanged(callback: (data: PomodoroStatusChangedEvent) => void) {
+  onPomodoroStatusChanged(
+    callback: (data: PomodoroStatusChangedEvent) => void,
+  ) {
     this.on("pomodoroStatusChanged", callback);
     return () => this.off("pomodoroStatusChanged", callback);
   }

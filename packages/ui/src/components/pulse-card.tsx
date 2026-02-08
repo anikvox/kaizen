@@ -22,7 +22,7 @@ const PulseCard = React.forwardRef<HTMLDivElement, PulseCardProps>(
         ref={ref}
         className={cn(
           "rounded-lg p-4 border bg-pulse/5 border-pulse/20",
-          className
+          className,
         )}
         {...props}
       >
@@ -50,7 +50,7 @@ const PulseCard = React.forwardRef<HTMLDivElement, PulseCardProps>(
         </p>
       </div>
     );
-  }
+  },
 );
 PulseCard.displayName = "PulseCard";
 

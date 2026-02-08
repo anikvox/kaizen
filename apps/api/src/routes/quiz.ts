@@ -19,7 +19,9 @@ type CombinedAuthVariables = {
 const app = new Hono<{ Variables: CombinedAuthVariables }>();
 
 // Helper to get userId from either auth method
-async function getUserIdFromContext(c: { get: (key: string) => string | undefined }): Promise<string | null> {
+async function getUserIdFromContext(c: {
+  get: (key: string) => string | undefined;
+}): Promise<string | null> {
   const deviceUserId = c.get("userId");
   if (deviceUserId) {
     return deviceUserId;
@@ -182,7 +184,9 @@ app.get("/job/:jobId", dualAuthMiddleware, async (c) => {
 
       return c.json({
         status: "failed",
-        error: isNoActivityError ? "Not enough activity data to generate quiz" : "Quiz generation failed",
+        error: isNoActivityError
+          ? "Not enough activity data to generate quiz"
+          : "Quiz generation failed",
         code: isNoActivityError ? "NO_ACTIVITY_DATA" : "INTERNAL_ERROR",
       });
     }
@@ -222,13 +226,27 @@ app.post("/:quizId/answer", dualAuthMiddleware, async (c) => {
   const quizId = c.req.param("quizId");
 
   try {
-    const body = await c.req.json<{ questionIndex: number; selectedIndex: number }>();
+    const body = await c.req.json<{
+      questionIndex: number;
+      selectedIndex: number;
+    }>();
 
-    if (typeof body.questionIndex !== "number" || typeof body.selectedIndex !== "number") {
-      return c.json({ error: "questionIndex and selectedIndex are required" }, 400);
+    if (
+      typeof body.questionIndex !== "number" ||
+      typeof body.selectedIndex !== "number"
+    ) {
+      return c.json(
+        { error: "questionIndex and selectedIndex are required" },
+        400,
+      );
     }
 
-    const result = await submitAnswer(userId, quizId, body.questionIndex, body.selectedIndex);
+    const result = await submitAnswer(
+      userId,
+      quizId,
+      body.questionIndex,
+      body.selectedIndex,
+    );
 
     if (!result.success) {
       return c.json({ error: result.error }, 400);
@@ -260,10 +278,19 @@ app.post("/result", dualAuthMiddleware, async (c) => {
   }
 
   try {
-    const body = await c.req.json<{ totalQuestions: number; correctAnswers: number }>();
+    const body = await c.req.json<{
+      totalQuestions: number;
+      correctAnswers: number;
+    }>();
 
-    if (typeof body.totalQuestions !== "number" || typeof body.correctAnswers !== "number") {
-      return c.json({ error: "totalQuestions and correctAnswers are required" }, 400);
+    if (
+      typeof body.totalQuestions !== "number" ||
+      typeof body.correctAnswers !== "number"
+    ) {
+      return c.json(
+        { error: "totalQuestions and correctAnswers are required" },
+        400,
+      );
     }
 
     const result = await db.quizResult.create({

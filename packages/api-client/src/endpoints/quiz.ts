@@ -1,5 +1,10 @@
 import type { HttpClient } from "../http.js";
-import type { QuizJobResponse, QuizHistoryResponse, QuizCurrentResponse, QuizAnswerResponse } from "../types/index.js";
+import type {
+  QuizJobResponse,
+  QuizHistoryResponse,
+  QuizCurrentResponse,
+  QuizAnswerResponse,
+} from "../types/index.js";
 
 export class QuizEndpoints {
   constructor(private http: HttpClient) {}
@@ -17,7 +22,11 @@ export class QuizEndpoints {
    * Use getJobStatus to poll for completion.
    */
   async generate(): Promise<{ jobId: string; status: string }> {
-    return this.http.post<{ jobId: string; status: string }>("/quiz/generate", {}, true);
+    return this.http.post<{ jobId: string; status: string }>(
+      "/quiz/generate",
+      {},
+      true,
+    );
   }
 
   /**
@@ -31,15 +40,30 @@ export class QuizEndpoints {
   /**
    * Submit an answer for a quiz question.
    */
-  async submitAnswer(quizId: string, questionIndex: number, selectedIndex: number): Promise<QuizAnswerResponse> {
-    return this.http.post<QuizAnswerResponse>(`/quiz/${quizId}/answer`, { questionIndex, selectedIndex }, true);
+  async submitAnswer(
+    quizId: string,
+    questionIndex: number,
+    selectedIndex: number,
+  ): Promise<QuizAnswerResponse> {
+    return this.http.post<QuizAnswerResponse>(
+      `/quiz/${quizId}/answer`,
+      { questionIndex, selectedIndex },
+      true,
+    );
   }
 
   /**
    * Save a quiz result (legacy endpoint).
    */
-  async saveResult(totalQuestions: number, correctAnswers: number): Promise<{ id: string; saved: boolean }> {
-    return this.http.post<{ id: string; saved: boolean }>("/quiz/result", { totalQuestions, correctAnswers }, true);
+  async saveResult(
+    totalQuestions: number,
+    correctAnswers: number,
+  ): Promise<{ id: string; saved: boolean }> {
+    return this.http.post<{ id: string; saved: boolean }>(
+      "/quiz/result",
+      { totalQuestions, correctAnswers },
+      true,
+    );
   }
 
   /**

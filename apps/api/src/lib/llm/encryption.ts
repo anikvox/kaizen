@@ -58,7 +58,10 @@ export function decrypt(encryptedBase64: string): string {
   // Extract IV, ciphertext, and auth tag
   const iv = combined.subarray(0, IV_LENGTH);
   const authTag = combined.subarray(combined.length - AUTH_TAG_LENGTH);
-  const ciphertext = combined.subarray(IV_LENGTH, combined.length - AUTH_TAG_LENGTH);
+  const ciphertext = combined.subarray(
+    IV_LENGTH,
+    combined.length - AUTH_TAG_LENGTH,
+  );
 
   const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
   decipher.setAuthTag(authTag);
@@ -74,7 +77,9 @@ export function decrypt(encryptedBase64: string): string {
 /**
  * Safely decrypt an API key, returning null if decryption fails or key is empty.
  */
-export function decryptApiKey(encryptedKey: string | null | undefined): string | null {
+export function decryptApiKey(
+  encryptedKey: string | null | undefined,
+): string | null {
   if (!encryptedKey) return null;
 
   try {

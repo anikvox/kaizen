@@ -19,7 +19,9 @@ const apiUrl =
 export default function LinkExtension() {
   const { isSignedIn, isLoaded, getToken } = useAuth();
   const { user: clerkUser } = useUser();
-  const [status, setStatus] = useState<"loading" | "consent" | "linking" | "success" | "error">("loading");
+  const [status, setStatus] = useState<
+    "loading" | "consent" | "linking" | "success" | "error"
+  >("loading");
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [userSynced, setUserSynced] = useState(false);
@@ -135,14 +137,18 @@ export default function LinkExtension() {
                 </div>
                 <div>
                   <p className="font-medium">Kaizen Chrome Extension</p>
-                  <p className="text-sm text-muted-foreground">wants to access your account</p>
+                  <p className="text-sm text-muted-foreground">
+                    wants to access your account
+                  </p>
                 </div>
               </div>
             </div>
 
             {!isSignedIn ? (
               <div className="text-center">
-                <p className="text-muted-foreground mb-4">Sign in to continue</p>
+                <p className="text-muted-foreground mb-4">
+                  Sign in to continue
+                </p>
                 <SignInButton mode="modal">
                   <Button className="w-full">Sign In</Button>
                 </SignInButton>
@@ -150,14 +156,19 @@ export default function LinkExtension() {
             ) : (
               <>
                 <div className="p-3 rounded-lg bg-secondary/10 mb-6">
-                  <p className="text-xs text-muted-foreground mb-1">Signed in as</p>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Signed in as
+                  </p>
                   <p className="font-medium text-sm">
-                    {clerkUser?.fullName || clerkUser?.emailAddresses[0]?.emailAddress}
+                    {clerkUser?.fullName ||
+                      clerkUser?.emailAddresses[0]?.emailAddress}
                   </p>
                 </div>
 
                 <div className="mb-6">
-                  <p className="text-sm font-medium mb-2">This will allow the extension to:</p>
+                  <p className="text-sm font-medium mb-2">
+                    This will allow the extension to:
+                  </p>
                   <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
                     <li>Access your account information</li>
                     <li>Track your browsing for focus detection</li>
@@ -166,7 +177,11 @@ export default function LinkExtension() {
                 </div>
 
                 <div className="flex gap-3">
-                  <Button variant="outline" onClick={handleDeny} className="flex-1">
+                  <Button
+                    variant="outline"
+                    onClick={handleDeny}
+                    className="flex-1"
+                  >
                     Deny
                   </Button>
                   <Button onClick={handleAuthorize} className="flex-1">
@@ -228,17 +243,24 @@ export default function LinkExtension() {
           </p>
 
           <div className="flex gap-3 justify-center">
-            <Button onClick={handleCloseWindow}>
-              Close Window
-            </Button>
-            <Button variant="outline" onClick={handleCopyToken} className="gap-2">
-              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            <Button onClick={handleCloseWindow}>Close Window</Button>
+            <Button
+              variant="outline"
+              onClick={handleCopyToken}
+              className="gap-2"
+            >
+              {copied ? (
+                <Check className="w-4 h-4" />
+              ) : (
+                <Copy className="w-4 h-4" />
+              )}
               {copied ? "Copied!" : "Copy Token"}
             </Button>
           </div>
 
           <p className="text-xs text-muted-foreground mt-4">
-            If the extension didn&apos;t receive the token automatically, copy it manually.
+            If the extension didn&apos;t receive the token automatically, copy
+            it manually.
           </p>
         </CardContent>
       </Card>

@@ -29,13 +29,17 @@ const PULSE_GENERATION_INTERVAL_MS = 15 * 60 * 1000;
  */
 export async function sendFocusCalculation(
   userId: string,
-  force?: boolean
+  force?: boolean,
 ): Promise<string | null> {
   const boss = await getBoss();
-  return boss.send(JOB_NAMES.FOCUS_CALCULATION, { userId, force } as FocusCalculationPayload, {
-    singletonKey: force ? undefined : `focus-${userId}`,
-    singletonSeconds: force ? undefined : 10,
-  });
+  return boss.send(
+    JOB_NAMES.FOCUS_CALCULATION,
+    { userId, force } as FocusCalculationPayload,
+    {
+      singletonKey: force ? undefined : `focus-${userId}`,
+      singletonSeconds: force ? undefined : 10,
+    },
+  );
 }
 
 /**
@@ -43,7 +47,7 @@ export async function sendFocusCalculation(
  */
 export async function sendQuizGeneration(
   userId: string,
-  options?: { answerOptionsCount?: number; activityDays?: number }
+  options?: { answerOptionsCount?: number; activityDays?: number },
 ): Promise<string | null> {
   const boss = await getBoss();
   return boss.send(
@@ -52,7 +56,7 @@ export async function sendQuizGeneration(
     {
       singletonKey: `quiz-${userId}`,
       singletonSeconds: 30,
-    }
+    },
   );
 }
 
@@ -61,7 +65,7 @@ export async function sendQuizGeneration(
  */
 export async function sendVisitSummarization(
   userId: string,
-  visitIds?: string[]
+  visitIds?: string[],
 ): Promise<string | null> {
   const boss = await getBoss();
   return boss.send(
@@ -70,14 +74,16 @@ export async function sendVisitSummarization(
     {
       singletonKey: visitIds ? undefined : `visit-summarize-${userId}`,
       singletonSeconds: visitIds ? undefined : 30,
-    }
+    },
   );
 }
 
 /**
  * Send a pulse generation job
  */
-export async function sendPulseGeneration(userId: string): Promise<string | null> {
+export async function sendPulseGeneration(
+  userId: string,
+): Promise<string | null> {
   const boss = await getBoss();
   return boss.send(
     JOB_NAMES.PULSE_GENERATION,
@@ -85,7 +91,7 @@ export async function sendPulseGeneration(userId: string): Promise<string | null
     {
       singletonKey: `pulse-${userId}`,
       singletonSeconds: 60, // Prevent duplicates within 1 minute
-    }
+    },
   );
 }
 
@@ -111,33 +117,46 @@ export async function scheduleInitialJobs(
   settings: {
     focusCalculationIntervalMs?: number | null;
     attentionSummarizationIntervalMs?: number | null;
-  }
+  },
 ): Promise<void> {
   const boss = await getBoss();
 
   // Always schedule focus calculation
   const focusInterval = settings.focusCalculationIntervalMs || 30000;
-  await boss.send(JOB_NAMES.FOCUS_CALCULATION, { userId }, {
-    singletonKey: `focus-${userId}`,
-    startAfter: Math.floor(focusInterval / 1000), // Convert ms to seconds
-    singletonSeconds: Math.floor(focusInterval / 1000),
-  });
+  await boss.send(
+    JOB_NAMES.FOCUS_CALCULATION,
+    { userId },
+    {
+      singletonKey: `focus-${userId}`,
+      startAfter: Math.floor(focusInterval / 1000), // Convert ms to seconds
+      singletonSeconds: Math.floor(focusInterval / 1000),
+    },
+  );
 
   // Always schedule visit summarization
-  const summarizationInterval = settings.attentionSummarizationIntervalMs || 60000;
-  await boss.send(JOB_NAMES.VISIT_SUMMARIZATION, { userId }, {
-    singletonKey: `visit-summarize-${userId}`,
-    startAfter: Math.floor(summarizationInterval / 1000), // Convert ms to seconds
-    singletonSeconds: Math.floor(summarizationInterval / 1000),
-  });
+  const summarizationInterval =
+    settings.attentionSummarizationIntervalMs || 60000;
+  await boss.send(
+    JOB_NAMES.VISIT_SUMMARIZATION,
+    { userId },
+    {
+      singletonKey: `visit-summarize-${userId}`,
+      startAfter: Math.floor(summarizationInterval / 1000), // Convert ms to seconds
+      singletonSeconds: Math.floor(summarizationInterval / 1000),
+    },
+  );
 
   // Schedule pulse generation (every 15 minutes)
   const pulseInterval = PULSE_GENERATION_INTERVAL_MS;
-  await boss.send(JOB_NAMES.PULSE_GENERATION, { userId }, {
-    singletonKey: `pulse-${userId}`,
-    startAfter: Math.floor(pulseInterval / 1000),
-    singletonSeconds: Math.floor(pulseInterval / 1000),
-  });
+  await boss.send(
+    JOB_NAMES.PULSE_GENERATION,
+    { userId },
+    {
+      singletonKey: `pulse-${userId}`,
+      startAfter: Math.floor(pulseInterval / 1000),
+      singletonSeconds: Math.floor(pulseInterval / 1000),
+    },
+  );
 }
 
 /**
@@ -149,27 +168,36 @@ export async function rescheduleUserJobs(
   settings: {
     focusCalculationIntervalMs?: number | null;
     attentionSummarizationIntervalMs?: number | null;
-  }
+  },
 ): Promise<void> {
   const boss = await getBoss();
 
   // Always reschedule focus calculation
   const focusInterval = settings.focusCalculationIntervalMs || 30000;
   // Send immediate job - will self-schedule next run with new interval
-  await boss.send(JOB_NAMES.FOCUS_CALCULATION, { userId, force: false }, {
-    singletonKey: `focus-${userId}`,
-    startAfter: 1, // Run in 1 second (0 may cause issues)
-    singletonSeconds: Math.floor(focusInterval / 1000),
-  });
+  await boss.send(
+    JOB_NAMES.FOCUS_CALCULATION,
+    { userId, force: false },
+    {
+      singletonKey: `focus-${userId}`,
+      startAfter: 1, // Run in 1 second (0 may cause issues)
+      singletonSeconds: Math.floor(focusInterval / 1000),
+    },
+  );
 
   // Always reschedule visit summarization
-  const summarizationInterval = settings.attentionSummarizationIntervalMs || 60000;
+  const summarizationInterval =
+    settings.attentionSummarizationIntervalMs || 60000;
   // Send immediate job - will self-schedule next run with new interval
-  await boss.send(JOB_NAMES.VISIT_SUMMARIZATION, { userId }, {
-    singletonKey: `visit-summarize-${userId}`,
-    startAfter: 1, // Run in 1 second (0 may cause issues)
-    singletonSeconds: Math.floor(summarizationInterval / 1000),
-  });
+  await boss.send(
+    JOB_NAMES.VISIT_SUMMARIZATION,
+    { userId },
+    {
+      singletonKey: `visit-summarize-${userId}`,
+      startAfter: 1, // Run in 1 second (0 may cause issues)
+      singletonSeconds: Math.floor(summarizationInterval / 1000),
+    },
+  );
 }
 
 /**
@@ -223,7 +251,9 @@ function toJobStatus(job: Job): JobStatus {
  * Job visibility is provided via SSE events (jobCreated, jobCompleted, jobFailed).
  * This returns minimal stats using pg-boss's getQueueStats().
  */
-export async function getUserJobsStatus(userId: string): Promise<UserJobsStatus> {
+export async function getUserJobsStatus(
+  userId: string,
+): Promise<UserJobsStatus> {
   if (!isBossRunning()) {
     return {
       pending: [],
@@ -349,33 +379,49 @@ export async function scheduleAllUserJobs(): Promise<void> {
   for (const user of users) {
     try {
       const focusInterval = user.focusCalculationIntervalMs || 30000;
-      const summarizationInterval = user.attentionSummarizationIntervalMs || 60000;
+      const summarizationInterval =
+        user.attentionSummarizationIntervalMs || 60000;
       const pulseInterval = PULSE_GENERATION_INTERVAL_MS;
 
       // Schedule focus calculation
-      await boss.send(JOB_NAMES.FOCUS_CALCULATION, { userId: user.userId }, {
-        singletonKey: `focus-${user.userId}`,
-        startAfter: Math.floor(focusInterval / 1000), // Convert ms to seconds
-        singletonSeconds: Math.floor(focusInterval / 1000),
-      });
+      await boss.send(
+        JOB_NAMES.FOCUS_CALCULATION,
+        { userId: user.userId },
+        {
+          singletonKey: `focus-${user.userId}`,
+          startAfter: Math.floor(focusInterval / 1000), // Convert ms to seconds
+          singletonSeconds: Math.floor(focusInterval / 1000),
+        },
+      );
 
       // Schedule visit summarization
-      await boss.send(JOB_NAMES.VISIT_SUMMARIZATION, { userId: user.userId }, {
-        singletonKey: `visit-summarize-${user.userId}`,
-        startAfter: Math.floor(summarizationInterval / 1000), // Convert ms to seconds
-        singletonSeconds: Math.floor(summarizationInterval / 1000),
-      });
+      await boss.send(
+        JOB_NAMES.VISIT_SUMMARIZATION,
+        { userId: user.userId },
+        {
+          singletonKey: `visit-summarize-${user.userId}`,
+          startAfter: Math.floor(summarizationInterval / 1000), // Convert ms to seconds
+          singletonSeconds: Math.floor(summarizationInterval / 1000),
+        },
+      );
 
       // Schedule pulse generation
-      await boss.send(JOB_NAMES.PULSE_GENERATION, { userId: user.userId }, {
-        singletonKey: `pulse-${user.userId}`,
-        startAfter: Math.floor(pulseInterval / 1000),
-        singletonSeconds: Math.floor(pulseInterval / 1000),
-      });
+      await boss.send(
+        JOB_NAMES.PULSE_GENERATION,
+        { userId: user.userId },
+        {
+          singletonKey: `pulse-${user.userId}`,
+          startAfter: Math.floor(pulseInterval / 1000),
+          singletonSeconds: Math.floor(pulseInterval / 1000),
+        },
+      );
 
       scheduled++;
     } catch (error) {
-      console.error(`[Jobs] Failed to schedule jobs for user ${user.userId}:`, error);
+      console.error(
+        `[Jobs] Failed to schedule jobs for user ${user.userId}:`,
+        error,
+      );
     }
   }
 

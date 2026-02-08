@@ -21,7 +21,7 @@ export const parseQuizResponse = validateQuiz;
 export function createQuizPrompt(
   context: QuizGenerationContext,
   optionsCount: number,
-  questionCount: number = 10
+  questionCount: number = 10,
 ): string {
   // Add randomness to encourage different questions each time
   const seed = Math.random().toString(36).slice(2, 8);
@@ -32,7 +32,8 @@ export function createQuizPrompt(
     "focus on key facts and details",
     "focus on comparisons and contrasts",
   ];
-  const selectedStyle = questionStyles[Math.floor(Math.random() * questionStyles.length)];
+  const selectedStyle =
+    questionStyles[Math.floor(Math.random() * questionStyles.length)];
 
   // Build previous questions section for deduplication
   let previousQuestionsSection = "";

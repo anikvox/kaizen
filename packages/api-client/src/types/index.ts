@@ -61,7 +61,6 @@ export interface DeviceTokenCreated {
   createdAt: string;
 }
 
-
 // Website Visit Types
 export interface WebsiteVisit {
   id: string;
@@ -400,7 +399,13 @@ export interface SSESettingsChangedData {
 
 // Chat Types
 export type ChatMessageRole = "user" | "assistant" | "tool";
-export type ChatMessageStatus = "sending" | "sent" | "typing" | "streaming" | "finished" | "error";
+export type ChatMessageStatus =
+  | "sending"
+  | "sent"
+  | "typing"
+  | "streaming"
+  | "finished"
+  | "error";
 
 /**
  * Attention time range options for chat context.
@@ -900,4 +905,3 @@ export interface JourneyDomainDetailResponse {
   referrers: JourneySiteReferrer[];
   dailyActivity: JourneyDailyActivity[];
 }
-

@@ -37,7 +37,7 @@ const PomodoroTimer = React.forwardRef<HTMLDivElement, PomodoroTimerProps>(
           isRunning
             ? "bg-pomodoro/10 border-pomodoro/30"
             : "bg-muted/50 border-border",
-          className
+          className,
         )}
         {...props}
       >
@@ -49,7 +49,7 @@ const PomodoroTimer = React.forwardRef<HTMLDivElement, PomodoroTimerProps>(
                 isRunning && "bg-pomodoro",
                 isPaused && "bg-yellow-500",
                 isCooldown && "bg-cyan-500",
-                !isActive && "bg-muted-foreground"
+                !isActive && "bg-muted-foreground",
               )}
             />
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -69,7 +69,7 @@ const PomodoroTimer = React.forwardRef<HTMLDivElement, PomodoroTimerProps>(
                 "px-3 py-1 text-xs font-medium rounded text-white transition-colors",
                 isPaused
                   ? "bg-focus hover:bg-focus/90"
-                  : "bg-muted-foreground hover:bg-muted-foreground/90"
+                  : "bg-muted-foreground hover:bg-muted-foreground/90",
               )}
             >
               {isPaused ? "Resume" : "Pause"}
@@ -82,14 +82,14 @@ const PomodoroTimer = React.forwardRef<HTMLDivElement, PomodoroTimerProps>(
             "text-3xl font-bold font-mono",
             isRunning && "text-pomodoro",
             isPaused && "text-yellow-500",
-            !isActive && "text-foreground"
+            !isActive && "text-foreground",
           )}
         >
           {status ? formatTime(status.elapsedSeconds) : "0:00"}
         </p>
       </div>
     );
-  }
+  },
 );
 PomodoroTimer.displayName = "PomodoroTimer";
 

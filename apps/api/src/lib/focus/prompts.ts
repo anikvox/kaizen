@@ -1,5 +1,9 @@
 import type { FormattedAttentionItem } from "./types.js";
-import { FOCUS_ANALYSIS_SYSTEM_PROMPT, validateYesNo, validateFocusItem } from "../llm/index.js";
+import {
+  FOCUS_ANALYSIS_SYSTEM_PROMPT,
+  validateYesNo,
+  validateFocusItem,
+} from "../llm/index.js";
 
 // Re-export centralized prompt for backward compatibility
 export { FOCUS_ANALYSIS_SYSTEM_PROMPT as FOCUS_SYSTEM_PROMPT };
@@ -13,7 +17,7 @@ export { validateYesNo, validateFocusItem };
  */
 export function formatAttentionForPrompt(
   attentionItems: FormattedAttentionItem[],
-  maxContentLength: number = 5000
+  maxContentLength: number = 5000,
 ): string {
   if (attentionItems.length === 0) {
     return "No recent attention data available.";
@@ -34,7 +38,9 @@ export function formatAttentionForPrompt(
     // Add text content (truncated)
     if (item.textContent.length > 0) {
       const textContent = item.textContent.join(" ").slice(0, 1000);
-      parts.push(`Text read: ${textContent}${item.textContent.join(" ").length > 1000 ? "..." : ""}`);
+      parts.push(
+        `Text read: ${textContent}${item.textContent.join(" ").length > 1000 ? "..." : ""}`,
+      );
     }
 
     // Add image descriptions
@@ -92,7 +98,7 @@ If you cannot determine a clear focus from the data, respond with exactly: null`
 export function createFocusDriftPrompt(
   currentFocusItem: string,
   keywords: string[],
-  formattedAttention: string
+  formattedAttention: string,
 ): string {
   return `You are performing focus analysis to check if the user's attention has shifted to a new topic.
 
@@ -131,4 +137,3 @@ Rules:
 - Consider both direct and indirect relationships
 - No punctuation or explanation in your response`;
 }
-

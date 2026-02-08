@@ -1,11 +1,6 @@
 import { Hono } from "hono";
 import type { UserSettings } from "@prisma/client";
-import {
-  db,
-  events,
-  generateChatTitle,
-  runChatAgent,
-} from "../lib/index.js";
+import { db, events, generateChatTitle, runChatAgent } from "../lib/index.js";
 import type { ChatAgentMessage } from "../lib/index.js";
 
 // Timeout for bot typing state (1 minute)
@@ -24,7 +19,9 @@ type CombinedAuthVariables = {
 const app = new Hono<{ Variables: CombinedAuthVariables }>();
 
 // Helper to get userId from either auth method
-async function getUserIdFromContext(c: { get: (key: string) => string | undefined }): Promise<string | null> {
+async function getUserIdFromContext(c: {
+  get: (key: string) => string | undefined;
+}): Promise<string | null> {
   const deviceUserId = c.get("userId");
   if (deviceUserId) {
     return deviceUserId;
@@ -109,7 +106,7 @@ app.get("/", dualAuthMiddleware, async (c) => {
       messageCount: countMap.get(s.id) || 0,
       createdAt: s.createdAt.toISOString(),
       updatedAt: s.updatedAt.toISOString(),
-    }))
+    })),
   );
 });
 
@@ -317,7 +314,15 @@ app.post("/", dualAuthMiddleware, async (c) => {
   // The agent will use tools to get attention data when needed
   // Pass first user message for title generation if this is a new session
   const firstUserMessage = isNewSession ? body.content.trim() : undefined;
-  generateAgentResponse(userId, sessionId, assistantMessage.id, agentMessages, firstUserMessage, userSettings, sessionAttentionRange);
+  generateAgentResponse(
+    userId,
+    sessionId,
+    assistantMessage.id,
+    agentMessages,
+    firstUserMessage,
+    userSettings,
+    sessionAttentionRange,
+  );
 
   // Update session updatedAt
   await db.chatSession.update({
@@ -385,7 +390,7 @@ async function generateAgentResponse(
   conversationHistory: ChatAgentMessage[],
   firstUserMessage?: string, // If provided, generate title after response
   userSettings?: UserSettings | null,
-  attentionRange?: string // User's selected time range for activity context
+  attentionRange?: string, // User's selected time range for activity context
 ) {
   // Build context about the user's selected attention range
   const attentionRangeContext = attentionRange
@@ -428,7 +433,11 @@ async function generateAgentResponse(
           });
         },
 
-        onToolCall: async (toolCallId: string, toolName: string, args: unknown) => {
+        onToolCall: async (
+          toolCallId: string,
+          toolName: string,
+          args: unknown,
+        ) => {
           // Clear timeout when tool is called
           const timeoutId = activeBotResponses.get(assistantMessageId);
           if (timeoutId) {
@@ -443,10 +452,13 @@ async function generateAgentResponse(
             toolCallId,
             toolName,
           });
-
         },
 
-        onToolResult: async (toolCallId: string, toolName: string, result: unknown) => {
+        onToolResult: async (
+          toolCallId: string,
+          toolName: string,
+          result: unknown,
+        ) => {
           // Create tool message in database (only when we have the result)
           const toolMessage = await db.chatMessage.create({
             data: {
@@ -561,7 +573,7 @@ async function generateAgentResponse(
             },
           });
         },
-      }
+      },
     );
   } catch (error) {
     console.error("Agent response error:", error);
@@ -573,7 +585,8 @@ async function generateAgentResponse(
       activeBotResponses.delete(assistantMessageId);
     }
 
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
 
     await db.chatMessage.update({
       where: { id: assistantMessageId },

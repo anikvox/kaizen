@@ -98,7 +98,9 @@ export function startTrace(options: TraceOptions): TraceContext | null {
       const span = trace.span({
         name: spanOptions.name,
         type: spanOptions.type || "general",
-        input: spanOptions.input ? anonymizeInput(spanOptions.input) : undefined,
+        input: spanOptions.input
+          ? anonymizeInput(spanOptions.input)
+          : undefined,
         metadata: spanOptions.metadata,
       });
 
@@ -107,14 +109,19 @@ export function startTrace(options: TraceOptions): TraceContext | null {
         end: (output?: Record<string, unknown>) => {
           try {
             // Don't anonymize outputs - we want to see LLM responses
-            const processedOutput = output ? anonymizeOutput(output) : undefined;
+            const processedOutput = output
+              ? anonymizeOutput(output)
+              : undefined;
             // Set output and endTime together in one update call
             span.update({
               output: processedOutput,
               endTime: new Date(),
             });
           } catch (error) {
-            console.error(`[Telemetry] Error ending span ${spanOptions.name}:`, error);
+            console.error(
+              `[Telemetry] Error ending span ${spanOptions.name}:`,
+              error,
+            );
             throw error;
           }
         },
@@ -143,7 +150,7 @@ export function startTrace(options: TraceOptions): TraceContext | null {
  * Create a simple one-shot trace (single operation, no nested spans).
  */
 export async function traceOperation<T>(
-  options: TraceOptions & { operation: () => Promise<T> }
+  options: TraceOptions & { operation: () => Promise<T> },
 ): Promise<T> {
   const client = getOpikClient();
 
@@ -167,7 +174,10 @@ export async function traceOperation<T>(
   try {
     const result = await options.operation();
     // Preserve output data (don't anonymize results)
-    const output = anonymizeOutput({ success: true, result: typeof result === "object" ? result : { value: result } });
+    const output = anonymizeOutput({
+      success: true,
+      result: typeof result === "object" ? result : { value: result },
+    });
     trace.update({ output, endTime: new Date() });
     await client.flush();
     return result;
@@ -212,7 +222,11 @@ export function getTelemetrySettings(options?: {
   metadata?: Record<string, unknown>;
   promptName?: string;
   promptVersion?: string;
-}): { isEnabled: boolean; functionId?: string; metadata?: Record<string, string> } {
+}): {
+  isEnabled: boolean;
+  functionId?: string;
+  metadata?: Record<string, string>;
+} {
   // Disable OpenTelemetry-based tracing since we're using Opik SDK directly
   return { isEnabled: false };
 }

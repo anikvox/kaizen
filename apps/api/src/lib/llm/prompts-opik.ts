@@ -60,7 +60,9 @@ export interface OpikPromptResult {
  * Always fetches fresh from Opik - no caching.
  * Returns null if Opik is not enabled or fetch fails.
  */
-export async function getPromptFromOpik(name: PromptName): Promise<OpikPromptResult | null> {
+export async function getPromptFromOpik(
+  name: PromptName,
+): Promise<OpikPromptResult | null> {
   const client = getOpikClient();
   if (!client) {
     return null;
@@ -97,7 +99,7 @@ export async function getPromptFromOpik(name: PromptName): Promise<OpikPromptRes
 export async function syncPromptToOpik(
   name: PromptName,
   content: string,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
 ): Promise<boolean> {
   const client = getOpikClient();
   if (!client) {
@@ -128,7 +130,7 @@ export async function syncPromptToOpik(
  * Sync all prompts from local definitions to Opik.
  */
 export async function syncAllPromptsToOpik(
-  prompts: Record<PromptName, string>
+  prompts: Record<PromptName, string>,
 ): Promise<{ synced: number; failed: number }> {
   const results = { synced: 0, failed: 0 };
 
@@ -141,6 +143,8 @@ export async function syncAllPromptsToOpik(
     }
   }
 
-  console.log(`[Opik] Prompt sync complete: ${results.synced} synced, ${results.failed} failed`);
+  console.log(
+    `[Opik] Prompt sync complete: ${results.synced} synced, ${results.failed} failed`,
+  );
   return results;
 }

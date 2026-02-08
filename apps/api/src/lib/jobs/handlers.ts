@@ -16,7 +16,10 @@ import {
   getEarliestTimestamp,
   getLatestTimestamp,
 } from "../focus/utils.js";
-import { MAX_ATTENTION_WINDOW_MS, NO_FOCUS_ATTENTION_WINDOW_MS } from "../focus/types.js";
+import {
+  MAX_ATTENTION_WINDOW_MS,
+  NO_FOCUS_ATTENTION_WINDOW_MS,
+} from "../focus/types.js";
 import { processUserSummarization } from "../summarization.js";
 import { generateQuiz } from "../quiz/service.js";
 import { generatePulses } from "../pulse/index.js";
@@ -50,7 +53,7 @@ function cleanHashCache(): void {
  * Handle focus calculation job
  */
 async function handleFocusCalculation(
-  job: Job<FocusCalculationPayload>
+  job: Job<FocusCalculationPayload>,
 ): Promise<FocusCalculationResult> {
   const { userId, force } = job.data;
 
@@ -73,7 +76,10 @@ async function handleFocusCalculation(
     const now = new Date();
 
     // Check and end inactive focuses
-    const endedCount = await checkAndEndInactiveFocuses(userId, focusSettings.focusInactivityThresholdMs);
+    const endedCount = await checkAndEndInactiveFocuses(
+      userId,
+      focusSettings.focusInactivityThresholdMs,
+    );
     if (endedCount > 0) {
       result.focusEnded = true;
       result.focusesEnded = endedCount;
@@ -86,7 +92,9 @@ async function handleFocusCalculation(
     let attentionFrom: Date;
 
     if (hasActiveFocus) {
-      attentionFrom = settings?.lastFocusCalculatedAt || new Date(now.getTime() - MAX_ATTENTION_WINDOW_MS);
+      attentionFrom =
+        settings?.lastFocusCalculatedAt ||
+        new Date(now.getTime() - MAX_ATTENTION_WINDOW_MS);
     } else {
       const lastEndedFocus = await db.focus.findFirst({
         where: { userId, isActive: false, endedAt: { not: null } },
@@ -94,7 +102,9 @@ async function handleFocusCalculation(
         select: { endedAt: true },
       });
 
-      attentionFrom = lastEndedFocus?.endedAt || new Date(now.getTime() - NO_FOCUS_ATTENTION_WINDOW_MS);
+      attentionFrom =
+        lastEndedFocus?.endedAt ||
+        new Date(now.getTime() - NO_FOCUS_ATTENTION_WINDOW_MS);
     }
 
     // Fetch attention data
@@ -129,20 +139,34 @@ async function handleFocusCalculation(
     const earliestAttentionTime = getEarliestTimestamp(attentionData);
     const latestAttentionTime = getLatestTimestamp(attentionData);
 
-    const agentResult = await runFocusAgent(userId, attentionData, settings, earliestAttentionTime, latestAttentionTime);
+    const agentResult = await runFocusAgent(
+      userId,
+      attentionData,
+      settings,
+      earliestAttentionTime,
+      latestAttentionTime,
+    );
 
     if (agentResult.success) {
       if (agentResult.focusesCreated > 0) {
         result.focusCreated = true;
         result.focusesCreated = agentResult.focusesCreated;
       }
-      if (agentResult.focusesUpdated > 0 || agentResult.focusesMerged > 0 || agentResult.focusesResumed > 0) {
+      if (
+        agentResult.focusesUpdated > 0 ||
+        agentResult.focusesMerged > 0 ||
+        agentResult.focusesResumed > 0
+      ) {
         result.focusUpdated = true;
-        result.focusesUpdated = (agentResult.focusesUpdated || 0) + (agentResult.focusesMerged || 0) + (agentResult.focusesResumed || 0);
+        result.focusesUpdated =
+          (agentResult.focusesUpdated || 0) +
+          (agentResult.focusesMerged || 0) +
+          (agentResult.focusesResumed || 0);
       }
       if (agentResult.focusesEnded > 0) {
         result.focusEnded = true;
-        result.focusesEnded = (result.focusesEnded || 0) + agentResult.focusesEnded;
+        result.focusesEnded =
+          (result.focusesEnded || 0) + agentResult.focusesEnded;
       }
     } else if (agentResult.error) {
       throw new Error(agentResult.error);
@@ -165,13 +189,20 @@ async function handleFocusCalculation(
         const boss = await getBoss();
         const interval = settings?.focusCalculationIntervalMs || 30000;
 
-        await boss.send(JOB_NAMES.FOCUS_CALCULATION, { userId }, {
-          singletonKey: `focus-${userId}`,
-          startAfter: Math.floor(interval / 1000), // Convert ms to seconds
-          singletonSeconds: Math.floor(interval / 1000), // Prevent duplicates within interval window
-        });
+        await boss.send(
+          JOB_NAMES.FOCUS_CALCULATION,
+          { userId },
+          {
+            singletonKey: `focus-${userId}`,
+            startAfter: Math.floor(interval / 1000), // Convert ms to seconds
+            singletonSeconds: Math.floor(interval / 1000), // Prevent duplicates within interval window
+          },
+        );
       } catch (error) {
-        console.error(`[Jobs] Failed to schedule next focus calculation for user ${userId}:`, error);
+        console.error(
+          `[Jobs] Failed to schedule next focus calculation for user ${userId}:`,
+          error,
+        );
       }
     }
   }
@@ -181,7 +212,7 @@ async function handleFocusCalculation(
  * Handle quiz generation job
  */
 async function handleQuizGeneration(
-  job: Job<QuizGenerationPayload>
+  job: Job<QuizGenerationPayload>,
 ): Promise<QuizGenerationResult> {
   const { userId, answerOptionsCount, activityDays } = job.data;
 
@@ -204,7 +235,7 @@ async function handleQuizGeneration(
  * Handle visit summarization job
  */
 async function handleVisitSummarization(
-  job: Job<VisitSummarizationPayload>
+  job: Job<VisitSummarizationPayload>,
 ): Promise<VisitSummarizationResult> {
   const { userId, visitIds } = job.data;
 
@@ -224,11 +255,15 @@ async function handleVisitSummarization(
     const boss = await getBoss();
     const interval = settings?.attentionSummarizationIntervalMs || 60000;
 
-    await boss.send(JOB_NAMES.VISIT_SUMMARIZATION, { userId }, {
-      singletonKey: `visit-summarize-${userId}`,
-      startAfter: Math.floor(interval / 1000), // Convert ms to seconds
-      singletonSeconds: Math.floor(interval / 1000), // Prevent duplicates within interval window
-    });
+    await boss.send(
+      JOB_NAMES.VISIT_SUMMARIZATION,
+      { userId },
+      {
+        singletonKey: `visit-summarize-${userId}`,
+        startAfter: Math.floor(interval / 1000), // Convert ms to seconds
+        singletonSeconds: Math.floor(interval / 1000), // Prevent duplicates within interval window
+      },
+    );
   }
 
   return { visitsSummarized };
@@ -241,7 +276,7 @@ const PULSE_GENERATION_INTERVAL_MS = 15 * 60 * 1000;
  * Handle pulse generation job
  */
 async function handlePulseGeneration(
-  job: Job<PulseGenerationPayload>
+  job: Job<PulseGenerationPayload>,
 ): Promise<PulseGenerationResult> {
   const { userId } = job.data;
 
@@ -252,13 +287,20 @@ async function handlePulseGeneration(
     // Self-schedule next run
     try {
       const boss = await getBoss();
-      await boss.send(JOB_NAMES.PULSE_GENERATION, { userId }, {
-        singletonKey: `pulse-${userId}`,
-        startAfter: Math.floor(PULSE_GENERATION_INTERVAL_MS / 1000),
-        singletonSeconds: Math.floor(PULSE_GENERATION_INTERVAL_MS / 1000),
-      });
+      await boss.send(
+        JOB_NAMES.PULSE_GENERATION,
+        { userId },
+        {
+          singletonKey: `pulse-${userId}`,
+          startAfter: Math.floor(PULSE_GENERATION_INTERVAL_MS / 1000),
+          singletonSeconds: Math.floor(PULSE_GENERATION_INTERVAL_MS / 1000),
+        },
+      );
     } catch (error) {
-      console.error(`[Jobs] Failed to schedule next pulse generation for user ${userId}:`, error);
+      console.error(
+        `[Jobs] Failed to schedule next pulse generation for user ${userId}:`,
+        error,
+      );
     }
   }
 }
@@ -271,36 +313,44 @@ export async function registerHandlers(boss: PgBoss): Promise<void> {
   await boss.work<FocusCalculationPayload, FocusCalculationResult>(
     JOB_NAMES.FOCUS_CALCULATION,
     async ([job]) => {
-      console.log(`[Jobs] Processing focus calculation for user ${job.data.userId}`);
+      console.log(
+        `[Jobs] Processing focus calculation for user ${job.data.userId}`,
+      );
       return handleFocusCalculation(job);
-    }
+    },
   );
 
   // Quiz generation
   await boss.work<QuizGenerationPayload, QuizGenerationResult>(
     JOB_NAMES.QUIZ_GENERATION,
     async ([job]) => {
-      console.log(`[Jobs] Processing quiz generation for user ${job.data.userId}`);
+      console.log(
+        `[Jobs] Processing quiz generation for user ${job.data.userId}`,
+      );
       return handleQuizGeneration(job);
-    }
+    },
   );
 
   // Visit summarization
   await boss.work<VisitSummarizationPayload, VisitSummarizationResult>(
     JOB_NAMES.VISIT_SUMMARIZATION,
     async ([job]) => {
-      console.log(`[Jobs] Processing visit summarization for user ${job.data.userId}`);
+      console.log(
+        `[Jobs] Processing visit summarization for user ${job.data.userId}`,
+      );
       return handleVisitSummarization(job);
-    }
+    },
   );
 
   // Pulse generation
   await boss.work<PulseGenerationPayload, PulseGenerationResult>(
     JOB_NAMES.PULSE_GENERATION,
     async ([job]) => {
-      console.log(`[Jobs] Processing pulse generation for user ${job.data.userId}`);
+      console.log(
+        `[Jobs] Processing pulse generation for user ${job.data.userId}`,
+      );
       return handlePulseGeneration(job);
-    }
+    },
   );
 
   console.log("[Jobs] All handlers registered");

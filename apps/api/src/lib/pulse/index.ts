@@ -78,13 +78,14 @@ export async function generatePulses(userId: string): Promise<number> {
   }
 
   // Prepare activity summary
-  const focusTopics = focuses.length > 0
-    ? focuses.map((f) => f.item).join(", ")
-    : "various topics";
+  const focusTopics =
+    focuses.length > 0
+      ? focuses.map((f) => f.item).join(", ")
+      : "various topics";
 
   const totalActiveTime = websiteVisits.reduce(
     (sum, visit) => sum + (visit.activeTime || 0),
-    0
+    0,
   );
   const minutesSpent = Math.round(totalActiveTime / (1000 * 60));
   const hoursSpent = (totalActiveTime / (1000 * 60 * 60)).toFixed(1);

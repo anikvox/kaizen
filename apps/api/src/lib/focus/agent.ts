@@ -3,9 +3,17 @@ import type { UserSettings } from "@prisma/client";
 import { db } from "../db.js";
 import { events } from "../events.js";
 import { createAgentProvider, getAgentModelId } from "../agent/index.js";
-import { startTrace, getPromptWithMetadata, PROMPT_NAMES } from "../llm/index.js";
+import {
+  startTrace,
+  getPromptWithMetadata,
+  PROMPT_NAMES,
+} from "../llm/index.js";
 import { createFocusTools } from "./tools.js";
-import { formatAttentionData, hasMinimalContent, extractFocusSettings } from "./utils.js";
+import {
+  formatAttentionData,
+  hasMinimalContent,
+  extractFocusSettings,
+} from "./utils.js";
 import { formatAttentionForPrompt } from "./prompts.js";
 import type { RawAttentionData } from "../attention.js";
 
@@ -41,7 +49,7 @@ export async function runFocusAgent(
   attentionData: RawAttentionData,
   settings: UserSettings | null,
   earliestAttentionTime?: Date,
-  latestAttentionTime?: Date
+  latestAttentionTime?: Date,
 ): Promise<FocusAgentResult> {
   const result: FocusAgentResult = {
     success: false,
@@ -97,7 +105,12 @@ export async function runFocusAgent(
     // Create the AI provider and tools
     const provider = createAgentProvider(settings);
     const modelId = getAgentModelId(settings);
-    const tools = createFocusTools(userId, focusSettings.focusInactivityThresholdMs, earliestAttentionTime, latestAttentionTime);
+    const tools = createFocusTools(
+      userId,
+      focusSettings.focusInactivityThresholdMs,
+      earliestAttentionTime,
+      latestAttentionTime,
+    );
 
     // Create span for the LLM call
     const llmSpan = trace?.span({
@@ -136,7 +149,9 @@ Remember to:
       if (step.toolCalls) {
         for (const toolCall of step.toolCalls) {
           // Find the corresponding tool result
-          const toolResult = (step.toolResults as any)?.find((r: any) => r.toolCallId === toolCall.toolCallId)?.result;
+          const toolResult = (step.toolResults as any)?.find(
+            (r: any) => r.toolCallId === toolCall.toolCallId,
+          )?.result;
 
           // Create a span for each tool call
           const toolSpan = trace?.span({
@@ -227,7 +242,7 @@ Remember to:
  */
 export async function checkAndEndInactiveFocuses(
   userId: string,
-  inactivityThresholdMs: number
+  inactivityThresholdMs: number,
 ): Promise<number> {
   const now = new Date();
   const threshold = new Date(now.getTime() - inactivityThresholdMs);
@@ -277,6 +292,8 @@ export async function checkAndEndInactiveFocuses(
     });
   }
 
-  console.log(`[Focus] Ended ${inactiveFocuses.length} inactive focuses for user ${userId}`);
+  console.log(
+    `[Focus] Ended ${inactiveFocuses.length} inactive focuses for user ${userId}`,
+  );
   return inactiveFocuses.length;
 }

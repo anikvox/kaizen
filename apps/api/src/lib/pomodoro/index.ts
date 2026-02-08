@@ -21,7 +21,9 @@ function emitStatusChanged(userId: string, status: PomodoroStatus) {
  * Get current Pomodoro status for a user.
  * Calculates elapsed time based on state and timestamps.
  */
-export async function getPomodoroStatus(userId: string): Promise<PomodoroStatus> {
+export async function getPomodoroStatus(
+  userId: string,
+): Promise<PomodoroStatus> {
   const settings = await db.userSettings.findUnique({
     where: { userId },
     include: { pomodoro: true },
@@ -60,7 +62,10 @@ export async function getPomodoroStatus(userId: string): Promise<PomodoroStatus>
   let elapsedSeconds = session.accumulatedSeconds;
 
   // Timer keeps running during both "running" and "cooldown" states
-  if ((session.state === "running" || session.state === "cooldown") && session.startedAt) {
+  if (
+    (session.state === "running" || session.state === "cooldown") &&
+    session.startedAt
+  ) {
     const runningMs = now.getTime() - session.startedAt.getTime();
     elapsedSeconds += Math.floor(runningMs / 1000);
   }
@@ -334,7 +339,7 @@ export async function hasActiveFocus(userId: string): Promise<boolean> {
  */
 export async function handleFocusChange(
   userId: string,
-  changeType: "created" | "updated" | "ended"
+  changeType: "created" | "updated" | "ended",
 ): Promise<PomodoroStatus> {
   const hasActive = await hasActiveFocus(userId);
 

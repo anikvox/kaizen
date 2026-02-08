@@ -1,11 +1,18 @@
 import { Hono } from "hono";
-import { db, formatDuration, extractDomain, getAttentionData } from "../lib/index.js";
+import {
+  db,
+  formatDuration,
+  extractDomain,
+  getAttentionData,
+} from "../lib/index.js";
 import { authMiddleware, type AuthVariables } from "../middleware/index.js";
 
 const app = new Hono<{ Variables: AuthVariables }>();
 
 // Helper to parse time range query params
-function parseTimeRange(c: { req: { query: (key: string) => string | undefined } }) {
+function parseTimeRange(c: {
+  req: { query: (key: string) => string | undefined };
+}) {
   const from = c.req.query("from");
   const to = c.req.query("to");
 
@@ -138,7 +145,7 @@ app.get("/website-activity", authMiddleware, async (c) => {
       totalVisits: visits.length,
       totalActiveTime: visits.reduce((sum, v) => sum + v.activeTime, 0),
       totalActiveTimeFormatted: formatDuration(
-        visits.reduce((sum, v) => sum + v.activeTime, 0)
+        visits.reduce((sum, v) => sum + v.activeTime, 0),
       ),
     },
     websites,

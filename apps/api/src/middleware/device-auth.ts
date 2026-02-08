@@ -8,7 +8,7 @@ export type DeviceAuthVariables = {
 
 export async function deviceAuthMiddleware(
   c: Context<{ Variables: DeviceAuthVariables }>,
-  next: Next
+  next: Next,
 ) {
   const authHeader = c.req.header("Authorization");
 

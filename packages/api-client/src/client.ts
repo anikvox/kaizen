@@ -1,5 +1,19 @@
 import { HttpClient } from "./http.js";
-import { HealthEndpoint, UsersEndpoint, SSEEndpoint, DeviceTokensEndpoint, WebsiteVisitsEndpoint, AttentionEndpoint, ExportEndpoint, SettingsEndpoint, ChatsEndpoint, FocusEndpoints, QuizEndpoints, PomodoroEndpoints, JourneyEndpoint } from "./endpoints/index.js";
+import {
+  HealthEndpoint,
+  UsersEndpoint,
+  SSEEndpoint,
+  DeviceTokensEndpoint,
+  WebsiteVisitsEndpoint,
+  AttentionEndpoint,
+  ExportEndpoint,
+  SettingsEndpoint,
+  ChatsEndpoint,
+  FocusEndpoints,
+  QuizEndpoints,
+  PomodoroEndpoints,
+  JourneyEndpoint,
+} from "./endpoints/index.js";
 import type { ApiClientOptions } from "./types/index.js";
 
 export class ApiClient {
@@ -39,7 +53,7 @@ export class ApiClient {
 
 export function createApiClient(
   baseUrl: string,
-  getToken?: () => Promise<string | null>
+  getToken?: () => Promise<string | null>,
 ): ApiClient {
   return new ApiClient({ baseUrl, getToken });
 }

@@ -40,7 +40,7 @@ const Logo = React.forwardRef<HTMLImageElement, LogoProps>(
               size === "sm" && "text-lg",
               size === "md" && "text-xl",
               size === "lg" && "text-2xl",
-              size === "xl" && "text-3xl"
+              size === "xl" && "text-3xl",
             )}
           >
             Kaizen
@@ -48,7 +48,7 @@ const Logo = React.forwardRef<HTMLImageElement, LogoProps>(
         )}
       </div>
     );
-  }
+  },
 );
 Logo.displayName = "Logo";
 

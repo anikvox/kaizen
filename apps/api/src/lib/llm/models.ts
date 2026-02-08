@@ -36,7 +36,8 @@ export const ANTHROPIC_MODELS: ModelInfo[] = [
   {
     id: "claude-sonnet-4-20250514",
     name: "Claude Sonnet 4",
-    description: "Latest Sonnet model, excellent balance of speed and intelligence",
+    description:
+      "Latest Sonnet model, excellent balance of speed and intelligence",
     contextWindow: 200000,
     maxOutputTokens: 8192,
   },
@@ -127,7 +128,10 @@ export function getModelsForProvider(provider: LLMProviderType): ModelInfo[] {
 /**
  * Check if a model ID is valid for a provider.
  */
-export function isValidModel(provider: LLMProviderType, modelId: string): boolean {
+export function isValidModel(
+  provider: LLMProviderType,
+  modelId: string,
+): boolean {
   const models = ALL_MODELS[provider];
   return models?.some((m) => m.id === modelId) ?? false;
 }

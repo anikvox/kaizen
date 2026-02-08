@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { db } from "../db.js";
-import { getActiveFocuses, getActiveFocus, processUserFocus } from "./service.js";
+import {
+  getActiveFocuses,
+  getActiveFocus,
+  processUserFocus,
+} from "./service.js";
 
 describe("Focus Service", () => {
   let testUser: { id: string };

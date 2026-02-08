@@ -19,7 +19,13 @@ export type {
 
 // Bot exports
 export { bot, fakeBot, FakeBot, LLMBot, createLLMBot } from "./bot/index.js";
-export type { BotInterface, BotMessage, BotMediaPart, BotCallbacks, LLMBotOptions } from "./bot/index.js";
+export type {
+  BotInterface,
+  BotMessage,
+  BotMediaPart,
+  BotCallbacks,
+  LLMBotOptions,
+} from "./bot/index.js";
 
 // LLM exports
 export {

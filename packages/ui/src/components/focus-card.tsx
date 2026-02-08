@@ -21,10 +21,8 @@ const FocusCard = React.forwardRef<HTMLDivElement, FocusCardProps>(
         ref={ref}
         className={cn(
           "rounded-lg p-4 border",
-          isActive
-            ? "bg-focus/5 border-focus/20"
-            : "bg-muted/50 border-border",
-          className
+          isActive ? "bg-focus/5 border-focus/20" : "bg-muted/50 border-border",
+          className,
         )}
         {...props}
       >
@@ -32,7 +30,7 @@ const FocusCard = React.forwardRef<HTMLDivElement, FocusCardProps>(
           <span
             className={cn(
               "w-2.5 h-2.5 rounded-full",
-              isActive ? "bg-focus" : "bg-muted-foreground"
+              isActive ? "bg-focus" : "bg-muted-foreground",
             )}
           />
           <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -66,7 +64,7 @@ const FocusCard = React.forwardRef<HTMLDivElement, FocusCardProps>(
         )}
       </div>
     );
-  }
+  },
 );
 FocusCard.displayName = "FocusCard";
 

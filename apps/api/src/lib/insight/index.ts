@@ -23,7 +23,9 @@ export interface AttentionInsight {
 /**
  * Get recent insights for a user
  */
-export async function getUserInsights(userId: string): Promise<AttentionInsight[]> {
+export async function getUserInsights(
+  userId: string,
+): Promise<AttentionInsight[]> {
   const insights = await db.attentionInsight.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
@@ -63,7 +65,7 @@ export async function generateInsight(
     type: "text" | "image" | "youtube";
     url: string;
     content: string; // text content, image alt/title, or youtube title
-  }
+  },
 ): Promise<AttentionInsight | null> {
   // Check if we should generate (rate limiting)
   const shouldGenerate = await shouldGenerateInsight(userId);

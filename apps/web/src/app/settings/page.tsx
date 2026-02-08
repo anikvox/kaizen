@@ -2,13 +2,16 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth, SignInButton, useUser } from "@clerk/nextjs";
-import { createApiClient, type UserSettings, type LLMModels, type LLMProviderType, type ModelInfo, type UnifiedSSEData } from "@kaizen/api-client";
-import Link from "next/link";
 import {
-  Button,
-  Input,
-  Logo,
-} from "@kaizen/ui";
+  createApiClient,
+  type UserSettings,
+  type LLMModels,
+  type LLMProviderType,
+  type ModelInfo,
+  type UnifiedSSEData,
+} from "@kaizen/api-client";
+import Link from "next/link";
+import { Button, Input, Logo } from "@kaizen/ui";
 import {
   ArrowLeft,
   Loader2,
@@ -53,14 +56,22 @@ export default function Settings() {
   const [ignoreListDirty, setIgnoreListDirty] = useState(false);
 
   // LLM settings state
-  const [providerModels, setProviderModels] = useState<Partial<Record<LLMProviderType, ModelInfo[]>>>({});
-  const [loadingModels, setLoadingModels] = useState<Partial<Record<LLMProviderType, boolean>>>({});
-  const [apiKeyInputs, setApiKeyInputs] = useState<Record<LLMProviderType, string>>({
+  const [providerModels, setProviderModels] = useState<
+    Partial<Record<LLMProviderType, ModelInfo[]>>
+  >({});
+  const [loadingModels, setLoadingModels] = useState<
+    Partial<Record<LLMProviderType, boolean>>
+  >({});
+  const [apiKeyInputs, setApiKeyInputs] = useState<
+    Record<LLMProviderType, string>
+  >({
     gemini: "",
     anthropic: "",
     openai: "",
   });
-  const [showApiKey, setShowApiKey] = useState<Record<LLMProviderType, boolean>>({
+  const [showApiKey, setShowApiKey] = useState<
+    Record<LLMProviderType, boolean>
+  >({
     gemini: false,
     anthropic: false,
     openai: false,
@@ -71,22 +82,28 @@ export default function Settings() {
     return getToken();
   }, [getToken]);
 
-  const fetchModelsForProvider = useCallback(async (provider: LLMProviderType) => {
-    const api = createApiClient(apiUrl, getTokenFn);
-    setLoadingModels((prev) => ({ ...prev, [provider]: true }));
+  const fetchModelsForProvider = useCallback(
+    async (provider: LLMProviderType) => {
+      const api = createApiClient(apiUrl, getTokenFn);
+      setLoadingModels((prev) => ({ ...prev, [provider]: true }));
 
-    try {
-      const models = await api.settings.getModelsForProvider(provider);
-      setProviderModels((prev) => ({ ...prev, [provider]: models }));
-    } catch (err) {
-      console.error(`Failed to fetch models for ${provider}:`, err);
-      if (llmModels?.[provider]) {
-        setProviderModels((prev) => ({ ...prev, [provider]: llmModels[provider] }));
+      try {
+        const models = await api.settings.getModelsForProvider(provider);
+        setProviderModels((prev) => ({ ...prev, [provider]: models }));
+      } catch (err) {
+        console.error(`Failed to fetch models for ${provider}:`, err);
+        if (llmModels?.[provider]) {
+          setProviderModels((prev) => ({
+            ...prev,
+            [provider]: llmModels[provider],
+          }));
+        }
+      } finally {
+        setLoadingModels((prev) => ({ ...prev, [provider]: false }));
       }
-    } finally {
-      setLoadingModels((prev) => ({ ...prev, [provider]: false }));
-    }
-  }, [getTokenFn, llmModels]);
+    },
+    [getTokenFn, llmModels],
+  );
 
   const fetchSettings = useCallback(async () => {
     if (!isSignedIn || !clerkUser) return;
@@ -119,10 +136,16 @@ export default function Settings() {
           (provider === "openai" && settingsResult.hasOpenaiApiKey);
 
         if (hasKey) {
-          api.settings.getModelsForProvider(provider)
-            .then((models) => setProviderModels((prev) => ({ ...prev, [provider]: models })))
+          api.settings
+            .getModelsForProvider(provider)
+            .then((models) =>
+              setProviderModels((prev) => ({ ...prev, [provider]: models })),
+            )
             .catch(() => {
-              setProviderModels((prev) => ({ ...prev, [provider]: modelsResult[provider] }));
+              setProviderModels((prev) => ({
+                ...prev,
+                [provider]: modelsResult[provider],
+              }));
             });
         }
       }
@@ -157,19 +180,28 @@ export default function Settings() {
           switch (data.type) {
             case "connected":
               setSettings(data.settings);
-              setIgnoreListValue(data.settings.attentionTrackingIgnoreList || "");
+              setIgnoreListValue(
+                data.settings.attentionTrackingIgnoreList || "",
+              );
               setIgnoreListDirty(false);
               break;
             case "settings-changed":
-              setSettings((prev) => prev ? { ...prev, ...data.settings } : null);
-              if (!ignoreListDirty && data.settings.attentionTrackingIgnoreList !== undefined) {
-                setIgnoreListValue(data.settings.attentionTrackingIgnoreList || "");
+              setSettings((prev) =>
+                prev ? { ...prev, ...data.settings } : null,
+              );
+              if (
+                !ignoreListDirty &&
+                data.settings.attentionTrackingIgnoreList !== undefined
+              ) {
+                setIgnoreListValue(
+                  data.settings.attentionTrackingIgnoreList || "",
+                );
               }
               break;
           }
         },
         (error) => console.error("Settings SSE error:", error),
-        token
+        token,
       );
     };
 
@@ -241,7 +273,9 @@ export default function Settings() {
 
     try {
       const newProvider = provider || null;
-      const models = newProvider ? (providerModels[newProvider] || llmModels?.[newProvider]) : null;
+      const models = newProvider
+        ? providerModels[newProvider] || llmModels?.[newProvider]
+        : null;
       const newModel = models?.[0]?.id || null;
 
       const result = await api.settings.update({
@@ -327,10 +361,14 @@ export default function Settings() {
   const hasApiKey = (provider: LLMProviderType): boolean => {
     if (!settings) return false;
     switch (provider) {
-      case "gemini": return !!settings.hasGeminiApiKey;
-      case "anthropic": return !!settings.hasAnthropicApiKey;
-      case "openai": return !!settings.hasOpenaiApiKey;
-      default: return false;
+      case "gemini":
+        return !!settings.hasGeminiApiKey;
+      case "anthropic":
+        return !!settings.hasAnthropicApiKey;
+      case "openai":
+        return !!settings.hasOpenaiApiKey;
+      default:
+        return false;
     }
   };
 
@@ -370,7 +408,9 @@ export default function Settings() {
               <Key className="w-8 h-8 text-muted-foreground" />
             </div>
             <h2 className="text-xl font-semibold mb-2">Sign in Required</h2>
-            <p className="text-muted-foreground mb-6">Sign in to manage your settings</p>
+            <p className="text-muted-foreground mb-6">
+              Sign in to manage your settings
+            </p>
             <SignInButton mode="modal">
               <Button>Sign In</Button>
             </SignInButton>
@@ -451,13 +491,18 @@ export default function Settings() {
                       <h3 className="font-medium">Debug Mode</h3>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Show real-time tracking overlay with reading progress and scroll velocity
+                      Show real-time tracking overlay with reading progress and
+                      scroll velocity
                     </p>
                   </div>
                   <Button
                     onClick={() => handleToggle("cognitiveAttentionDebugMode")}
                     disabled={saving}
-                    variant={settings.cognitiveAttentionDebugMode ? "default" : "outline"}
+                    variant={
+                      settings.cognitiveAttentionDebugMode
+                        ? "default"
+                        : "outline"
+                    }
                     size="sm"
                     className="flex-shrink-0"
                   >
@@ -474,13 +519,20 @@ export default function Settings() {
                       <h3 className="font-medium">Visual Overlay</h3>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Display visual highlights around tracked text and media elements
+                      Display visual highlights around tracked text and media
+                      elements
                     </p>
                   </div>
                   <Button
-                    onClick={() => handleToggle("cognitiveAttentionShowOverlay")}
+                    onClick={() =>
+                      handleToggle("cognitiveAttentionShowOverlay")
+                    }
                     disabled={saving}
-                    variant={settings.cognitiveAttentionShowOverlay ? "default" : "outline"}
+                    variant={
+                      settings.cognitiveAttentionShowOverlay
+                        ? "default"
+                        : "outline"
+                    }
                     size="sm"
                     className="flex-shrink-0"
                   >
@@ -497,7 +549,9 @@ export default function Settings() {
                 <h3 className="font-medium">Ignore List</h3>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
-                URLs to exclude from tracking. One pattern per line. Supports plain text, glob patterns (*.example.com), and regex (/pattern/).
+                URLs to exclude from tracking. One pattern per line. Supports
+                plain text, glob patterns (*.example.com), and regex
+                (/pattern/).
               </p>
               <textarea
                 value={ignoreListValue}
@@ -505,7 +559,9 @@ export default function Settings() {
                   setIgnoreListValue(e.target.value);
                   setIgnoreListDirty(true);
                 }}
-                placeholder={"Example:\nexample.com\n*.internal.company.com\n/^https:\\/\\/mail\\.google\\.com/"}
+                placeholder={
+                  "Example:\nexample.com\n*.internal.company.com\n/^https:\\/\\/mail\\.google\\.com/"
+                }
                 disabled={saving}
                 className="w-full p-4 rounded-xl border border-border bg-background text-sm font-mono resize-y min-h-[120px] focus:outline-none focus:ring-2 focus:ring-ring"
                 rows={5}
@@ -528,13 +584,20 @@ export default function Settings() {
                 <h3 className="font-medium">Auto-Summarization</h3>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
-                Automatically generate summaries of pages based on your reading activity
+                Automatically generate summaries of pages based on your reading
+                activity
               </p>
               <div>
-                <label className="block text-sm font-medium mb-2">Check Interval</label>
+                <label className="block text-sm font-medium mb-2">
+                  Check Interval
+                </label>
                 <select
                   value={settings.attentionSummarizationIntervalMs ?? 60000}
-                  onChange={(e) => handleUpdate({ attentionSummarizationIntervalMs: Number(e.target.value) })}
+                  onChange={(e) =>
+                    handleUpdate({
+                      attentionSummarizationIntervalMs: Number(e.target.value),
+                    })
+                  }
                   disabled={saving}
                   className="w-full md:w-64 p-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
@@ -555,7 +618,8 @@ export default function Settings() {
             <div>
               <h2 className="text-lg font-semibold mb-1">AI Configuration</h2>
               <p className="text-sm text-muted-foreground">
-                Configure your AI provider and API keys for chat and analysis features
+                Configure your AI provider and API keys for chat and analysis
+                features
               </p>
             </div>
 
@@ -566,61 +630,84 @@ export default function Settings() {
                 <h3 className="font-medium">API Keys</h3>
               </div>
               <p className="text-sm text-muted-foreground mb-6">
-                Add your API keys to use your own accounts. Keys are encrypted and stored securely.
+                Add your API keys to use your own accounts. Keys are encrypted
+                and stored securely.
               </p>
 
               <div className="space-y-5">
-                {(Object.keys(PROVIDER_LABELS) as LLMProviderType[]).map((provider) => (
-                  <div key={provider} className="p-4 rounded-xl bg-muted/30">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{PROVIDER_LABELS[provider]}</span>
-                        {hasApiKey(provider) && (
-                          <span className="flex items-center gap-1 text-xs text-accent">
-                            <Check className="w-3 h-3" />
-                            configured
+                {(Object.keys(PROVIDER_LABELS) as LLMProviderType[]).map(
+                  (provider) => (
+                    <div key={provider} className="p-4 rounded-xl bg-muted/30">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">
+                            {PROVIDER_LABELS[provider]}
                           </span>
+                          {hasApiKey(provider) && (
+                            <span className="flex items-center gap-1 text-xs text-accent">
+                              <Check className="w-3 h-3" />
+                              configured
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="flex-1 relative">
+                          <Input
+                            type={showApiKey[provider] ? "text" : "password"}
+                            placeholder={
+                              hasApiKey(provider)
+                                ? "••••••••••••••••"
+                                : `Enter API key`
+                            }
+                            value={apiKeyInputs[provider]}
+                            onChange={(e) =>
+                              setApiKeyInputs((prev) => ({
+                                ...prev,
+                                [provider]: e.target.value,
+                              }))
+                            }
+                            disabled={saving}
+                            className="pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setShowApiKey((prev) => ({
+                                ...prev,
+                                [provider]: !prev[provider],
+                              }))
+                            }
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          >
+                            {showApiKey[provider] ? (
+                              <EyeOff className="w-4 h-4" />
+                            ) : (
+                              <Eye className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
+                        <Button
+                          onClick={() => handleApiKeySave(provider)}
+                          disabled={saving || !apiKeyInputs[provider].trim()}
+                          size="sm"
+                        >
+                          Save
+                        </Button>
+                        {hasApiKey(provider) && (
+                          <Button
+                            onClick={() => handleApiKeyClear(provider)}
+                            disabled={saving}
+                            variant="destructive"
+                            size="sm"
+                          >
+                            Clear
+                          </Button>
                         )}
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <div className="flex-1 relative">
-                        <Input
-                          type={showApiKey[provider] ? "text" : "password"}
-                          placeholder={hasApiKey(provider) ? "••••••••••••••••" : `Enter API key`}
-                          value={apiKeyInputs[provider]}
-                          onChange={(e) => setApiKeyInputs((prev) => ({ ...prev, [provider]: e.target.value }))}
-                          disabled={saving}
-                          className="pr-10"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowApiKey((prev) => ({ ...prev, [provider]: !prev[provider] }))}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        >
-                          {showApiKey[provider] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                      <Button
-                        onClick={() => handleApiKeySave(provider)}
-                        disabled={saving || !apiKeyInputs[provider].trim()}
-                        size="sm"
-                      >
-                        Save
-                      </Button>
-                      {hasApiKey(provider) && (
-                        <Button
-                          onClick={() => handleApiKeyClear(provider)}
-                          disabled={saving}
-                          variant="destructive"
-                          size="sm"
-                        >
-                          Clear
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  ),
+                )}
               </div>
             </div>
 
@@ -636,7 +723,9 @@ export default function Settings() {
                 </p>
                 <select
                   value={settings.llmProvider || ""}
-                  onChange={(e) => handleProviderChange(e.target.value as LLMProviderType | "")}
+                  onChange={(e) =>
+                    handleProviderChange(e.target.value as LLMProviderType | "")
+                  }
                   disabled={saving}
                   className="w-full p-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
@@ -651,51 +740,61 @@ export default function Settings() {
                 </select>
                 {!settings.llmProvider && (
                   <p className="text-xs text-muted-foreground mt-2">
-                    Using system Gemini. Add your own API key for a different provider.
+                    Using system Gemini. Add your own API key for a different
+                    provider.
                   </p>
                 )}
               </div>
 
-              {settings.llmProvider && hasApiKey(settings.llmProvider) && (() => {
-                const models = providerModels[settings.llmProvider] || llmModels?.[settings.llmProvider] || [];
-                const isLoadingProviderModels = loadingModels[settings.llmProvider];
+              {settings.llmProvider &&
+                hasApiKey(settings.llmProvider) &&
+                (() => {
+                  const models =
+                    providerModels[settings.llmProvider] ||
+                    llmModels?.[settings.llmProvider] ||
+                    [];
+                  const isLoadingProviderModels =
+                    loadingModels[settings.llmProvider];
 
-                return (
-                  <div className="rounded-2xl border border-border bg-card p-6">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Sparkles className="w-4 h-4 text-amber-500" />
-                      <h3 className="font-medium">
-                        Model
-                        {isLoadingProviderModels && (
-                          <span className="font-normal text-muted-foreground ml-2 text-xs">
-                            (loading...)
-                          </span>
-                        )}
-                      </h3>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      {models.length} models available
-                    </p>
-                    <select
-                      value={settings.llmModel || ""}
-                      onChange={(e) => handleModelChange(e.target.value)}
-                      disabled={saving || isLoadingProviderModels}
-                      className="w-full p-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    >
-                      {models.map((model) => (
-                        <option key={model.id} value={model.id}>
-                          {model.name}
-                        </option>
-                      ))}
-                    </select>
-                    {settings.llmModel && models.length > 0 && (
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {models.find((m) => m.id === settings.llmModel)?.description}
+                  return (
+                    <div className="rounded-2xl border border-border bg-card p-6">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Sparkles className="w-4 h-4 text-amber-500" />
+                        <h3 className="font-medium">
+                          Model
+                          {isLoadingProviderModels && (
+                            <span className="font-normal text-muted-foreground ml-2 text-xs">
+                              (loading...)
+                            </span>
+                          )}
+                        </h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        {models.length} models available
                       </p>
-                    )}
-                  </div>
-                );
-              })()}
+                      <select
+                        value={settings.llmModel || ""}
+                        onChange={(e) => handleModelChange(e.target.value)}
+                        disabled={saving || isLoadingProviderModels}
+                        className="w-full p-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      >
+                        {models.map((model) => (
+                          <option key={model.id} value={model.id}>
+                            {model.name}
+                          </option>
+                        ))}
+                      </select>
+                      {settings.llmModel && models.length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {
+                            models.find((m) => m.id === settings.llmModel)
+                              ?.description
+                          }
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
             </div>
           </div>
         )}
@@ -717,15 +816,22 @@ export default function Settings() {
                 <h3 className="font-medium">Focus Detection</h3>
               </div>
               <p className="text-sm text-muted-foreground mb-6">
-                AI-powered detection of what you&apos;re focused on based on browsing patterns
+                AI-powered detection of what you&apos;re focused on based on
+                browsing patterns
               </p>
 
               <div className="grid md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Calculation Interval</label>
+                  <label className="block text-sm font-medium mb-2">
+                    Calculation Interval
+                  </label>
                   <select
                     value={settings.focusCalculationIntervalMs ?? 30000}
-                    onChange={(e) => handleUpdate({ focusCalculationIntervalMs: Number(e.target.value) })}
+                    onChange={(e) =>
+                      handleUpdate({
+                        focusCalculationIntervalMs: Number(e.target.value),
+                      })
+                    }
                     disabled={saving}
                     className="w-full p-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
@@ -740,10 +846,16 @@ export default function Settings() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Inactivity Threshold</label>
+                  <label className="block text-sm font-medium mb-2">
+                    Inactivity Threshold
+                  </label>
                   <select
                     value={settings.focusInactivityThresholdMs ?? 60000}
-                    onChange={(e) => handleUpdate({ focusInactivityThresholdMs: Number(e.target.value) })}
+                    onChange={(e) =>
+                      handleUpdate({
+                        focusInactivityThresholdMs: Number(e.target.value),
+                      })
+                    }
                     disabled={saving}
                     className="w-full p-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
@@ -759,10 +871,16 @@ export default function Settings() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Min Focus Duration</label>
+                  <label className="block text-sm font-medium mb-2">
+                    Min Focus Duration
+                  </label>
                   <select
                     value={settings.focusMinDurationMs ?? 30000}
-                    onChange={(e) => handleUpdate({ focusMinDurationMs: Number(e.target.value) })}
+                    onChange={(e) =>
+                      handleUpdate({
+                        focusMinDurationMs: Number(e.target.value),
+                      })
+                    }
                     disabled={saving}
                     className="w-full p-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
@@ -789,10 +907,14 @@ export default function Settings() {
               </p>
 
               <div className="max-w-xs">
-                <label className="block text-sm font-medium mb-2">Cooldown Period</label>
+                <label className="block text-sm font-medium mb-2">
+                  Cooldown Period
+                </label>
                 <select
                   value={settings.pomodoroCooldownMs ?? 120000}
-                  onChange={(e) => handleUpdate({ pomodoroCooldownMs: Number(e.target.value) })}
+                  onChange={(e) =>
+                    handleUpdate({ pomodoroCooldownMs: Number(e.target.value) })
+                  }
                   disabled={saving}
                   className="w-full p-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
@@ -817,7 +939,8 @@ export default function Settings() {
             <div>
               <h2 className="text-lg font-semibold mb-1">Quiz Settings</h2>
               <p className="text-sm text-muted-foreground">
-                Configure how quizzes are generated based on your browsing activity
+                Configure how quizzes are generated based on your browsing
+                activity
               </p>
             </div>
 
@@ -832,7 +955,11 @@ export default function Settings() {
                 </p>
                 <select
                   value={settings.quizAnswerOptionsCount ?? 2}
-                  onChange={(e) => handleUpdate({ quizAnswerOptionsCount: Number(e.target.value) })}
+                  onChange={(e) =>
+                    handleUpdate({
+                      quizAnswerOptionsCount: Number(e.target.value),
+                    })
+                  }
                   disabled={saving}
                   className="w-full p-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
@@ -852,7 +979,9 @@ export default function Settings() {
                 </p>
                 <select
                   value={settings.quizActivityDays ?? 3}
-                  onChange={(e) => handleUpdate({ quizActivityDays: Number(e.target.value) })}
+                  onChange={(e) =>
+                    handleUpdate({ quizActivityDays: Number(e.target.value) })
+                  }
                   disabled={saving}
                   className="w-full p-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
@@ -876,9 +1005,10 @@ export default function Settings() {
                 <div>
                   <h3 className="font-medium mb-1">How Quizzes Work</h3>
                   <p className="text-sm text-muted-foreground">
-                    Quizzes are generated based on the content you&apos;ve read in the browser extension.
-                    The AI analyzes your reading activity and creates questions to help reinforce your learning.
-                    Generate quizzes from the Dashboard tab.
+                    Quizzes are generated based on the content you&apos;ve read
+                    in the browser extension. The AI analyzes your reading
+                    activity and creates questions to help reinforce your
+                    learning. Generate quizzes from the Dashboard tab.
                   </p>
                 </div>
               </div>
