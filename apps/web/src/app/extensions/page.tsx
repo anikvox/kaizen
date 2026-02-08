@@ -139,7 +139,7 @@ export default function Extensions() {
 
   if (!isLoaded || loading) {
     return (
-      <main className="min-h-screen bg-background p-8 max-w-2xl mx-auto">
+      <main className="min-h-screen bg-background p-8 max-w-6xl mx-auto">
         <Logo size="md" className="mb-6" />
         <div className="flex items-center gap-2 text-muted-foreground">
           <Loader2 className="w-5 h-5 animate-spin" />
@@ -151,7 +151,7 @@ export default function Extensions() {
 
   if (!isSignedIn) {
     return (
-      <main className="min-h-screen bg-background p-8 max-w-2xl mx-auto">
+      <main className="min-h-screen bg-background p-8 max-w-6xl mx-auto">
         <Logo size="md" className="mb-6" />
         <Card>
           <CardHeader>
@@ -174,7 +174,7 @@ export default function Extensions() {
   }
 
   return (
-    <main className="min-h-screen bg-background p-8 max-w-2xl mx-auto">
+    <main className="min-h-screen bg-background p-8 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <Logo size="md" />

@@ -382,7 +382,7 @@ export default function Settings() {
   if (!isLoaded || loading) {
     return (
       <main className="min-h-screen bg-background">
-        <div className="max-w-4xl mx-auto px-6 py-8">
+        <div className="max-w-6xl mx-auto px-6 py-8">
           <div className="flex items-center gap-4 mb-8">
             <Logo size="md" />
             <h1 className="text-2xl font-bold">Settings</h1>
@@ -398,7 +398,7 @@ export default function Settings() {
   if (!isSignedIn) {
     return (
       <main className="min-h-screen bg-background">
-        <div className="max-w-4xl mx-auto px-6 py-8">
+        <div className="max-w-6xl mx-auto px-6 py-8">
           <div className="flex items-center gap-4 mb-8">
             <Logo size="md" />
             <h1 className="text-2xl font-bold">Settings</h1>
@@ -424,7 +424,7 @@ export default function Settings() {
     <main className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border/40 bg-background sticky top-0 z-50">
-        <div className="max-w-4xl mx-auto px-6">
+        <div className="max-w-6xl mx-auto px-6">
           <div className="h-16 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Logo size="md" />
@@ -463,7 +463,7 @@ export default function Settings() {
       </header>
 
       {/* Content */}
-      <div className="max-w-4xl mx-auto px-6 py-8">
+      <div className="max-w-6xl mx-auto px-6 py-8">
         {error && (
           <div className="mb-6 p-4 rounded-xl bg-destructive/10 text-destructive flex items-center gap-2">
             <X className="w-4 h-4" />
