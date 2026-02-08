@@ -24,6 +24,7 @@ import {
   type HealthMetricsSummary,
 } from "./metrics.js";
 import { createChatTools } from "../chat/tools.js";
+import { getPromptWithMetadata, PROMPT_NAMES } from "../llm/prompt-provider.js";
 
 export interface ReportGenerationProgress {
   step: string;
@@ -246,6 +247,71 @@ function createHealthReportTools(userId: string, timeRange: TimeRange) {
       },
     }),
 
+    analyze_quiz_retention: tool({
+      description: "Analyze quiz performance and knowledge retention patterns. Quizzes test recall of content the user has read or watched.",
+      parameters: z.object({}),
+      execute: async () => {
+        const metrics = await getHealthMetrics(userId, timeRange);
+        const { quizRetention, dailyQuizPerformance } = metrics;
+
+        if (quizRetention.totalQuizzes === 0) {
+          return {
+            success: false,
+            message: "No quiz data found in this period. User may not have completed any quizzes.",
+          };
+        }
+
+        // Analyze retention patterns
+        const isImproving = quizRetention.trend > 10;
+        const isDeclining = quizRetention.trend < -10;
+
+        // Check for consistency
+        const daysWithQuizzes = dailyQuizPerformance.length;
+        const consistencyRate = (daysWithQuizzes / timeRange) * 100;
+
+        // Identify performance pattern
+        let performanceLevel = "moderate";
+        if (quizRetention.overallAccuracy >= 80) performanceLevel = "strong";
+        else if (quizRetention.overallAccuracy >= 60) performanceLevel = "good";
+        else if (quizRetention.overallAccuracy < 40) performanceLevel = "developing";
+
+        return {
+          success: true,
+          analysis: {
+            totalQuizzes: quizRetention.totalQuizzes,
+            totalQuestions: quizRetention.totalQuestions,
+            correctAnswers: quizRetention.correctAnswers,
+            overallAccuracy: quizRetention.overallAccuracy,
+            trend: quizRetention.trend,
+            trendInterpretation: isImproving
+              ? "Retention appears to be improving"
+              : isDeclining
+                ? "Retention may need attention"
+                : "Retention is stable",
+            consistencyRate: Math.round(consistencyRate),
+            consistencyInterpretation: consistencyRate >= 50
+              ? "Regular quiz engagement"
+              : consistencyRate >= 25
+                ? "Occasional quiz engagement"
+                : "Sporadic quiz engagement",
+            performanceLevel,
+            dailyBreakdown: dailyQuizPerformance.slice(-7), // Last 7 days
+            insights: [
+              quizRetention.overallAccuracy >= 70
+                ? "Good knowledge retention from consumed content"
+                : "May benefit from more active recall practice",
+              isImproving
+                ? "Positive trend suggests effective learning strategies"
+                : isDeclining
+                  ? "Consider reviewing content more actively or taking breaks during consumption"
+                  : "Consistent retention levels",
+            ],
+          },
+          note: "Quiz accuracy reflects recall of content from browsing. Higher accuracy may indicate better attention during content consumption.",
+        };
+      },
+    }),
+
     think_aloud: tool({
       description: "Use this tool to think through your analysis before writing the final report. This helps you organize insights and ensure comprehensive coverage. Call this multiple times as you develop your thinking.",
       parameters: z.object({
@@ -263,67 +329,6 @@ function createHealthReportTools(userId: string, timeRange: TimeRange) {
     }),
   };
 }
-
-/**
- * System prompt for the health report agent
- */
-const HEALTH_REPORT_SYSTEM_PROMPT = `You are a supportive cognitive wellness assistant. Your role is to analyze user activity data and generate a helpful, non-judgmental health report.
-
-CRITICAL GUIDELINES:
-1. Use SOFT LANGUAGE always:
-   - Say "may indicate", "possible signal", "worth noticing", "pattern suggests"
-   - Never say: diagnose, disorder, illness, depression, anxiety, ADHD, addiction, problem, issue
-
-2. NEVER provide medical advice or suggest conditions
-
-3. Be CALM and SUPPORTIVE:
-   - Acknowledge effort and positive patterns
-   - Frame challenges as opportunities
-   - Be encouraging without being patronizing
-
-4. CITE SPECIFIC METRICS:
-   - Reference actual numbers from the data
-   - Compare to their own trends (not external benchmarks)
-   - Use relative language ("compared to your previous week")
-
-5. THINK BEFORE WRITING:
-   - Use the think_aloud tool multiple times to organize your analysis
-   - Consider multiple angles before drawing conclusions
-   - Look for both patterns and outliers
-
-REPORT STRUCTURE (follow this exactly):
-
-## Overview
-2-3 paragraphs providing a warm, comprehensive summary of the analysis period. Acknowledge the user directly with "you/your".
-
-## Key Signals
-- Bulleted list of 4-6 notable observations
-- Each backed by specific data
-- Mix of positive and areas for attention
-
-## What Improved
-- 2-4 positive trends or patterns
-- Celebrate progress, even small wins
-
-## What May Need Attention
-- 2-3 areas that might benefit from awareness
-- Frame as opportunities, not problems
-- Use soft language
-
-## Recommendations
-- Maximum 3 specific, actionable suggestions
-- Based directly on the data patterns
-- Realistic and achievable
-
-## One Experiment for Next Week
-A single, concrete thing to try. Frame it as an experiment, not a requirement.
-
-## Closing
-A supportive paragraph acknowledging their journey and effort in tracking their cognitive wellness.
-
----
-
-Remember: Your goal is to help the user understand their patterns and make informed choices about their digital habits. You are NOT a medical professional and should never imply diagnosis or treatment.`;
 
 /**
  * Generate a health report using the agentic approach
@@ -401,12 +406,22 @@ ATTENTION DISTRIBUTION:
 - Unique domains: ${metrics.attentionEntropy.uniqueDomains}
 - Top domains: ${metrics.attentionEntropy.topDomains.slice(0, 5).map((d) => `${d.domain} (${Math.round(d.percentage)}%)`).join(", ")}
 
+QUIZ RETENTION (knowledge recall from consumed content):
+- Total quizzes completed: ${metrics.quizRetention.totalQuizzes}
+- Overall accuracy: ${metrics.quizRetention.overallAccuracy}%
+- Trend: ${metrics.quizRetention.trend > 0 ? "+" : ""}${metrics.quizRetention.trend}%
+- Questions answered: ${metrics.quizRetention.correctAnswers}/${metrics.quizRetention.totalQuestions} correct
+
 Please:
 1. Use the think_aloud tool multiple times to organize your analysis
-2. Call additional tools if you need more context (analyze_sleep_patterns, analyze_focus_quality, analyze_media_balance, get_nudge_history)
+2. Call additional tools if you need more context (analyze_sleep_patterns, analyze_focus_quality, analyze_media_balance, analyze_quiz_retention, get_nudge_history)
 3. Generate a comprehensive report following the structure in your instructions`;
 
   emitProgress("analysis", "Starting LLM analysis with tool access...");
+
+  // Get centralized prompt
+  const promptData = await getPromptWithMetadata(PROMPT_NAMES.MENTAL_HEALTH_AGENT);
+  const systemPrompt = promptData.content;
 
   // Use the LLM with tools
   const provider = llmService.getProvider();
@@ -428,7 +443,7 @@ Please:
       const response = await provider.generate({
         messages,
         tools,
-        systemPrompt: HEALTH_REPORT_SYSTEM_PROMPT,
+        systemPrompt,
       });
 
       // If no tool calls, we have the final response
@@ -498,7 +513,7 @@ Please:
 
       const finalResponse = await provider.generate({
         messages,
-        systemPrompt: HEALTH_REPORT_SYSTEM_PROMPT,
+        systemPrompt,
       });
 
       reportContent = finalResponse.content;

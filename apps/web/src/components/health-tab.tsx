@@ -31,6 +31,7 @@ import {
   ChevronUp,
   CheckCircle2,
   XCircle,
+  GraduationCap,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
@@ -428,6 +429,63 @@ export function HealthTab({ apiUrl, getToken }: HealthTabProps) {
               icon={Moon}
               description="Activity between 11PM-5AM"
             />
+          </div>
+
+          {/* Second row of cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <MetricCard
+              title="Quiz Accuracy"
+              value={summary.quizRetention.totalQuizzes > 0 ? summary.quizRetention.accuracy : "—"}
+              unit={summary.quizRetention.totalQuizzes > 0 ? "%" : ""}
+              trend={summary.quizRetention.totalQuizzes > 0 ? summary.quizRetention.trend : undefined}
+              icon={GraduationCap}
+              description={summary.quizRetention.totalQuizzes > 0
+                ? `${summary.quizRetention.correctAnswers}/${summary.quizRetention.totalQuestions} correct`
+                : "No quizzes taken"
+              }
+            />
+
+            <div className="p-4 rounded-xl border border-border/50 bg-card/50 col-span-3">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-2 rounded-lg bg-secondary/10">
+                  <Brain className="w-4 h-4 text-secondary" />
+                </div>
+                <h3 className="font-medium text-foreground">Knowledge Retention</h3>
+              </div>
+              {summary.quizRetention.totalQuizzes > 0 ? (
+                <div className="grid grid-cols-3 gap-4 mt-3">
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{summary.quizRetention.totalQuizzes}</p>
+                    <p className="text-xs text-muted-foreground">Quizzes completed</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{summary.quizRetention.totalQuestions}</p>
+                    <p className="text-xs text-muted-foreground">Questions answered</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <div className="h-2 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className={`h-full transition-all ${
+                            summary.quizRetention.accuracy >= 70 ? "bg-green-500" :
+                            summary.quizRetention.accuracy >= 50 ? "bg-amber-500" : "bg-red-500"
+                          }`}
+                          style={{ width: `${summary.quizRetention.accuracy}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {summary.quizRetention.accuracy >= 70 ? "Strong retention" :
+                         summary.quizRetention.accuracy >= 50 ? "Moderate retention" : "Needs attention"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground mt-2">
+                  Complete quizzes to track your knowledge retention from consumed content.
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Activity Timing */}

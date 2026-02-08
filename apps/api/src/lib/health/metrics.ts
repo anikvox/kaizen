@@ -94,6 +94,23 @@ export interface AttentionEntropy {
   uniqueDomains: number;
 }
 
+export interface QuizRetention {
+  totalQuizzes: number;
+  totalQuestions: number;
+  correctAnswers: number;
+  overallAccuracy: number;
+  averageAccuracyPerQuiz: number;
+  trend: number; // percentage change in accuracy
+}
+
+export interface DailyQuizPerformance {
+  date: string;
+  quizzesCompleted: number;
+  totalQuestions: number;
+  correctAnswers: number;
+  accuracy: number;
+}
+
 export interface HealthMetricsSummary {
   timeRange: TimeRange;
   // Activity
@@ -132,6 +149,10 @@ export interface HealthMetricsSummary {
 
   // Attention
   attentionEntropy: AttentionEntropy;
+
+  // Quiz Retention
+  quizRetention: QuizRetention;
+  dailyQuizPerformance: DailyQuizPerformance[];
 }
 
 /**
@@ -618,6 +639,132 @@ export async function getAttentionEntropy(
 }
 
 /**
+ * 10) Quiz Retention Metrics
+ * Accuracy and retention from quiz results
+ */
+export async function getQuizRetention(
+  userId: string,
+  days: TimeRange
+): Promise<QuizRetention> {
+  const { from, to } = getDateRange(days);
+
+  const result = await db.$queryRaw<Array<{
+    total_quizzes: bigint;
+    total_questions: bigint;
+    correct_answers: bigint;
+  }>>`
+    SELECT
+      COUNT(DISTINCT qr.id) as total_quizzes,
+      COALESCE(SUM(qr."totalQuestions"), 0) as total_questions,
+      COALESCE(SUM(qr."correctAnswers"), 0) as correct_answers
+    FROM quiz_results qr
+    WHERE qr."userId" = ${userId}
+      AND qr."completedAt" >= ${from}
+      AND qr."completedAt" <= ${to}
+  `;
+
+  const totalQuizzes = Number(result[0]?.total_quizzes || 0);
+  const totalQuestions = Number(result[0]?.total_questions || 0);
+  const correctAnswers = Number(result[0]?.correct_answers || 0);
+  const overallAccuracy = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
+  const averageAccuracyPerQuiz = totalQuizzes > 0 ? overallAccuracy : 0;
+
+  // Calculate trend by comparing first half vs second half
+  const midDate = new Date((from.getTime() + to.getTime()) / 2);
+
+  const firstHalfResult = await db.$queryRaw<Array<{
+    total_questions: bigint;
+    correct_answers: bigint;
+  }>>`
+    SELECT
+      COALESCE(SUM(qr."totalQuestions"), 0) as total_questions,
+      COALESCE(SUM(qr."correctAnswers"), 0) as correct_answers
+    FROM quiz_results qr
+    WHERE qr."userId" = ${userId}
+      AND qr."completedAt" >= ${from}
+      AND qr."completedAt" < ${midDate}
+  `;
+
+  const secondHalfResult = await db.$queryRaw<Array<{
+    total_questions: bigint;
+    correct_answers: bigint;
+  }>>`
+    SELECT
+      COALESCE(SUM(qr."totalQuestions"), 0) as total_questions,
+      COALESCE(SUM(qr."correctAnswers"), 0) as correct_answers
+    FROM quiz_results qr
+    WHERE qr."userId" = ${userId}
+      AND qr."completedAt" >= ${midDate}
+      AND qr."completedAt" <= ${to}
+  `;
+
+  const firstHalfQuestions = Number(firstHalfResult[0]?.total_questions || 0);
+  const firstHalfCorrect = Number(firstHalfResult[0]?.correct_answers || 0);
+  const firstHalfAccuracy = firstHalfQuestions > 0 ? (firstHalfCorrect / firstHalfQuestions) * 100 : 0;
+
+  const secondHalfQuestions = Number(secondHalfResult[0]?.total_questions || 0);
+  const secondHalfCorrect = Number(secondHalfResult[0]?.correct_answers || 0);
+  const secondHalfAccuracy = secondHalfQuestions > 0 ? (secondHalfCorrect / secondHalfQuestions) * 100 : 0;
+
+  let trend = 0;
+  if (firstHalfAccuracy > 0) {
+    trend = ((secondHalfAccuracy - firstHalfAccuracy) / firstHalfAccuracy) * 100;
+  } else if (secondHalfAccuracy > 0) {
+    trend = 100;
+  }
+
+  return {
+    totalQuizzes,
+    totalQuestions,
+    correctAnswers,
+    overallAccuracy: Math.round(overallAccuracy * 10) / 10,
+    averageAccuracyPerQuiz: Math.round(averageAccuracyPerQuiz * 10) / 10,
+    trend: Math.round(trend),
+  };
+}
+
+/**
+ * Daily quiz performance for trend visualization
+ */
+export async function getDailyQuizPerformance(
+  userId: string,
+  days: TimeRange
+): Promise<DailyQuizPerformance[]> {
+  const { from, to } = getDateRange(days);
+
+  const result = await db.$queryRaw<Array<{
+    date: Date;
+    quizzes_completed: bigint;
+    total_questions: bigint;
+    correct_answers: bigint;
+  }>>`
+    SELECT
+      DATE(qr."completedAt") as date,
+      COUNT(*) as quizzes_completed,
+      COALESCE(SUM(qr."totalQuestions"), 0) as total_questions,
+      COALESCE(SUM(qr."correctAnswers"), 0) as correct_answers
+    FROM quiz_results qr
+    WHERE qr."userId" = ${userId}
+      AND qr."completedAt" >= ${from}
+      AND qr."completedAt" <= ${to}
+    GROUP BY DATE(qr."completedAt")
+    ORDER BY date ASC
+  `;
+
+  return result.map((row) => {
+    const total = Number(row.total_questions);
+    const correct = Number(row.correct_answers);
+    return {
+      date: row.date.toISOString().split("T")[0],
+      quizzesCompleted: Number(row.quizzes_completed),
+      totalQuestions: total,
+      correctAnswers: correct,
+      accuracy: total > 0 ? Math.round((correct / total) * 100 * 10) / 10 : 0,
+    };
+  });
+}
+
+/**
  * Calculate trend (percentage change) between two halves of a period
  */
 function calculateTrend(values: number[]): number {
@@ -654,6 +801,8 @@ export async function getHealthMetrics(
     mediaDiet,
     dailyMediaDiet,
     attentionEntropy,
+    quizRetention,
+    dailyQuizPerformance,
   ] = await Promise.all([
     getDailyActiveMinutes(userId, days),
     getDailyActivityTimes(userId, days),
@@ -666,6 +815,8 @@ export async function getHealthMetrics(
     getMediaDiet(userId, days),
     getDailyMediaDiet(userId, days),
     getAttentionEntropy(userId, days),
+    getQuizRetention(userId, days),
+    getDailyQuizPerformance(userId, days),
   ]);
 
   // Calculate averages
@@ -744,6 +895,10 @@ export async function getHealthMetrics(
 
     // Attention
     attentionEntropy,
+
+    // Quiz Retention
+    quizRetention,
+    dailyQuizPerformance,
   };
 }
 

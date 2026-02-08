@@ -280,6 +280,15 @@ app.get("/summary", dualAuthMiddleware, async (c) => {
         uniqueDomains: metrics.attentionEntropy.uniqueDomains,
         topDomains: metrics.attentionEntropy.topDomains.slice(0, 5),
       },
+
+      // Quiz retention card
+      quizRetention: {
+        totalQuizzes: metrics.quizRetention.totalQuizzes,
+        totalQuestions: metrics.quizRetention.totalQuestions,
+        correctAnswers: metrics.quizRetention.correctAnswers,
+        accuracy: metrics.quizRetention.overallAccuracy,
+        trend: metrics.quizRetention.trend,
+      },
     };
 
     return c.json({

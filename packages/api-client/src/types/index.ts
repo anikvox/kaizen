@@ -1134,6 +1134,13 @@ export interface CognitiveHealthSummary {
     uniqueDomains: number;
     topDomains: Array<{ domain: string; percentage: number }>;
   };
+  quizRetention: {
+    totalQuizzes: number;
+    totalQuestions: number;
+    correctAnswers: number;
+    accuracy: number;
+    trend: number;
+  };
 }
 
 export interface CognitiveHealthNudge {
