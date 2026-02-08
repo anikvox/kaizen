@@ -345,6 +345,10 @@ export interface UserSettings {
   quizActivityDays?: number; // 1-7
   // Pomodoro settings
   pomodoroCooldownMs?: number; // Default 120000 (2 minutes)
+  // Focus agent settings
+  focusAgentEnabled?: boolean; // Default true
+  focusAgentSensitivity?: number; // 0-1, Default 0.5
+  focusAgentCooldownMs?: number; // Default 300000 (5 minutes)
 }
 
 export interface UserSettingsUpdateRequest {
@@ -370,6 +374,10 @@ export interface UserSettingsUpdateRequest {
   quizActivityDays?: number;
   // Pomodoro settings
   pomodoroCooldownMs?: number;
+  // Focus agent settings
+  focusAgentEnabled?: boolean;
+  focusAgentSensitivity?: number;
+  focusAgentCooldownMs?: number;
 }
 
 export interface SSESettingsConnectedData {
@@ -395,6 +403,10 @@ export interface SSESettingsChangedData {
   hasGeminiApiKey?: boolean;
   hasAnthropicApiKey?: boolean;
   hasOpenaiApiKey?: boolean;
+  // Focus agent settings
+  focusAgentEnabled?: boolean;
+  focusAgentSensitivity?: number;
+  focusAgentCooldownMs?: number;
 }
 
 // Chat Types
@@ -703,6 +715,7 @@ export type UnifiedSSEEventType =
   | "active-tab-changed"
   | "pulses-updated"
   | "insight-created"
+  | "agent-nudge"
   | "ping";
 
 // Pulse types
@@ -718,6 +731,20 @@ export interface AttentionInsight {
   message: string;
   sourceUrl: string | null;
   createdAt: string;
+}
+
+// Agent Nudge types
+export type AgentNudgeType = "doomscroll" | "distraction" | "break" | "focus_drift" | "encouragement";
+
+export interface AgentNudge {
+  id: string;
+  type: AgentNudgeType;
+  message: string;
+  createdAt: string;
+}
+
+export interface AgentNudgeResponse {
+  response: "acknowledged" | "false_positive" | "dismissed";
 }
 
 export interface UnifiedSSEConnectedData {
@@ -826,6 +853,11 @@ export interface UnifiedSSEInsightCreatedData {
   insight: AttentionInsight;
 }
 
+export interface UnifiedSSEAgentNudgeData {
+  type: "agent-nudge";
+  nudge: AgentNudge;
+}
+
 export interface UnifiedSSEPingData {
   type: "ping";
   time: string;
@@ -848,6 +880,7 @@ export type UnifiedSSEData =
   | UnifiedSSEActiveTabChangedData
   | UnifiedSSEPulsesUpdatedData
   | UnifiedSSEInsightCreatedData
+  | UnifiedSSEAgentNudgeData
   | UnifiedSSEPingData;
 
 // Journey Types

@@ -15,6 +15,7 @@ import {
   pomodoroRoutes,
   unifiedSSERoutes,
   journeyRoutes,
+  agentRoutes,
 } from "./routes/index.js";
 
 const app = new Hono();
@@ -50,5 +51,6 @@ app.route("/focus", focusRoutes);
 app.route("/quiz", quizRoutes);
 app.route("/pomodoro", pomodoroRoutes);
 app.route("/journey", journeyRoutes);
+app.route("/agent", agentRoutes);
 
 export default app;

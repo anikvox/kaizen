@@ -10,6 +10,7 @@ export const JOB_NAMES = {
   QUIZ_GENERATION: "quiz-generation",
   VISIT_SUMMARIZATION: "visit-summarization",
   PULSE_GENERATION: "pulse-generation",
+  FOCUS_AGENT: "focus-agent",
 } as const;
 
 export type JobName = (typeof JOB_NAMES)[keyof typeof JOB_NAMES];
@@ -35,11 +36,16 @@ export interface PulseGenerationPayload {
   userId: string;
 }
 
+export interface FocusAgentPayload {
+  userId: string;
+}
+
 export type JobPayload =
   | FocusCalculationPayload
   | QuizGenerationPayload
   | VisitSummarizationPayload
-  | PulseGenerationPayload;
+  | PulseGenerationPayload
+  | FocusAgentPayload;
 
 // Job results
 export interface FocusCalculationResult {
@@ -65,11 +71,18 @@ export interface PulseGenerationResult {
   pulsesGenerated: number;
 }
 
+export interface FocusAgentResult {
+  nudgeSent: boolean;
+  nudgeType?: string;
+  reason?: string;
+}
+
 export type JobResult =
   | FocusCalculationResult
   | QuizGenerationResult
   | VisitSummarizationResult
-  | PulseGenerationResult;
+  | PulseGenerationResult
+  | FocusAgentResult;
 
 // Job status for API
 export interface JobStatus {

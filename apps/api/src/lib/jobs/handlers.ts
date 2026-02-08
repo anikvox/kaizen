@@ -23,6 +23,7 @@ import {
 import { processUserSummarization } from "../summarization.js";
 import { generateQuiz } from "../quiz/service.js";
 import { generatePulses } from "../pulse/index.js";
+import { runFocusAgent as runFocusGuardianAgent } from "../agent/focus-agent.js";
 import { getBoss } from "./boss.js";
 import {
   JOB_NAMES,
@@ -34,6 +35,8 @@ import {
   type VisitSummarizationResult,
   type PulseGenerationPayload,
   type PulseGenerationResult,
+  type FocusAgentPayload,
+  type FocusAgentResult,
 } from "./types.js";
 
 // Cache processed attention hashes to avoid reprocessing
@@ -272,6 +275,9 @@ async function handleVisitSummarization(
 // Pulse generation interval: 15 minutes
 const PULSE_GENERATION_INTERVAL_MS = 15 * 60 * 1000;
 
+// Focus agent interval: 1 minute
+const FOCUS_AGENT_INTERVAL_MS = 60 * 1000;
+
 /**
  * Handle pulse generation job
  */
@@ -301,6 +307,41 @@ async function handlePulseGeneration(
         `[Jobs] Failed to schedule next pulse generation for user ${userId}:`,
         error,
       );
+    }
+  }
+}
+
+/**
+ * Handle focus agent job (autonomous focus guardian)
+ */
+async function handleFocusAgent(
+  job: Job<FocusAgentPayload>
+): Promise<FocusAgentResult> {
+  const { userId } = job.data;
+
+  try {
+    const decision = await runFocusGuardianAgent(userId);
+
+    if (decision) {
+      return {
+        nudgeSent: true,
+        nudgeType: decision.nudgeType,
+        reason: decision.reasoning,
+      };
+    }
+
+    return { nudgeSent: false };
+  } finally {
+    // Self-schedule next run
+    try {
+      const boss = await getBoss();
+      await boss.send(JOB_NAMES.FOCUS_AGENT, { userId }, {
+        singletonKey: `focus-agent-${userId}`,
+        startAfter: Math.floor(FOCUS_AGENT_INTERVAL_MS / 1000),
+        singletonSeconds: Math.floor(FOCUS_AGENT_INTERVAL_MS / 1000),
+      });
+    } catch (error) {
+      console.error(`[Jobs] Failed to schedule next focus agent run for user ${userId}:`, error);
     }
   }
 }
@@ -351,6 +392,15 @@ export async function registerHandlers(boss: PgBoss): Promise<void> {
       );
       return handlePulseGeneration(job);
     },
+  );
+
+  // Focus agent (autonomous guardian)
+  await boss.work<FocusAgentPayload, FocusAgentResult>(
+    JOB_NAMES.FOCUS_AGENT,
+    async ([job]) => {
+      console.log(`[Jobs] Running focus agent for user ${job.data.userId}`);
+      return handleFocusAgent(job);
+    }
   );
 
   console.log("[Jobs] All handlers registered");

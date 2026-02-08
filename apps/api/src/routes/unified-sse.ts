@@ -149,6 +149,9 @@ app.get("/", async (c) => {
           quizAnswerOptionsCount: settings.quizAnswerOptionsCount,
           quizActivityDays: settings.quizActivityDays,
           pomodoroCooldownMs: settings.pomodoroCooldownMs,
+          focusAgentEnabled: settings.focusAgentEnabled,
+          focusAgentSensitivity: settings.focusAgentSensitivity,
+          focusAgentCooldownMs: settings.focusAgentCooldownMs,
         },
         focuses: focuses.map((f) => ({
           id: f.id,
@@ -421,6 +424,27 @@ app.get("/", async (c) => {
           });
         }
       }),
+    );
+
+    // Agent nudge
+    cleanups.push(
+      events.onAgentNudge(async (data) => {
+        if (data.userId === userId) {
+          await stream.writeSSE({
+            data: JSON.stringify({
+              type: "agent-nudge",
+              nudge: {
+                id: data.nudge.id,
+                type: data.nudge.type,
+                message: data.nudge.message,
+                createdAt: data.nudge.createdAt.toISOString(),
+              },
+            }),
+            event: "message",
+            id: String(id++),
+          });
+        }
+      })
     );
 
     // Keep-alive ping and pomodoro ticks

@@ -13,6 +13,7 @@ import {
   QuizEndpoints,
   PomodoroEndpoints,
   JourneyEndpoint,
+  AgentEndpoints,
 } from "./endpoints/index.js";
 import type { ApiClientOptions } from "./types/index.js";
 
@@ -32,6 +33,7 @@ export class ApiClient {
   public quiz: QuizEndpoints;
   public pomodoro: PomodoroEndpoints;
   public journey: JourneyEndpoint;
+  public agent: AgentEndpoints;
 
   constructor(options: ApiClientOptions) {
     this.http = new HttpClient(options);
@@ -48,6 +50,7 @@ export class ApiClient {
     this.quiz = new QuizEndpoints(this.http);
     this.pomodoro = new PomodoroEndpoints(this.http);
     this.journey = new JourneyEndpoint(this.http);
+    this.agent = new AgentEndpoints(this.http);
   }
 }
 

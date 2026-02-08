@@ -1,5 +1,5 @@
 import { Storage } from "@plasmohq/storage"
-import { createApiClient, type UnifiedSSEData } from "@kaizen/api-client"
+import { createApiClient, type UnifiedSSEData, type AgentNudge } from "@kaizen/api-client"
 
 import {
   COGNITIVE_ATTENTION_DEBUG_MODE,
@@ -11,6 +11,9 @@ const apiUrl = process.env.PLASMO_PUBLIC_KAIZEN_API_URL || "http://localhost:600
 const storage = new Storage()
 
 let settingsEventSource: EventSource | null = null
+
+// Storage key for active nudge
+export const AGENT_NUDGE_KEY = "agentNudge"
 
 export async function startSettingsSync() {
   const token = await storage.get<string>("deviceToken")
@@ -36,6 +39,14 @@ export async function startSettingsSync() {
         case "settings-changed":
           // Update local storage when settings change
           await syncSettingsToStorage(data.settings)
+          break
+
+        case "agent-nudge":
+          // Store nudge for content script to display
+          await storage.set(AGENT_NUDGE_KEY, {
+            ...data.nudge,
+            receivedAt: Date.now()
+          })
           break
       }
     },

@@ -145,6 +145,19 @@ export interface InsightCreatedEvent {
   insight: InsightData;
 }
 
+// Agent Nudge Events
+export interface AgentNudgeData {
+  id: string;
+  type: string;
+  message: string;
+  createdAt: Date;
+}
+
+export interface AgentNudgeEvent {
+  userId: string;
+  nudge: AgentNudgeData;
+}
+
 // Pomodoro Events
 export type PomodoroState = "idle" | "running" | "paused" | "cooldown";
 
@@ -358,6 +371,16 @@ class AppEvents extends EventEmitter {
   onInsightCreated(callback: (data: InsightCreatedEvent) => void) {
     this.on("insightCreated", callback);
     return () => this.off("insightCreated", callback);
+  }
+
+  // Agent Nudge Events
+  emitAgentNudge(data: AgentNudgeEvent) {
+    this.emit("agentNudge", data);
+  }
+
+  onAgentNudge(callback: (data: AgentNudgeEvent) => void) {
+    this.on("agentNudge", callback);
+    return () => this.off("agentNudge", callback);
   }
 }
 

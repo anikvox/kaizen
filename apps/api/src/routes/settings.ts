@@ -226,6 +226,10 @@ app.post("/", dualAuthMiddleware, async (c) => {
     quizActivityDays?: number;
     // Pomodoro settings
     pomodoroCooldownMs?: number;
+    // Focus agent settings
+    focusAgentEnabled?: boolean;
+    focusAgentSensitivity?: number;
+    focusAgentCooldownMs?: number;
   }>();
 
   // Build update data - using Prisma's unchecked types for direct field assignment
@@ -362,6 +366,21 @@ app.post("/", dualAuthMiddleware, async (c) => {
     createData.pomodoroCooldownMs = cooldown;
   }
 
+  // Focus agent settings
+  if (body.focusAgentEnabled !== undefined) {
+    updateData.focusAgentEnabled = body.focusAgentEnabled;
+  }
+  if (body.focusAgentSensitivity !== undefined) {
+    // Enforce valid range 0-1
+    const sensitivity = Math.min(1, Math.max(0, body.focusAgentSensitivity));
+    updateData.focusAgentSensitivity = sensitivity;
+  }
+  if (body.focusAgentCooldownMs !== undefined) {
+    // Enforce minimum of 1 minute
+    const cooldown = Math.max(60000, body.focusAgentCooldownMs);
+    updateData.focusAgentCooldownMs = cooldown;
+  }
+
   const settings = await db.userSettings.upsert({
     where: { userId },
     update: updateData,
@@ -404,6 +423,9 @@ app.post("/", dualAuthMiddleware, async (c) => {
       quizAnswerOptionsCount: settings.quizAnswerOptionsCount,
       quizActivityDays: settings.quizActivityDays,
       pomodoroCooldownMs: settings.pomodoroCooldownMs,
+      focusAgentEnabled: settings.focusAgentEnabled,
+      focusAgentSensitivity: settings.focusAgentSensitivity,
+      focusAgentCooldownMs: settings.focusAgentCooldownMs,
     },
   });
 
@@ -425,6 +447,9 @@ app.post("/", dualAuthMiddleware, async (c) => {
     quizAnswerOptionsCount: settings.quizAnswerOptionsCount,
     quizActivityDays: settings.quizActivityDays,
     pomodoroCooldownMs: settings.pomodoroCooldownMs,
+    focusAgentEnabled: settings.focusAgentEnabled,
+    focusAgentSensitivity: settings.focusAgentSensitivity,
+    focusAgentCooldownMs: settings.focusAgentCooldownMs,
   });
 });
 
