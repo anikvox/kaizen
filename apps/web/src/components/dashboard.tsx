@@ -20,6 +20,8 @@ import {
   type LLMModels,
   type LLMProviderType,
   type ModelInfo,
+  type JourneyResponse,
+  type JourneySite,
 } from "@kaizen/api-client";
 import {
   Button,
@@ -52,6 +54,9 @@ import {
   Plus,
   Trash2,
   Loader2,
+  Globe,
+  ExternalLink,
+  ArrowRight,
 } from "lucide-react";
 
 const PROVIDER_LABELS: Record<LLMProviderType, string> = {
@@ -102,6 +107,20 @@ function formatDate(): string {
     month: "short",
     day: "numeric",
   });
+}
+
+function formatDuration(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes % 60}m`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m`;
+  }
+  return `${seconds}s`;
 }
 
 // Seeded random for consistent shuffling per question
@@ -181,6 +200,11 @@ export function Dashboard({ initialTab }: DashboardProps) {
     anthropic: "",
     openai: "",
   });
+
+  // Journey state
+  const [journeyData, setJourneyData] = useState<JourneyResponse | null>(null);
+  const [journeyLoading, setJourneyLoading] = useState(false);
+  const [journeyDays, setJourneyDays] = useState(7);
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -618,6 +642,27 @@ export function Dashboard({ initialTab }: DashboardProps) {
       default: return false;
     }
   };
+
+  // Journey data fetch
+  const fetchJourneyData = useCallback(async (days: number) => {
+    setJourneyLoading(true);
+    const api = createApiClient(apiUrl, getTokenFn);
+    try {
+      const data = await api.journey.get(days);
+      setJourneyData(data);
+    } catch (err) {
+      console.error("Failed to fetch journey data:", err);
+    } finally {
+      setJourneyLoading(false);
+    }
+  }, [getTokenFn]);
+
+  // Fetch journey data when tab changes
+  useEffect(() => {
+    if (activeTab === "journey" && !journeyData && !journeyLoading) {
+      fetchJourneyData(journeyDays);
+    }
+  }, [activeTab, journeyData, journeyLoading, journeyDays, fetchJourneyData]);
 
   // Quiz handlers
   const generateQuiz = async () => {
@@ -1222,15 +1267,158 @@ export function Dashboard({ initialTab }: DashboardProps) {
           )}
 
           {activeTab === "journey" && (
-            <div className="rounded-2xl border bg-card border-border p-8 text-center">
-              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-                <History className="w-8 h-8 text-muted-foreground" />
+            <div className="space-y-4">
+              {/* Journey Header & Stats */}
+              <div className="rounded-2xl border bg-card border-border p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Globe className="w-5 h-5 text-secondary" />
+                    <h2 className="text-lg font-semibold">Learning Journey</h2>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={journeyDays}
+                      onChange={(e) => {
+                        const days = Number(e.target.value);
+                        setJourneyDays(days);
+                        setJourneyData(null);
+                        fetchJourneyData(days);
+                      }}
+                      className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value={1}>Last 24 hours</option>
+                      <option value={3}>Last 3 days</option>
+                      <option value={7}>Last 7 days</option>
+                      <option value={14}>Last 14 days</option>
+                      <option value={30}>Last 30 days</option>
+                    </select>
+                    <Button
+                      onClick={() => fetchJourneyData(journeyDays)}
+                      variant="outline"
+                      size="sm"
+                      disabled={journeyLoading}
+                    >
+                      {journeyLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                {journeyLoading && !journeyData ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : journeyData ? (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center p-4 rounded-xl bg-muted/50">
+                      <p className="text-2xl font-bold">{journeyData.summary.totalSites}</p>
+                      <p className="text-sm text-muted-foreground">Sites Visited</p>
+                    </div>
+                    <div className="text-center p-4 rounded-xl bg-muted/50">
+                      <p className="text-2xl font-bold">{journeyData.summary.totalVisits}</p>
+                      <p className="text-sm text-muted-foreground">Total Visits</p>
+                    </div>
+                    <div className="text-center p-4 rounded-xl bg-muted/50">
+                      <p className="text-2xl font-bold">{formatDuration(journeyData.summary.totalActiveTimeMs)}</p>
+                      <p className="text-sm text-muted-foreground">Active Time</p>
+                    </div>
+                    <div className="text-center p-4 rounded-xl bg-muted/50">
+                      <p className="text-2xl font-bold">{journeyData.summary.avgVisitsPerSite}</p>
+                      <p className="text-sm text-muted-foreground">Avg Visits/Site</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No journey data available
+                  </div>
+                )}
               </div>
-              <h2 className="text-xl font-semibold mb-2">Learning Journey</h2>
-              <p className="text-muted-foreground mb-4">
-                Your learning history and progress will appear here.
-              </p>
-              <p className="text-sm text-muted-foreground">Coming soon...</p>
+
+              {/* Sites List */}
+              {journeyData && journeyData.sites.length > 0 && (
+                <div className="rounded-2xl border bg-card border-border p-6">
+                  <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground mb-4">
+                    Most Visited Sites
+                  </h3>
+                  <div className="space-y-3">
+                    {journeyData.sites.slice(0, 15).map((site, idx) => (
+                      <div
+                        key={site.domain}
+                        className="flex items-center gap-4 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center flex-shrink-0">
+                          <span className="text-sm font-semibold text-secondary">{idx + 1}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium truncate">{site.domain}</p>
+                            <a
+                              href={`https://${site.domain}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-muted-foreground hover:text-foreground"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                            <span>{site.totalVisits} visits</span>
+                            <span>{site.uniquePages} pages</span>
+                            <span>{formatDuration(site.totalActiveTimeMs)}</span>
+                          </div>
+                          {site.titles.length > 0 && (
+                            <p className="text-xs text-muted-foreground mt-1 truncate">
+                              {site.titles[0]}
+                            </p>
+                          )}
+                        </div>
+                        {site.topReferrers.length > 0 && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
+                            <span className="hidden sm:inline">from</span>
+                            <span className="font-medium">{site.topReferrers[0].domain}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Navigation Flows */}
+              {journeyData && journeyData.referrerFlows.length > 0 && (
+                <div className="rounded-2xl border bg-card border-border p-6">
+                  <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground mb-4">
+                    Navigation Patterns
+                  </h3>
+                  <div className="grid gap-2">
+                    {journeyData.referrerFlows.slice(0, 10).map((flow, idx) => (
+                      <div
+                        key={`${flow.from}-${flow.to}-${idx}`}
+                        className="flex items-center gap-2 p-2 rounded-lg bg-muted/20 text-sm"
+                      >
+                        <span className="font-medium truncate max-w-[140px]">{flow.from}</span>
+                        <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <span className="font-medium truncate max-w-[140px]">{flow.to}</span>
+                        <span className="text-muted-foreground ml-auto flex-shrink-0">
+                          {flow.count}x
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty State */}
+              {journeyData && journeyData.sites.length === 0 && (
+                <div className="rounded-2xl border bg-card border-border p-8 text-center">
+                  <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                    <Globe className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">No Activity Yet</h3>
+                  <p className="text-muted-foreground text-sm">
+                    Start browsing with the extension enabled to see your learning journey here.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

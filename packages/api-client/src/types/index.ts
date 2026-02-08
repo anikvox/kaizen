@@ -830,3 +830,74 @@ export type UnifiedSSEData =
   | UnifiedSSEInsightCreatedData
   | UnifiedSSEPingData;
 
+// Journey Types
+export interface JourneySiteReferrer {
+  domain: string;
+  count: number;
+}
+
+export interface JourneySite {
+  domain: string;
+  totalVisits: number;
+  totalActiveTimeMs: number;
+  uniquePages: number;
+  titles: string[];
+  summaries: string[];
+  topReferrers: JourneySiteReferrer[];
+  lastVisitedAt: string;
+  firstVisitedAt: string;
+}
+
+export interface JourneyReferrerFlow {
+  from: string;
+  to: string;
+  count: number;
+}
+
+export interface JourneyResponse {
+  period: {
+    days: number;
+    since: string;
+    until: string;
+  };
+  summary: {
+    totalSites: number;
+    totalVisits: number;
+    totalActiveTimeMs: number;
+    avgVisitsPerSite: number;
+  };
+  sites: JourneySite[];
+  referrerFlows: JourneyReferrerFlow[];
+}
+
+export interface JourneyPage {
+  url: string;
+  title: string;
+  visits: number;
+  totalActiveTime: number;
+  summary: string | null;
+  lastVisited: string;
+}
+
+export interface JourneyDailyActivity {
+  date: string;
+  visits: number;
+  activeTimeMs: number;
+}
+
+export interface JourneyDomainDetailResponse {
+  domain: string;
+  period: {
+    days: number;
+    since: string;
+  };
+  summary: {
+    totalVisits: number;
+    uniquePages: number;
+    totalActiveTimeMs: number;
+  };
+  pages: JourneyPage[];
+  referrers: JourneySiteReferrer[];
+  dailyActivity: JourneyDailyActivity[];
+}
+
