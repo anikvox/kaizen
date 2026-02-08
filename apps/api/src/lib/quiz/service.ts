@@ -9,7 +9,13 @@ import { serializeAttentionCompact } from "../llm/prompts.js";
 import { createLLMService } from "../llm/service.js";
 import { getUserFocusHistory } from "../focus/index.js";
 import type { UserSettings } from "@prisma/client";
-import type { QuizSettings, GeneratedQuiz, QuizGenerationContext, QuizQuestion, QuizWithAnswers } from "./types.js";
+import type {
+  QuizSettings,
+  GeneratedQuiz,
+  QuizGenerationContext,
+  QuizQuestion,
+  QuizWithAnswers,
+} from "./types.js";
 import { DEFAULT_QUIZ_SETTINGS } from "./types.js";
 import { createQuizPrompt, parseQuizResponse } from "./prompts.js";
 import { LLM_CONFIG, getPrompt, PROMPT_NAMES } from "../llm/index.js";
@@ -26,18 +32,27 @@ const QUIZ_VALIDITY_HOURS = 24; // Quiz is valid for 24 hours
 /**
  * Extract quiz settings from user settings
  */
-export function extractQuizSettings(settings: UserSettings | null): QuizSettings {
+export function extractQuizSettings(
+  settings: UserSettings | null,
+): QuizSettings {
   return {
-    answerOptionsCount: settings?.quizAnswerOptionsCount ?? DEFAULT_QUIZ_SETTINGS.answerOptionsCount,
-    activityDays: settings?.quizActivityDays ?? DEFAULT_QUIZ_SETTINGS.activityDays,
+    answerOptionsCount:
+      settings?.quizAnswerOptionsCount ??
+      DEFAULT_QUIZ_SETTINGS.answerOptionsCount,
+    activityDays:
+      settings?.quizActivityDays ?? DEFAULT_QUIZ_SETTINGS.activityDays,
   };
 }
 
 /**
  * Get the current quiz for a user (or null if none exists or expired)
  */
-export async function getCurrentQuiz(userId: string): Promise<QuizWithAnswers | null> {
-  const cutoffTime = new Date(Date.now() - QUIZ_VALIDITY_HOURS * 60 * 60 * 1000);
+export async function getCurrentQuiz(
+  userId: string,
+): Promise<QuizWithAnswers | null> {
+  const cutoffTime = new Date(
+    Date.now() - QUIZ_VALIDITY_HOURS * 60 * 60 * 1000,
+  );
 
   const quiz = await db.quiz.findFirst({
     where: {
@@ -56,7 +71,7 @@ export async function getCurrentQuiz(userId: string): Promise<QuizWithAnswers | 
   if (!quiz) return null;
 
   const questions = quiz.questions as QuizQuestion[];
-  const correctCount = quiz.answers.filter(a => a.isCorrect).length;
+  const correctCount = quiz.answers.filter((a) => a.isCorrect).length;
 
   return {
     id: quiz.id,
@@ -64,7 +79,7 @@ export async function getCurrentQuiz(userId: string): Promise<QuizWithAnswers | 
     generatedAt: quiz.generatedAt.toISOString(),
     activityDays: quiz.activityDays,
     optionsCount: quiz.optionsCount,
-    answers: quiz.answers.map(a => ({
+    answers: quiz.answers.map((a) => ({
       questionIndex: a.questionIndex,
       selectedIndex: a.selectedIndex,
       isCorrect: a.isCorrect,
@@ -82,7 +97,7 @@ export async function submitAnswer(
   userId: string,
   quizId: string,
   questionIndex: number,
-  selectedIndex: number
+  selectedIndex: number,
 ): Promise<{ success: boolean; isCorrect: boolean; error?: string }> {
   // Verify quiz belongs to user
   const quiz = await db.quiz.findUnique({
@@ -95,7 +110,11 @@ export async function submitAnswer(
   }
 
   if (quiz.completedAt) {
-    return { success: false, isCorrect: false, error: "Quiz already completed" };
+    return {
+      success: false,
+      isCorrect: false,
+      error: "Quiz already completed",
+    };
   }
 
   const questions = quiz.questions as QuizQuestion[];
@@ -131,7 +150,7 @@ export async function submitAnswer(
   if (answerCount === questions.length) {
     // Mark quiz as completed and create result
     const answers = await db.quizAnswer.findMany({ where: { quizId } });
-    const correctAnswers = answers.filter(a => a.isCorrect).length;
+    const correctAnswers = answers.filter((a) => a.isCorrect).length;
 
     await db.$transaction([
       db.quiz.update({
@@ -155,11 +174,37 @@ export async function submitAnswer(
 /**
  * Start quiz generation via job queue.
  * Returns the job ID immediately, client should poll for status.
+ * Pre-checks for activity data and returns error immediately if none.
  */
 export async function startQuizGeneration(userId: string): Promise<{
   jobId: string | null;
   status: string;
+  error?: string;
+  code?: string;
 }> {
+  // Get user settings for activity days
+  const settings = await db.userSettings.findUnique({
+    where: { userId },
+  });
+
+  const activityDays =
+    settings?.quizActivityDays ?? DEFAULT_QUIZ_SETTINGS.activityDays;
+
+  // Pre-check for activity data before creating job
+  const context = await gatherQuizContext(userId, activityDays);
+
+  if (!context) {
+    console.log(
+      `[Quiz] No activity data for user ${userId}, skipping job creation`,
+    );
+    return {
+      jobId: null,
+      status: "failed",
+      error: "Not enough activity data to generate quiz",
+      code: "NO_ACTIVITY_DATA",
+    };
+  }
+
   const jobId = await sendQuizGeneration(userId);
 
   console.log(`[Quiz] Created job ${jobId} for user ${userId}`);
@@ -173,7 +218,10 @@ export async function startQuizGeneration(userId: string): Promise<{
 /**
  * Get quiz job status and result.
  */
-export async function getQuizJobStatus(jobId: string, userId: string): Promise<{
+export async function getQuizJobStatus(
+  jobId: string,
+  userId: string,
+): Promise<{
   status: string;
   quiz?: GeneratedQuiz;
   error?: string;
@@ -220,7 +268,7 @@ export async function getQuizJobStatus(jobId: string, userId: string): Promise<{
  */
 export async function generateQuiz(
   userId: string,
-  options?: { answerOptionsCount?: number; activityDays?: number }
+  options?: { answerOptionsCount?: number; activityDays?: number },
 ): Promise<GeneratedQuiz | null> {
   console.log(`[Quiz] Starting generation for user ${userId}`);
 
@@ -229,10 +277,18 @@ export async function generateQuiz(
     where: { userId },
   });
 
-  const answerOptionsCount = options?.answerOptionsCount ?? settings?.quizAnswerOptionsCount ?? DEFAULT_QUIZ_SETTINGS.answerOptionsCount;
-  const activityDays = options?.activityDays ?? settings?.quizActivityDays ?? DEFAULT_QUIZ_SETTINGS.activityDays;
+  const answerOptionsCount =
+    options?.answerOptionsCount ??
+    settings?.quizAnswerOptionsCount ??
+    DEFAULT_QUIZ_SETTINGS.answerOptionsCount;
+  const activityDays =
+    options?.activityDays ??
+    settings?.quizActivityDays ??
+    DEFAULT_QUIZ_SETTINGS.activityDays;
 
-  console.log(`[Quiz] Settings: answerOptionsCount=${answerOptionsCount}, activityDays=${activityDays}`);
+  console.log(
+    `[Quiz] Settings: answerOptionsCount=${answerOptionsCount}, activityDays=${activityDays}`,
+  );
 
   // Gather context for quiz generation
   const context = await gatherQuizContext(userId, activityDays);
@@ -265,7 +321,7 @@ export async function generateQuiz(
   const parsed = parseQuizResponse(
     response.content,
     QUESTION_COUNT,
-    answerOptionsCount
+    answerOptionsCount,
   );
 
   if (!parsed.success || !parsed.questions) {
@@ -273,7 +329,9 @@ export async function generateQuiz(
     throw new Error(parsed.error || "Failed to parse quiz response");
   }
 
-  console.log(`[Quiz] Successfully generated ${parsed.questions.length} questions`);
+  console.log(
+    `[Quiz] Successfully generated ${parsed.questions.length} questions`,
+  );
 
   // Create content hash for deduplication tracking
   const contentHash = createHash("md5")
@@ -315,7 +373,7 @@ export async function generateQuiz(
  */
 export async function gatherQuizContext(
   userId: string,
-  activityDays: number
+  activityDays: number,
 ): Promise<QuizGenerationContext | null> {
   const now = new Date();
   const from = new Date(now.getTime() - activityDays * 24 * 60 * 60 * 1000);
@@ -329,7 +387,10 @@ export async function gatherQuizContext(
   }
 
   // Get focus topics
-  const focuses = await getUserFocusHistory(userId, { limit: 10, includeActive: true });
+  const focuses = await getUserFocusHistory(userId, {
+    limit: 10,
+    includeActive: true,
+  });
   const focusTopics = focuses.map((f) => f.item);
 
   // Serialize attention data
@@ -366,8 +427,12 @@ export async function gatherQuizContext(
 export async function getQueueStatus(userId?: string) {
   if (userId) {
     const status = await getUserJobsStatus(userId);
-    const quizPending = status.pending.filter(j => j.name === JOB_NAMES.QUIZ_GENERATION);
-    const quizActive = status.active.filter(j => j.name === JOB_NAMES.QUIZ_GENERATION);
+    const quizPending = status.pending.filter(
+      (j) => j.name === JOB_NAMES.QUIZ_GENERATION,
+    );
+    const quizActive = status.active.filter(
+      (j) => j.name === JOB_NAMES.QUIZ_GENERATION,
+    );
 
     return {
       pending: quizPending.length,
@@ -392,6 +457,8 @@ export async function getQueueStatus(userId?: string) {
  * @deprecated Use startQuizGeneration instead
  */
 export function getJobStatus(jobId: string, userId: string): null {
-  console.warn("[Quiz] getJobStatus is deprecated. Use getQuizTaskStatus or task queue API.");
+  console.warn(
+    "[Quiz] getJobStatus is deprecated. Use getQuizTaskStatus or task queue API.",
+  );
   return null;
 }

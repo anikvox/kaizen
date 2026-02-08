@@ -11,13 +11,18 @@ import { decryptApiKey } from "../llm/encryption.js";
 import { SYSTEM_DEFAULT_MODEL } from "../llm/models.js";
 import { env } from "../env.js";
 
-export type AgentProvider = ReturnType<typeof createGoogleGenerativeAI> | ReturnType<typeof createAnthropic> | ReturnType<typeof createOpenAI>;
+export type AgentProvider =
+  | ReturnType<typeof createGoogleGenerativeAI>
+  | ReturnType<typeof createAnthropic>
+  | ReturnType<typeof createOpenAI>;
 
 /**
  * Create an AI provider instance for Vercel AI SDK based on user settings.
  * Falls back to system Gemini if no user provider is configured.
  */
-export function createAgentProvider(settings: UserSettings | null): AgentProvider {
+export function createAgentProvider(
+  settings: UserSettings | null,
+): AgentProvider {
   // Check user's configured provider first
   if (settings?.llmProvider) {
     const providerType = settings.llmProvider;

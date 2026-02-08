@@ -1,11 +1,6 @@
 import { Hono } from "hono";
 import type { UserSettings } from "@prisma/client";
-import {
-  db,
-  events,
-  generateChatTitle,
-  runChatAgent,
-} from "../lib/index.js";
+import { db, events, generateChatTitle, runChatAgent } from "../lib/index.js";
 import type { ChatAgentMessage } from "../lib/index.js";
 
 // Timeout for bot typing state (1 minute)
@@ -24,7 +19,9 @@ type CombinedAuthVariables = {
 const app = new Hono<{ Variables: CombinedAuthVariables }>();
 
 // Helper to get userId from either auth method
-async function getUserIdFromContext(c: { get: (key: string) => string | undefined }): Promise<string | null> {
+async function getUserIdFromContext(c: {
+  get: (key: string) => string | undefined;
+}): Promise<string | null> {
   const deviceUserId = c.get("userId");
   if (deviceUserId) {
     return deviceUserId;
@@ -109,7 +106,7 @@ app.get("/", dualAuthMiddleware, async (c) => {
       messageCount: countMap.get(s.id) || 0,
       createdAt: s.createdAt.toISOString(),
       updatedAt: s.updatedAt.toISOString(),
-    }))
+    })),
   );
 });
 
@@ -165,6 +162,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
   const body = await c.req.json<{
     sessionId?: string;
     content: string;
+    attentionRange?: string;
   }>();
 
   if (!body.content?.trim()) {
@@ -173,6 +171,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
 
   let sessionId = body.sessionId;
   let isNewSession = false;
+  let sessionAttentionRange = body.attentionRange || "2h";
 
   // Create new session if not provided
   if (!sessionId) {
@@ -180,6 +179,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
       data: {
         userId,
         title: "New Chat", // Will be updated by bot after first response
+        attentionRange: sessionAttentionRange,
       },
     });
     sessionId = session.id;
@@ -192,13 +192,13 @@ app.post("/", dualAuthMiddleware, async (c) => {
       session: {
         id: session.id,
         title: session.title,
-        attentionRange: "2h", // Default for backwards compatibility
+        attentionRange: sessionAttentionRange,
         createdAt: session.createdAt.toISOString(),
         updatedAt: session.updatedAt.toISOString(),
       },
     });
   } else {
-    // Verify session belongs to user
+    // Verify session belongs to user and get its attention range
     const existingSession = await db.chatSession.findFirst({
       where: { id: sessionId, userId },
     });
@@ -206,6 +206,9 @@ app.post("/", dualAuthMiddleware, async (c) => {
     if (!existingSession) {
       return c.json({ error: "Chat session not found" }, 404);
     }
+
+    // Use the session's stored attention range
+    sessionAttentionRange = existingSession.attentionRange || "2h";
   }
 
   // Create user message
@@ -311,7 +314,15 @@ app.post("/", dualAuthMiddleware, async (c) => {
   // The agent will use tools to get attention data when needed
   // Pass first user message for title generation if this is a new session
   const firstUserMessage = isNewSession ? body.content.trim() : undefined;
-  generateAgentResponse(userId, sessionId, assistantMessage.id, agentMessages, firstUserMessage, userSettings);
+  generateAgentResponse(
+    userId,
+    sessionId,
+    assistantMessage.id,
+    agentMessages,
+    firstUserMessage,
+    userSettings,
+    sessionAttentionRange,
+  );
 
   // Update session updatedAt
   await db.chatSession.update({
@@ -379,14 +390,19 @@ async function generateAgentResponse(
   conversationHistory: ChatAgentMessage[],
   firstUserMessage?: string, // If provided, generate title after response
   userSettings?: UserSettings | null,
-  systemPrompt?: string
+  attentionRange?: string, // User's selected time range for activity context
 ) {
+  // Build context about the user's selected attention range
+  const attentionRangeContext = attentionRange
+    ? `\n\n## Attention Range Context\nThe user has selected "${attentionRange}" as their attention range for this conversation. When querying browsing activity or attention data, use this time range:\n- "30m" = last 30 minutes\n- "2h" = last 2 hours\n- "1d" = last 24 hours\n- "all" = all available data\n\nUse the appropriate preset or minutes value when calling get_attention_data or similar tools.`
+    : "";
+
   try {
     await runChatAgent(
       userId,
       conversationHistory,
       userSettings || null,
-      systemPrompt,
+      attentionRangeContext || undefined,
       {
         onTextChunk: async (chunk: string, fullContent: string) => {
           // Clear timeout on first chunk
@@ -417,7 +433,11 @@ async function generateAgentResponse(
           });
         },
 
-        onToolCall: async (toolCallId: string, toolName: string, args: unknown) => {
+        onToolCall: async (
+          toolCallId: string,
+          toolName: string,
+          args: unknown,
+        ) => {
           // Clear timeout when tool is called
           const timeoutId = activeBotResponses.get(assistantMessageId);
           if (timeoutId) {
@@ -432,10 +452,13 @@ async function generateAgentResponse(
             toolCallId,
             toolName,
           });
-
         },
 
-        onToolResult: async (toolCallId: string, toolName: string, result: unknown) => {
+        onToolResult: async (
+          toolCallId: string,
+          toolName: string,
+          result: unknown,
+        ) => {
           // Create tool message in database (only when we have the result)
           const toolMessage = await db.chatMessage.create({
             data: {
@@ -550,7 +573,7 @@ async function generateAgentResponse(
             },
           });
         },
-      }
+      },
     );
   } catch (error) {
     console.error("Agent response error:", error);
@@ -562,7 +585,8 @@ async function generateAgentResponse(
       activeBotResponses.delete(assistantMessageId);
     }
 
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
 
     await db.chatMessage.update({
       where: { id: assistantMessageId },

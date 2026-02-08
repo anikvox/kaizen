@@ -123,50 +123,61 @@ export function extractDomain(url: string): string {
  */
 export async function fetchRawAttentionData(
   userId: string,
-  timeRange: AttentionTimeRange
+  timeRange: AttentionTimeRange,
 ): Promise<RawAttentionData> {
   const { from, to } = timeRange;
 
-  const [visits, textAttentions, imageAttentions, audioAttentions, youtubeAttentions] =
-    await Promise.all([
-      db.websiteVisit.findMany({
-        where: {
-          userId,
-          openedAt: { gte: from, lte: to },
-        },
-        orderBy: { openedAt: "desc" },
-      }),
-      db.textAttention.findMany({
-        where: {
-          userId,
-          timestamp: { gte: from, lte: to },
-        },
-        orderBy: { timestamp: "desc" },
-      }),
-      db.imageAttention.findMany({
-        where: {
-          userId,
-          timestamp: { gte: from, lte: to },
-        },
-        orderBy: { timestamp: "desc" },
-      }),
-      db.audioAttention.findMany({
-        where: {
-          userId,
-          timestamp: { gte: from, lte: to },
-        },
-        orderBy: { timestamp: "desc" },
-      }),
-      db.youtubeAttention.findMany({
-        where: {
-          userId,
-          timestamp: { gte: from, lte: to },
-        },
-        orderBy: { timestamp: "desc" },
-      }),
-    ]);
+  const [
+    visits,
+    textAttentions,
+    imageAttentions,
+    audioAttentions,
+    youtubeAttentions,
+  ] = await Promise.all([
+    db.websiteVisit.findMany({
+      where: {
+        userId,
+        openedAt: { gte: from, lte: to },
+      },
+      orderBy: { openedAt: "desc" },
+    }),
+    db.textAttention.findMany({
+      where: {
+        userId,
+        timestamp: { gte: from, lte: to },
+      },
+      orderBy: { timestamp: "desc" },
+    }),
+    db.imageAttention.findMany({
+      where: {
+        userId,
+        timestamp: { gte: from, lte: to },
+      },
+      orderBy: { timestamp: "desc" },
+    }),
+    db.audioAttention.findMany({
+      where: {
+        userId,
+        timestamp: { gte: from, lte: to },
+      },
+      orderBy: { timestamp: "desc" },
+    }),
+    db.youtubeAttention.findMany({
+      where: {
+        userId,
+        timestamp: { gte: from, lte: to },
+      },
+      orderBy: { timestamp: "desc" },
+    }),
+  ]);
 
-  return { visits, textAttentions, imageAttentions, audioAttentions, youtubeAttentions };
+  return {
+    visits,
+    textAttentions,
+    imageAttentions,
+    audioAttentions,
+    youtubeAttentions,
+  };
 }
 
 /**
@@ -174,9 +185,15 @@ export async function fetchRawAttentionData(
  */
 export function aggregateAttentionData(
   raw: RawAttentionData,
-  timeRange: AttentionTimeRange
+  timeRange: AttentionTimeRange,
 ): AttentionDataResponse {
-  const { visits, textAttentions, imageAttentions, audioAttentions, youtubeAttentions } = raw;
+  const {
+    visits,
+    textAttentions,
+    imageAttentions,
+    audioAttentions,
+    youtubeAttentions,
+  } = raw;
   const { from, to } = timeRange;
 
   // Build attention summaries keyed by URL
@@ -244,7 +261,8 @@ export function aggregateAttentionData(
     const summary = urlMap.get(text.url)!;
     summary.attention.text.totalWordsRead += text.wordsRead;
     summary.attention.text.excerpts.push({
-      text: text.text.length > 500 ? text.text.slice(0, 500) + "..." : text.text,
+      text:
+        text.text.length > 500 ? text.text.slice(0, 500) + "..." : text.text,
       wordsRead: text.wordsRead,
       timestamp: text.timestamp.toISOString(),
     });
@@ -308,14 +326,21 @@ export function aggregateAttentionData(
     }
     const video = youtubeVideoMap.get(key)!;
 
-    if (yt.event === "active-watch-time-update" && yt.activeWatchTime !== null) {
-      video.activeWatchTime = Math.max(video.activeWatchTime || 0, yt.activeWatchTime);
+    if (
+      yt.event === "active-watch-time-update" &&
+      yt.activeWatchTime !== null
+    ) {
+      video.activeWatchTime = Math.max(
+        video.activeWatchTime || 0,
+        yt.activeWatchTime,
+      );
     }
     if (yt.event === "caption" && yt.caption) {
       video.captions.push(yt.caption);
     }
     if (yt.title && !video.title) video.title = yt.title;
-    if (yt.channelName && !video.channelName) video.channelName = yt.channelName;
+    if (yt.channelName && !video.channelName)
+      video.channelName = yt.channelName;
     if (yt.url && !video.url) video.url = yt.url;
   }
 
@@ -346,15 +371,24 @@ export function aggregateAttentionData(
       ...summary,
       activeTimeFormatted: formatDuration(summary.activeTime),
     }))
-    .sort((a, b) => new Date(b.visitedAt).getTime() - new Date(a.visitedAt).getTime());
+    .sort(
+      (a, b) =>
+        new Date(b.visitedAt).getTime() - new Date(a.visitedAt).getTime(),
+    );
 
   // Calculate totals
-  const totalWordsRead = pages.reduce((sum, p) => sum + p.attention.text.totalWordsRead, 0);
-  const totalImages = pages.reduce((sum, p) => sum + p.attention.images.count, 0);
+  const totalWordsRead = pages.reduce(
+    (sum, p) => sum + p.attention.text.totalWordsRead,
+    0,
+  );
+  const totalImages = pages.reduce(
+    (sum, p) => sum + p.attention.images.count,
+    0,
+  );
   const totalAudio = pages.reduce((sum, p) => sum + p.attention.audio.count, 0);
   const totalYoutubeVideos = pages.reduce(
     (sum, p) => sum + p.attention.youtube.videos.length,
-    0
+    0,
   );
   const totalActiveTime = pages.reduce((sum, p) => sum + p.activeTime, 0);
 
@@ -381,7 +415,7 @@ export function aggregateAttentionData(
  */
 export async function getAttentionData(
   userId: string,
-  timeRange: AttentionTimeRange
+  timeRange: AttentionTimeRange,
 ): Promise<AttentionDataResponse> {
   const raw = await fetchRawAttentionData(userId, timeRange);
   return aggregateAttentionData(raw, timeRange);
@@ -393,7 +427,9 @@ export async function getAttentionData(
 export function serializeAttentionForLLM(data: AttentionDataResponse): string {
   const lines: string[] = [];
 
-  lines.push(`Activity Summary (${data.summary.totalPages} pages, ${data.summary.totalActiveTimeFormatted} active time):`);
+  lines.push(
+    `Activity Summary (${data.summary.totalPages} pages, ${data.summary.totalActiveTimeFormatted} active time):`,
+  );
   lines.push(`- Words read: ${data.summary.totalWordsRead}`);
   lines.push(`- Images viewed: ${data.summary.totalImagesViewed}`);
   lines.push(`- YouTube videos: ${data.summary.totalYoutubeVideos}`);
@@ -431,7 +467,9 @@ export function serializeAttentionForLLM(data: AttentionDataResponse): string {
 
     if (page.attention.youtube.videos.length > 0) {
       for (const video of page.attention.youtube.videos) {
-        lines.push(`   YouTube: "${video.title || "Unknown"}" by ${video.channelName || "Unknown"}`);
+        lines.push(
+          `   YouTube: "${video.title || "Unknown"}" by ${video.channelName || "Unknown"}`,
+        );
         if (video.activeWatchTimeFormatted) {
           lines.push(`     Watched: ${video.activeWatchTimeFormatted}`);
         }

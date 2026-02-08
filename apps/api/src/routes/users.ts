@@ -59,7 +59,9 @@ app.post("/sync", async (c) => {
       });
 
       await scheduleInitialJobs(user.id, settings);
-      console.log(`[Users] Scheduled initial jobs for new user ${user.id} (${body.email})`);
+      console.log(
+        `[Users] Scheduled initial jobs for new user ${user.id} (${body.email})`,
+      );
     } catch (error) {
       console.error("[Users] Failed to schedule initial jobs:", error);
       // Don't fail user creation if job scheduling fails

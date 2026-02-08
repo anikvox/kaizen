@@ -1,6 +1,10 @@
 import type { UserSettings } from "@prisma/client";
 import type { LLMProvider, LLMProviderType } from "./interface.js";
-import { GeminiProvider, AnthropicProvider, OpenAIProvider } from "./providers/index.js";
+import {
+  GeminiProvider,
+  AnthropicProvider,
+  OpenAIProvider,
+} from "./providers/index.js";
 import { decryptApiKey } from "./encryption.js";
 import { SYSTEM_DEFAULT_MODEL, getDefaultModel } from "./models.js";
 import { env } from "../env.js";
@@ -44,7 +48,9 @@ export class LLMService {
    */
   getProviderType(): LLMProviderType {
     if (this.settings?.llmProvider) {
-      const apiKey = this.getUserApiKey(this.settings.llmProvider as LLMProviderType);
+      const apiKey = this.getUserApiKey(
+        this.settings.llmProvider as LLMProviderType,
+      );
       if (apiKey) {
         return this.settings.llmProvider as LLMProviderType;
       }
@@ -80,7 +86,9 @@ export class LLMService {
     const apiKey = this.getUserApiKey(providerType);
 
     if (!apiKey) {
-      console.warn(`No API key found for provider: ${providerType}, falling back to system`);
+      console.warn(
+        `No API key found for provider: ${providerType}, falling back to system`,
+      );
       return null;
     }
 
@@ -128,7 +136,7 @@ export class LLMService {
   private createProvider(
     providerType: LLMProviderType,
     apiKey: string,
-    model: string
+    model: string,
   ): LLMProvider {
     const config = { apiKey, model, userId: this.settings?.userId };
 

@@ -53,5 +53,9 @@ export {
 } from "./service.js";
 
 // Agent
-export { runFocusAgent, checkAndEndInactiveFocuses, type FocusAgentResult } from "./agent.js";
+export {
+  runFocusAgent,
+  checkAndEndInactiveFocuses,
+  type FocusAgentResult,
+} from "./agent.js";
 export { createFocusTools, type FocusTools } from "./tools.js";

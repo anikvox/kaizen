@@ -6,17 +6,31 @@ import {
   type UserSettings,
   type ChatSessionListItem,
   type ChatMessage,
-  type ChatMessageStatus,
   type Focus,
   type PomodoroStatus,
   type UnifiedSSEData,
   type AttentionInsight
 } from "@kaizen/api-client"
 import {
+  Button,
+  Logo,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  FocusCard,
+  PomodoroTimer,
+  Badge,
+  Separator,
+  cn
+} from "@kaizen/ui"
+import { MessageSquare, Lightbulb, Settings, Plus, ArrowLeft, Trash2, Send } from "lucide-react"
+import {
   COGNITIVE_ATTENTION_DEBUG_MODE,
   COGNITIVE_ATTENTION_SHOW_OVERLAY,
   ATTENTION_TRACKING_IGNORE_LIST
 } from "./cognitive-attention/default-settings"
+import "./styles.css"
 
 const apiUrl = process.env.PLASMO_PUBLIC_KAIZEN_API_URL || "http://localhost:60092"
 
@@ -146,18 +160,6 @@ function SidePanel() {
     })
   }, [])
 
-  // Format seconds to HH:MM:SS or MM:SS
-  const formatTime = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600)
-    const mins = Math.floor((seconds % 3600) / 60)
-    const secs = seconds % 60
-
-    if (hours > 0) {
-      return `${hours}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
-    }
-    return `${mins}:${secs.toString().padStart(2, "0")}`
-  }
-
   // Handle Pomodoro pause/resume
   const handlePomodoroToggle = async () => {
     const api = createApiClient(apiUrl, getTokenFn)
@@ -217,47 +219,6 @@ function SidePanel() {
       console.error("Failed to update setting:", error)
     } finally {
       setSavingSettings(false)
-    }
-  }
-
-  const handleUpdateIgnoreList = async (value: string | null) => {
-    if (!settings) return
-
-    setSavingSettings(true)
-
-    try {
-      // Update local storage immediately
-      await storage.set(ATTENTION_TRACKING_IGNORE_LIST.key, value)
-
-      // Update local state
-      setSettings({ ...settings, attentionTrackingIgnoreList: value })
-
-      // Push to server in background
-      const token = await storage.get<string>("deviceToken")
-      if (token) {
-        const api = createApiClient(apiUrl, getTokenFn)
-        api.settings.update({ attentionTrackingIgnoreList: value }, token).catch((err) => {
-          console.error("Failed to sync ignore list to server:", err)
-        })
-      }
-    } catch (error) {
-      console.error("Failed to update ignore list:", error)
-    } finally {
-      setSavingSettings(false)
-    }
-  }
-
-  // Fetch chat sessions
-  const fetchSessions = async () => {
-    const token = await storage.get<string>("deviceToken")
-    if (!token) return
-
-    const api = createApiClient(apiUrl, getTokenFn)
-    try {
-      const result = await api.chats.list()
-      setSessions(sortSessionsByDate(result))
-    } catch (error) {
-      console.error("Failed to fetch sessions:", error)
     }
   }
 
@@ -565,139 +526,82 @@ function SidePanel() {
 
   if (loading) {
     return (
-      <div style={styles.container}>
-        <p>Loading...</p>
+      <div className="h-screen flex items-center justify-center bg-background">
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     )
   }
 
   if (!user) {
     return (
-      <div style={styles.container}>
-        <div style={styles.centered}>
-          <h2 style={styles.title}>Kaizen</h2>
-          <p style={styles.text}>Not logged in. Please click the extension icon to link your account.</p>
-        </div>
+      <div className="h-screen flex flex-col items-center justify-center bg-background p-6 text-center">
+        <Logo size="lg" showText className="mb-4" />
+        <p className="text-muted-foreground">
+          Not logged in. Please click the extension icon to link your account.
+        </p>
       </div>
     )
   }
 
   return (
-    <div style={styles.container}>
+    <div className="h-screen flex flex-col bg-background">
       {/* Header */}
-      <div style={styles.header}>
-        <div style={styles.headerTop}>
-          <h2 style={styles.title}>Kaizen</h2>
-          <button onClick={handleUnlink} style={styles.unlinkButton}>
+      <div className="p-3 border-b">
+        <div className="flex items-center justify-between">
+          <Logo size="sm" showText />
+          <Button variant="outline" size="sm" onClick={handleUnlink} className="text-destructive border-destructive hover:bg-destructive/10">
             Unlink
-          </button>
+          </Button>
         </div>
-        <div style={styles.userInfo}>
-          <span style={styles.userName}>{user.name || user.email}</span>
-        </div>
+        <p className="text-xs text-muted-foreground mt-1">{user.name || user.email}</p>
       </div>
 
       {/* Focus Display */}
-      <div style={styles.focusContainer}>
-        <div style={styles.focusHeader}>
-          <span style={{
-            ...styles.focusIndicator,
-            background: focuses.length > 0 ? "#28a745" : "#6c757d"
-          }} />
-          <span style={styles.focusLabel}>
-            Active Focuses {focuses.length > 0 && `(${focuses.length})`}
-          </span>
-        </div>
-        {focuses.length > 0 ? (
-          <div style={styles.focusList}>
-            {focuses.map((focus) => (
-              <div key={focus.id} style={styles.focusContent}>
-                <span style={styles.focusItem}>{focus.item}</span>
-                <span style={styles.focusMeta}>
-                  Since {new Date(focus.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  {focus.keywords.length > 0 && ` · ${focus.keywords.slice(0, 2).join(", ")}`}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <span style={styles.focusEmpty}>No active focus</span>
-        )}
+      <div className="px-3 py-2">
+        <FocusCard focuses={focuses} className="text-xs" />
       </div>
 
       {/* Pomodoro Timer */}
-      <div style={styles.pomodoroContainer}>
-        <div style={styles.pomodoroHeader}>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <span style={{
-              ...styles.focusIndicator,
-              background: pomodoroStatus?.state === "running" ? "#fd7e14" :
-                         pomodoroStatus?.state === "paused" ? "#ffc107" :
-                         pomodoroStatus?.state === "cooldown" ? "#17a2b8" : "#6c757d"
-            }} />
-            <span style={styles.focusLabel}>Pomodoro</span>
-            {pomodoroStatus && pomodoroStatus.state !== "idle" && (
-              <span style={{ fontSize: "10px", color: "#888", textTransform: "capitalize" }}>
-                ({pomodoroStatus.state})
-              </span>
-            )}
-          </div>
-          {pomodoroStatus && (pomodoroStatus.state === "running" || pomodoroStatus.state === "paused") && (
-            <button
-              onClick={handlePomodoroToggle}
-              style={{
-                padding: "2px 8px",
-                fontSize: "10px",
-                cursor: "pointer",
-                background: pomodoroStatus.state === "paused" ? "#28a745" : "#6c757d",
-                color: "white",
-                border: "none",
-                borderRadius: "3px"
-              }}
-            >
-              {pomodoroStatus.state === "paused" ? "Resume" : "Pause"}
-            </button>
-          )}
-        </div>
-        <span style={{
-          ...styles.pomodoroTime,
-          color: pomodoroStatus?.state === "running" ? "#fd7e14" :
-                 pomodoroStatus?.state === "paused" ? "#ffc107" : "#333"
-        }}>
-          {pomodoroStatus ? formatTime(pomodoroStatus.elapsedSeconds) : "0:00"}
-        </span>
+      <div className="px-3 pb-2">
+        <PomodoroTimer status={pomodoroStatus} onToggle={handlePomodoroToggle} className="text-xs" />
       </div>
 
       {/* Tabs */}
-      <div style={styles.tabs}>
+      <div className="flex border-b">
         <button
           onClick={() => setActiveTab("chat")}
-          style={{
-            ...styles.tab,
-            borderBottom: activeTab === "chat" ? "2px solid #007bff" : "2px solid transparent",
-            color: activeTab === "chat" ? "#007bff" : "#666"
-          }}
+          className={cn(
+            "flex-1 py-2 text-xs font-medium border-b-2 transition-colors",
+            activeTab === "chat"
+              ? "border-secondary text-secondary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
         >
+          <MessageSquare className="w-3 h-3 inline mr-1" />
           Chat
         </button>
         <button
           onClick={() => setActiveTab("insights")}
-          style={{
-            ...styles.tab,
-            borderBottom: activeTab === "insights" ? "2px solid #8b5cf6" : "2px solid transparent",
-            color: activeTab === "insights" ? "#8b5cf6" : "#666"
-          }}
+          className={cn(
+            "flex-1 py-2 text-xs font-medium border-b-2 transition-colors",
+            activeTab === "insights"
+              ? "border-pulse text-pulse"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
         >
+          <Lightbulb className="w-3 h-3 inline mr-1" />
           Insights
         </button>
         <button
           onClick={() => setActiveTab("settings")}
-          style={{
-            ...styles.tab,
-            borderBottom: activeTab === "settings" ? "2px solid #007bff" : "2px solid transparent",
-            color: activeTab === "settings" ? "#007bff" : "#666"
-          }}
+          className={cn(
+            "flex-1 py-2 text-xs font-medium border-b-2 transition-colors",
+            activeTab === "settings"
+              ? "border-secondary text-secondary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
         >
+          <Settings className="w-3 h-3 inline mr-1" />
           Settings
         </button>
       </div>
@@ -768,31 +672,38 @@ function ChatTab({
   if (showSessionList) {
     // Session List View
     return (
-      <div style={styles.chatContainer}>
-        <button onClick={onNewChat} style={styles.newChatButton}>
-          + New Chat
-        </button>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="p-3">
+          <Button onClick={onNewChat} className="w-full gap-2">
+            <Plus className="w-4 h-4" />
+            New Chat
+          </Button>
+        </div>
 
-        <div style={styles.sessionList}>
+        <div className="flex-1 overflow-auto">
           {sessions.length === 0 ? (
-            <p style={styles.emptyText}>No chats yet. Start a new conversation!</p>
+            <p className="p-4 text-center text-sm text-muted-foreground">
+              No chats yet. Start a new conversation!
+            </p>
           ) : (
             sessions.map((session) => (
               <div
                 key={session.id}
                 onClick={() => onSelectSession(session.id)}
-                style={styles.sessionItem}
+                className="px-3 py-2 border-b cursor-pointer hover:bg-muted/50 flex items-center justify-between"
               >
-                <div style={styles.sessionInfo}>
-                  <span style={styles.sessionTitle}>{session.title || "New Chat"}</span>
-                  <span style={styles.sessionMeta}>{session.messageCount} messages</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{session.title || "New Chat"}</p>
+                  <p className="text-xs text-muted-foreground">{session.messageCount} messages</p>
                 </div>
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={(e) => onDeleteSession(session.id, e)}
-                  style={styles.deleteButton}
+                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
                 >
-                  ×
-                </button>
+                  <Trash2 className="w-3 h-3" />
+                </Button>
               </div>
             ))
           )}
@@ -803,18 +714,19 @@ function ChatTab({
 
   // Chat View
   return (
-    <div style={styles.chatContainer}>
+    <div className="flex-1 flex flex-col overflow-hidden">
       {/* Back button */}
-      <button onClick={onBackToList} style={styles.backButton}>
-        ← Back to chats
-      </button>
+      <Button variant="ghost" onClick={onBackToList} className="justify-start text-xs border-b rounded-none">
+        <ArrowLeft className="w-3 h-3 mr-1" />
+        Back to chats
+      </Button>
 
       {/* Messages */}
-      <div style={styles.messagesContainer}>
+      <div className="flex-1 overflow-auto p-3 flex flex-col gap-2">
         {messages.length === 0 ? (
-          <div style={styles.emptyState}>
-            <p style={styles.emptyTitle}>Start a conversation</p>
-            <p style={styles.emptySubtitle}>Send a message to begin</p>
+          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
+            <p className="text-sm font-medium">Start a conversation</p>
+            <p className="text-xs">Send a message to begin</p>
           </div>
         ) : (
           messages.map((message) => (
@@ -825,26 +737,24 @@ function ChatTab({
       </div>
 
       {/* Input */}
-      <div style={styles.inputContainer}>
+      <div className="p-3 border-t flex gap-2">
         <textarea
           value={inputValue}
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder="Type a message..."
           disabled={sending}
-          style={styles.input}
+          className="flex-1 p-2 border rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
           rows={2}
         />
-        <button
+        <Button
           onClick={onSend}
           disabled={!inputValue.trim() || sending}
-          style={{
-            ...styles.sendButton,
-            opacity: !inputValue.trim() || sending ? 0.5 : 1
-          }}
+          size="icon"
+          className="self-end"
         >
-          {sending ? "..." : "Send"}
-        </button>
+          <Send className="w-4 h-4" />
+        </Button>
       </div>
     </div>
   )
@@ -856,45 +766,39 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   const isTool = message.role === "tool"
   const isUser = message.role === "user"
   const isStreaming = message.status === "streaming" || message.status === "typing"
-  const isError = message.status === "error"
 
   // Render tool messages as compact agentic lines
   if (isTool) {
     const text = formatToolResultMessage(message.toolName, message.content)
     return (
-      <div style={styles.agentLine}>
-        <span style={styles.agentIcon}>●</span>
-        <span style={styles.agentText}>{text}</span>
+      <div className="flex items-center gap-1.5 py-1">
+        <span className="text-[8px] text-muted-foreground">●</span>
+        <span className="text-[11px] text-muted-foreground">{text}</span>
       </div>
     )
   }
 
   return (
     <div
-      style={{
-        ...styles.messageBubble,
-        alignSelf: isUser ? "flex-end" : "flex-start",
-        background: isUser ? "#007bff" : "#f0f0f0",
-        color: isUser ? "#fff" : "#333"
-      }}
+      className={cn(
+        "max-w-[85%] px-3 py-2 rounded-xl text-sm",
+        isUser
+          ? "self-end bg-secondary text-secondary-foreground"
+          : "self-start bg-muted"
+      )}
     >
       {message.status === "typing" ? (
-        <span style={styles.typingIndicator}>● ● ●</span>
+        <span className="tracking-wider">● ● ●</span>
       ) : (
         <>
-          <p style={styles.messageContent}>
+          <p className="whitespace-pre-wrap break-words">
             {message.content}
-            {isStreaming && <span style={styles.cursor}>▊</span>}
+            {isStreaming && <span className="ml-0.5 animate-blink">▊</span>}
           </p>
-          {isError && message.errorMessage && (
-            <p style={styles.errorMessage}>Error: {message.errorMessage}</p>
+          {message.status === "error" && message.errorMessage && (
+            <p className="text-xs text-destructive mt-1">Error: {message.errorMessage}</p>
           )}
         </>
-      )}
-      {isBot && message.status !== "finished" && message.status !== "sent" && (
-        <span style={styles.statusText}>
-          {message.status === "typing" ? "Typing..." : message.status === "streaming" ? "Streaming..." : ""}
-        </span>
       )}
     </div>
   )
@@ -903,20 +807,22 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 // Insights Tab Component
 function InsightsTab({ insights }: { insights: AttentionInsight[] }) {
   return (
-    <div style={styles.insightsContainer}>
+    <div className="flex-1 overflow-auto p-4">
       {insights.length === 0 ? (
-        <div style={styles.insightsEmpty}>
-          <p style={styles.insightsEmptyTitle}>No insights yet</p>
-          <p style={styles.insightsEmptySubtitle}>
-            Insights will appear as you browse the web
-          </p>
+        <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground">
+          <Lightbulb className="w-8 h-8 mb-2 opacity-50" />
+          <p className="text-sm font-medium">No insights yet</p>
+          <p className="text-xs">Insights will appear as you browse the web</p>
         </div>
       ) : (
-        <div style={styles.insightsList}>
+        <div className="flex flex-col gap-2">
           {insights.map((insight) => (
-            <div key={insight.id} style={styles.insightItem}>
-              <span style={styles.insightMessage}>{insight.message}</span>
-              <span style={styles.insightTime}>
+            <div
+              key={insight.id}
+              className="p-3 bg-pulse/5 rounded-lg border-l-2 border-pulse flex items-center justify-between gap-2"
+            >
+              <span className="text-sm">{insight.message}</span>
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">
                 {new Date(insight.createdAt).toLocaleTimeString([], {
                   hour: "2-digit",
                   minute: "2-digit"
@@ -941,506 +847,46 @@ function SettingsTab({
   onToggleSetting: (key: keyof UserSettings) => void
 }) {
   return (
-    <div style={styles.settingsContainer}>
-      <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Attention Tracking</h3>
-        {settings ? (
-          <div style={styles.settingsList}>
-            <div style={styles.settingItem}>
-              <div style={styles.settingInfo}>
-                <span style={styles.settingName}>Debug Mode</span>
-                <span style={styles.settingDesc}>Show debug overlay</span>
-              </div>
-              <button
-                onClick={() => onToggleSetting("cognitiveAttentionDebugMode")}
-                disabled={savingSettings}
-                style={{
-                  ...styles.toggleButton,
-                  background: settings.cognitiveAttentionDebugMode ? "#28a745" : "#6c757d",
-                  opacity: savingSettings ? 0.6 : 1,
-                  cursor: savingSettings ? "not-allowed" : "pointer"
-                }}
-              >
-                {settings.cognitiveAttentionDebugMode ? "ON" : "OFF"}
-              </button>
+    <div className="flex-1 overflow-auto p-4">
+      <h3 className="text-sm font-semibold mb-3">Attention Tracking</h3>
+      {settings ? (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+            <div>
+              <p className="text-xs font-medium">Debug Mode</p>
+              <p className="text-[10px] text-muted-foreground">Show debug overlay</p>
             </div>
-            <div style={styles.settingItem}>
-              <div style={styles.settingInfo}>
-                <span style={styles.settingName}>Show Overlay</span>
-                <span style={styles.settingDesc}>Highlight tracked elements</span>
-              </div>
-              <button
-                onClick={() => onToggleSetting("cognitiveAttentionShowOverlay")}
-                disabled={savingSettings}
-                style={{
-                  ...styles.toggleButton,
-                  background: settings.cognitiveAttentionShowOverlay ? "#28a745" : "#6c757d",
-                  opacity: savingSettings ? 0.6 : 1,
-                  cursor: savingSettings ? "not-allowed" : "pointer"
-                }}
-              >
-                {settings.cognitiveAttentionShowOverlay ? "ON" : "OFF"}
-              </button>
-            </div>
+            <Button
+              variant={settings.cognitiveAttentionDebugMode ? "default" : "secondary"}
+              size="sm"
+              onClick={() => onToggleSetting("cognitiveAttentionDebugMode")}
+              disabled={savingSettings}
+              className="text-[10px] h-6 px-2"
+            >
+              {settings.cognitiveAttentionDebugMode ? "ON" : "OFF"}
+            </Button>
           </div>
-        ) : (
-          <p style={styles.text}>Loading settings...</p>
-        )}
-      </div>
+          <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+            <div>
+              <p className="text-xs font-medium">Show Overlay</p>
+              <p className="text-[10px] text-muted-foreground">Highlight tracked elements</p>
+            </div>
+            <Button
+              variant={settings.cognitiveAttentionShowOverlay ? "default" : "secondary"}
+              size="sm"
+              onClick={() => onToggleSetting("cognitiveAttentionShowOverlay")}
+              disabled={savingSettings}
+              className="text-[10px] h-6 px-2"
+            >
+              {settings.cognitiveAttentionShowOverlay ? "ON" : "OFF"}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">Loading settings...</p>
+      )}
     </div>
   )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    height: "100vh",
-    display: "flex",
-    flexDirection: "column",
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-    backgroundColor: "#fff"
-  },
-  centered: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-    textAlign: "center"
-  },
-  header: {
-    padding: "12px 16px",
-    borderBottom: "1px solid #eee"
-  },
-  headerTop: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center"
-  },
-  title: {
-    margin: 0,
-    fontSize: 16,
-    fontWeight: 600
-  },
-  unlinkButton: {
-    padding: "4px 10px",
-    background: "transparent",
-    color: "#dc3545",
-    border: "1px solid #dc3545",
-    borderRadius: 4,
-    cursor: "pointer",
-    fontSize: 11
-  },
-  userInfo: {
-    marginTop: 4
-  },
-  userName: {
-    fontSize: 12,
-    color: "#666"
-  },
-  tabs: {
-    display: "flex",
-    borderBottom: "1px solid #eee"
-  },
-  tab: {
-    flex: 1,
-    padding: "10px 0",
-    background: "none",
-    border: "none",
-    cursor: "pointer",
-    fontSize: 13,
-    fontWeight: 500
-  },
-  // Chat styles
-  chatContainer: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    overflow: "hidden"
-  },
-  newChatButton: {
-    margin: 12,
-    padding: "10px",
-    background: "#007bff",
-    color: "#fff",
-    border: "none",
-    borderRadius: 6,
-    cursor: "pointer",
-    fontSize: 13,
-    fontWeight: 500
-  },
-  sessionList: {
-    flex: 1,
-    overflow: "auto"
-  },
-  sessionItem: {
-    padding: "10px 12px",
-    borderBottom: "1px solid #eee",
-    cursor: "pointer",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center"
-  },
-  sessionInfo: {
-    flex: 1,
-    minWidth: 0
-  },
-  sessionTitle: {
-    display: "block",
-    fontSize: 13,
-    fontWeight: 500,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap"
-  },
-  sessionMeta: {
-    display: "block",
-    fontSize: 11,
-    color: "#666",
-    marginTop: 2
-  },
-  deleteButton: {
-    background: "transparent",
-    border: "none",
-    fontSize: 18,
-    color: "#999",
-    cursor: "pointer",
-    padding: "2px 6px",
-    lineHeight: 1
-  },
-  backButton: {
-    padding: "8px 12px",
-    background: "none",
-    border: "none",
-    borderBottom: "1px solid #eee",
-    cursor: "pointer",
-    fontSize: 12,
-    color: "#007bff",
-    textAlign: "left"
-  },
-  messagesContainer: {
-    flex: 1,
-    overflow: "auto",
-    padding: 12,
-    display: "flex",
-    flexDirection: "column",
-    gap: 8
-  },
-  emptyState: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    color: "#666"
-  },
-  emptyTitle: {
-    margin: 0,
-    fontSize: 14,
-    fontWeight: 500
-  },
-  emptySubtitle: {
-    margin: "4px 0 0",
-    fontSize: 12
-  },
-  emptyText: {
-    padding: 16,
-    textAlign: "center",
-    color: "#666",
-    fontSize: 13
-  },
-  messageBubble: {
-    maxWidth: "85%",
-    padding: "8px 12px",
-    borderRadius: 12,
-    position: "relative"
-  },
-  messageContent: {
-    margin: 0,
-    fontSize: 13,
-    lineHeight: 1.4,
-    whiteSpace: "pre-wrap",
-    wordBreak: "break-word"
-  },
-  cursor: {
-    marginLeft: 2,
-    animation: "blink 1s infinite"
-  },
-  typingIndicator: {
-    letterSpacing: 2
-  },
-  errorMessage: {
-    margin: "4px 0 0",
-    fontSize: 11,
-    color: "#dc3545"
-  },
-  statusText: {
-    display: "block",
-    marginTop: 4,
-    fontSize: 10,
-    color: "#666"
-  },
-  // Agent/tool message styles
-  agentLine: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    padding: "4px 0",
-    alignSelf: "flex-start"
-  },
-  agentIcon: {
-    fontSize: 8,
-    color: "#999"
-  },
-  agentText: {
-    fontSize: 11,
-    color: "#666"
-  },
-  inputContainer: {
-    padding: 12,
-    borderTop: "1px solid #eee",
-    display: "flex",
-    gap: 8
-  },
-  input: {
-    flex: 1,
-    padding: 8,
-    border: "1px solid #ddd",
-    borderRadius: 6,
-    fontSize: 13,
-    resize: "none",
-    outline: "none",
-    fontFamily: "inherit"
-  },
-  sendButton: {
-    padding: "8px 14px",
-    background: "#007bff",
-    color: "#fff",
-    border: "none",
-    borderRadius: 6,
-    cursor: "pointer",
-    fontSize: 12,
-    fontWeight: 500,
-    alignSelf: "flex-end"
-  },
-  // Settings styles
-  settingsContainer: {
-    flex: 1,
-    padding: 16,
-    overflow: "auto"
-  },
-  section: {
-    marginBottom: 24
-  },
-  sectionTitle: {
-    margin: "0 0 12px 0",
-    fontSize: 13,
-    fontWeight: 600,
-    color: "#333"
-  },
-  settingsList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 8
-  },
-  settingItem: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 10,
-    background: "#f8f9fa",
-    borderRadius: 6
-  },
-  settingInfo: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 2
-  },
-  settingName: {
-    fontSize: 12,
-    fontWeight: 500,
-    color: "#333"
-  },
-  settingDesc: {
-    fontSize: 10,
-    color: "#666"
-  },
-  toggleButton: {
-    padding: "4px 10px",
-    border: "none",
-    borderRadius: 4,
-    color: "#fff",
-    fontSize: 10,
-    fontWeight: 500,
-    minWidth: 36
-  },
-  text: {
-    margin: 0,
-    fontSize: 13,
-    color: "#666"
-  },
-  ignoreListSection: {
-    marginTop: 12,
-    padding: 10,
-    background: "#f8f9fa",
-    borderRadius: 6
-  },
-  ignoreListTextarea: {
-    width: "100%",
-    marginTop: 8,
-    padding: 8,
-    border: "1px solid #ddd",
-    borderRadius: 4,
-    fontSize: 11,
-    fontFamily: "monospace",
-    resize: "vertical",
-    boxSizing: "border-box" as const
-  },
-  saveButton: {
-    marginTop: 8,
-    padding: "6px 12px",
-    background: "#007bff",
-    color: "#fff",
-    border: "none",
-    borderRadius: 4,
-    fontSize: 11,
-    fontWeight: 500
-  },
-  selectSection: {
-    padding: 10,
-    background: "#f8f9fa",
-    borderRadius: 6
-  },
-  selectInput: {
-    width: "100%",
-    marginTop: 6,
-    padding: 6,
-    border: "1px solid #ddd",
-    borderRadius: 4,
-    fontSize: 11,
-    background: "#fff",
-    boxSizing: "border-box" as const
-  },
-  // Focus styles
-  focusContainer: {
-    padding: "10px 16px",
-    background: "#f8f9fa",
-    borderBottom: "1px solid #eee"
-  },
-  focusHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 4
-  },
-  focusIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: "50%",
-    display: "inline-block"
-  },
-  focusLabel: {
-    fontSize: 10,
-    fontWeight: 600,
-    color: "#666",
-    textTransform: "uppercase" as const,
-    letterSpacing: "0.5px"
-  },
-  focusList: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: 6
-  },
-  focusContent: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: 2,
-    padding: "4px 8px",
-    background: "#fff",
-    borderRadius: 4,
-    borderLeft: "2px solid #007bff"
-  },
-  focusItem: {
-    fontSize: 14,
-    fontWeight: 600,
-    color: "#007bff"
-  },
-  focusMeta: {
-    fontSize: 10,
-    color: "#666"
-  },
-  focusEmpty: {
-    fontSize: 12,
-    color: "#999",
-    fontStyle: "italic" as const
-  },
-  // Pomodoro styles
-  pomodoroContainer: {
-    padding: "10px 16px",
-    background: "#fff8f0",
-    borderBottom: "1px solid #eee"
-  },
-  pomodoroHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 4
-  },
-  pomodoroTime: {
-    fontSize: 24,
-    fontWeight: 700,
-    fontFamily: "monospace"
-  },
-  // Insights styles
-  insightsContainer: {
-    flex: 1,
-    overflow: "auto",
-    padding: 16
-  },
-  insightsEmpty: {
-    display: "flex",
-    flexDirection: "column" as const,
-    alignItems: "center",
-    justifyContent: "center",
-    height: "100%",
-    color: "#666",
-    textAlign: "center" as const
-  },
-  insightsEmptyTitle: {
-    margin: 0,
-    fontSize: 14,
-    fontWeight: 500
-  },
-  insightsEmptySubtitle: {
-    margin: "4px 0 0",
-    fontSize: 12,
-    color: "#999"
-  },
-  insightsList: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: 8
-  },
-  insightItem: {
-    padding: "10px 12px",
-    background: "#f8f4ff",
-    borderRadius: 8,
-    borderLeft: "3px solid #8b5cf6",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 8
-  },
-  insightMessage: {
-    fontSize: 13,
-    color: "#333",
-    flex: 1
-  },
-  insightTime: {
-    fontSize: 10,
-    color: "#999",
-    whiteSpace: "nowrap" as const
-  },
 }
 
 export default SidePanel

@@ -60,11 +60,12 @@ export async function getActiveFocus(userId: string): Promise<Focus | null> {
   return focuses[0] || null;
 }
 
-
 /**
  * Process focus calculation for a single user using agentic multi-focus clustering.
  */
-export async function processUserFocus(userId: string): Promise<ProcessUserFocusResult> {
+export async function processUserFocus(
+  userId: string,
+): Promise<ProcessUserFocusResult> {
   const result: ProcessUserFocusResult = {
     focusCreated: false,
     focusUpdated: false,
@@ -96,7 +97,10 @@ export async function processUserFocus(userId: string): Promise<ProcessUserFocus
     const now = new Date();
 
     // First, check and end any inactive focuses
-    const endedCount = await checkAndEndInactiveFocuses(userId, focusSettings.focusInactivityThresholdMs);
+    const endedCount = await checkAndEndInactiveFocuses(
+      userId,
+      focusSettings.focusInactivityThresholdMs,
+    );
     if (endedCount > 0) {
       result.focusEnded = true;
       result.inactivityDetected = true;
@@ -110,7 +114,9 @@ export async function processUserFocus(userId: string): Promise<ProcessUserFocus
 
     if (hasActiveFocus) {
       // If there's an active focus, use the standard calculation window
-      attentionFrom = settings?.lastFocusCalculatedAt || new Date(now.getTime() - MAX_ATTENTION_WINDOW_MS);
+      attentionFrom =
+        settings?.lastFocusCalculatedAt ||
+        new Date(now.getTime() - MAX_ATTENTION_WINDOW_MS);
     } else {
       // No active focus - get activity since last focus ended (or all activity if no previous focus)
       const lastEndedFocus = await db.focus.findFirst({
@@ -170,22 +176,36 @@ export async function processUserFocus(userId: string): Promise<ProcessUserFocus
     const latestAttentionTime = getLatestTimestamp(attentionData);
 
     // Run the focus agent to cluster attention into focuses
-    const agentResult = await runFocusAgent(userId, attentionData, settings, earliestAttentionTime, latestAttentionTime);
+    const agentResult = await runFocusAgent(
+      userId,
+      attentionData,
+      settings,
+      earliestAttentionTime,
+      latestAttentionTime,
+    );
 
     if (agentResult.success) {
       // Update results based on agent actions
       if (agentResult.focusesCreated > 0) result.focusCreated = true;
-      if (agentResult.focusesUpdated > 0 || agentResult.focusesMerged > 0 || agentResult.focusesResumed > 0) {
+      if (
+        agentResult.focusesUpdated > 0 ||
+        agentResult.focusesMerged > 0 ||
+        agentResult.focusesResumed > 0
+      ) {
         result.focusUpdated = true;
       }
       if (agentResult.focusesEnded > 0) result.focusEnded = true;
 
       // Log activity
-      if (agentResult.focusesCreated > 0 || agentResult.focusesUpdated > 0 || agentResult.focusesMerged > 0) {
+      if (
+        agentResult.focusesCreated > 0 ||
+        agentResult.focusesUpdated > 0 ||
+        agentResult.focusesMerged > 0
+      ) {
         console.log(
           `[Focus] Agent processed for user ${userId}: ` +
-          `created=${agentResult.focusesCreated}, updated=${agentResult.focusesUpdated}, ` +
-          `merged=${agentResult.focusesMerged}, resumed=${agentResult.focusesResumed}`
+            `created=${agentResult.focusesCreated}, updated=${agentResult.focusesUpdated}, ` +
+            `merged=${agentResult.focusesMerged}, resumed=${agentResult.focusesResumed}`,
         );
       }
     } else if (agentResult.error) {
@@ -243,7 +263,8 @@ export async function processAllUsersFocus(): Promise<ProcessAllUsersResult> {
   });
 
   for (const userSettings of usersWithFocus) {
-    const { userId, focusCalculationIntervalMs, lastFocusCalculatedAt } = userSettings;
+    const { userId, focusCalculationIntervalMs, lastFocusCalculatedAt } =
+      userSettings;
 
     // Check if user's individual interval has elapsed
     if (lastFocusCalculatedAt) {
@@ -282,7 +303,7 @@ export async function getUserFocusHistory(
   options: {
     limit?: number;
     includeActive?: boolean;
-  } = {}
+  } = {},
 ): Promise<Focus[]> {
   const { limit = 50, includeActive = true } = options;
 

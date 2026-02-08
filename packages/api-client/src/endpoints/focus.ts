@@ -1,5 +1,9 @@
 import type { HttpClient } from "../http.js";
-import type { Focus, FocusListResponse, FocusResponse } from "../types/index.js";
+import type {
+  Focus,
+  FocusListResponse,
+  FocusResponse,
+} from "../types/index.js";
 
 export class FocusEndpoints {
   constructor(private http: HttpClient) {}
@@ -7,7 +11,10 @@ export class FocusEndpoints {
   /**
    * Get user's focus history
    */
-  async list(options?: { limit?: number; includeActive?: boolean }): Promise<Focus[]> {
+  async list(options?: {
+    limit?: number;
+    includeActive?: boolean;
+  }): Promise<Focus[]> {
     const params = new URLSearchParams();
     if (options?.limit !== undefined) {
       params.set("limit", options.limit.toString());

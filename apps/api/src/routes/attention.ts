@@ -1,6 +1,9 @@
 import { Hono } from "hono";
 import { db, events } from "../lib/index.js";
-import { deviceAuthMiddleware, type DeviceAuthVariables } from "../middleware/index.js";
+import {
+  deviceAuthMiddleware,
+  type DeviceAuthVariables,
+} from "../middleware/index.js";
 import { generateIndividualImageSummary } from "../lib/summarization.js";
 import { generateInsight } from "../lib/insight/index.js";
 
@@ -65,9 +68,11 @@ app.post("/image", deviceAuthMiddleware, async (c) => {
         body.src,
         body.alt,
         body.title,
-        settings
+        settings,
       );
-      console.log(`[Image Attention] Generated summary for kaizen-id: ${body.kaizenId}`);
+      console.log(
+        `[Image Attention] Generated summary for kaizen-id: ${body.kaizenId}`,
+      );
     } catch (error) {
       console.error("Failed to generate image summary:", error);
     }

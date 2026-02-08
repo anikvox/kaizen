@@ -1,6 +1,9 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateText, streamText } from "ai";
-import type { UserModelMessage, AssistantModelMessage } from "@ai-sdk/provider-utils";
+import type {
+  UserModelMessage,
+  AssistantModelMessage,
+} from "@ai-sdk/provider-utils";
 import type {
   LLMProvider,
   LLMProviderConfig,
@@ -48,17 +51,21 @@ export class AnthropicProvider implements LLMProvider {
     });
 
     // Extract tool calls and results
-    const toolCalls: LLMToolCall[] | undefined = result.toolCalls?.map((tc) => ({
-      toolCallId: tc.toolCallId,
-      toolName: tc.toolName,
-      args: "args" in tc ? (tc.args as Record<string, unknown>) : {},
-    }));
+    const toolCalls: LLMToolCall[] | undefined = result.toolCalls?.map(
+      (tc) => ({
+        toolCallId: tc.toolCallId,
+        toolName: tc.toolName,
+        args: "args" in tc ? (tc.args as Record<string, unknown>) : {},
+      }),
+    );
 
-    const toolResults: LLMToolResult[] | undefined = result.toolResults?.map((tr) => ({
-      toolCallId: tr.toolCallId,
-      toolName: tr.toolName,
-      result: "result" in tr ? tr.result : undefined,
-    }));
+    const toolResults: LLMToolResult[] | undefined = result.toolResults?.map(
+      (tr) => ({
+        toolCallId: tr.toolCallId,
+        toolName: tr.toolName,
+        result: "result" in tr ? tr.result : undefined,
+      }),
+    );
 
     return {
       content: result.text,
@@ -138,7 +145,9 @@ export class AnthropicProvider implements LLMProvider {
       });
   }
 
-  private formatUserContent(content: LLMMessageContent): UserModelMessage["content"] {
+  private formatUserContent(
+    content: LLMMessageContent,
+  ): UserModelMessage["content"] {
     // Simple string content
     if (typeof content === "string") {
       return content;

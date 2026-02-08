@@ -2,7 +2,11 @@ import { z } from "zod";
 import { tool } from "ai";
 import { calc } from "a-calc";
 import { db } from "../db.js";
-import { getAttentionData, serializeAttentionForLLM, formatDuration } from "../attention.js";
+import {
+  getAttentionData,
+  serializeAttentionForLLM,
+  formatDuration,
+} from "../attention.js";
 import { getActiveFocuses, getUserFocusHistory } from "../focus/index.js";
 
 /**
@@ -22,7 +26,10 @@ async function getUserLocationSettings(userId: string) {
 /**
  * Geocode a city name and get its timezone (with retry)
  */
-async function geocodeCity(city: string, retries = 2): Promise<{
+async function geocodeCity(
+  city: string,
+  retries = 2,
+): Promise<{
   found: boolean;
   lat?: number;
   lon?: number;
@@ -49,7 +56,9 @@ async function geocodeCity(city: string, retries = 2): Promise<{
       });
 
       if (!geoResponse.ok) {
-        console.error(`[Geocode] HTTP error: ${geoResponse.status} ${geoResponse.statusText}`);
+        console.error(
+          `[Geocode] HTTP error: ${geoResponse.status} ${geoResponse.statusText}`,
+        );
         lastError = `Geocoding API returned ${geoResponse.status}`;
         continue;
       }
@@ -88,7 +97,8 @@ export function createChatTools(userId: string) {
      * Get user's preferred translation language
      */
     get_translation_language: tool({
-      description: "Get the user's preferred language for translations. Use this before translating if you need to check their preference.",
+      description:
+        "Get the user's preferred language for translations. Use this before translating if you need to check their preference.",
       parameters: z.object({}),
       execute: async () => {
         const settings = await db.userSettings.findUnique({
@@ -105,7 +115,8 @@ export function createChatTools(userId: string) {
 
         return {
           found: false,
-          message: "No preferred translation language set. Ask the user what language they want.",
+          message:
+            "No preferred translation language set. Ask the user what language they want.",
         };
       },
     }),
@@ -114,9 +125,14 @@ export function createChatTools(userId: string) {
      * Save user's preferred translation language
      */
     set_translation_language: tool({
-      description: "Save the user's preferred language for translations. Use this when the user tells you what language they want translations in.",
+      description:
+        "Save the user's preferred language for translations. Use this when the user tells you what language they want translations in.",
       parameters: z.object({
-        language: z.string().describe("The language name (e.g., 'Spanish', 'French', 'Japanese', 'German')"),
+        language: z
+          .string()
+          .describe(
+            "The language name (e.g., 'Spanish', 'French', 'Japanese', 'German')",
+          ),
       }),
       execute: async ({ language }) => {
         await db.userSettings.upsert({
@@ -142,11 +158,15 @@ export function createChatTools(userId: string) {
      * Get the current time for a location
      */
     get_current_time: tool({
-      description: "Get the current time for a city/location. IMPORTANT: If the user mentions a specific city (e.g., 'time in Tokyo'), you MUST pass that city name as the 'city' parameter. Only omit the city parameter if the user doesn't specify one.",
+      description:
+        "Get the current time for a city/location. IMPORTANT: If the user mentions a specific city (e.g., 'time in Tokyo'), you MUST pass that city name as the 'city' parameter. Only omit the city parameter if the user doesn't specify one.",
       parameters: z.object({
-        city: z.string().optional().describe(
-          "The city name mentioned by the user. REQUIRED if user specifies a city (e.g., 'Tokyo' from 'time in Tokyo'). Only omit if user doesn't specify a city."
-        ),
+        city: z
+          .string()
+          .optional()
+          .describe(
+            "The city name mentioned by the user. REQUIRED if user specifies a city (e.g., 'Tokyo' from 'time in Tokyo'). Only omit if user doesn't specify a city.",
+          ),
       }),
       execute: async ({ city }) => {
         const { location, timezone } = await getUserLocationSettings(userId);
@@ -160,7 +180,8 @@ export function createChatTools(userId: string) {
         if (!targetCity) {
           return {
             needsLocation: true,
-            message: "I don't know your location yet. Please tell me which city you're in so I can give you the correct time.",
+            message:
+              "I don't know your location yet. Please tell me which city you're in so I can give you the correct time.",
           };
         }
 
@@ -201,11 +222,15 @@ export function createChatTools(userId: string) {
      * Get current weather for a location
      */
     get_current_weather: tool({
-      description: "Get the current weather for a city/location. IMPORTANT: If the user mentions a specific city (e.g., 'weather in Delhi'), you MUST pass that city name as the 'city' parameter. Only omit the city parameter if the user doesn't specify one.",
+      description:
+        "Get the current weather for a city/location. IMPORTANT: If the user mentions a specific city (e.g., 'weather in Delhi'), you MUST pass that city name as the 'city' parameter. Only omit the city parameter if the user doesn't specify one.",
       parameters: z.object({
-        city: z.string().optional().describe(
-          "The city name mentioned by the user. REQUIRED if user specifies a city (e.g., 'Delhi' from 'weather in Delhi'). Only omit if user doesn't specify a city."
-        ),
+        city: z
+          .string()
+          .optional()
+          .describe(
+            "The city name mentioned by the user. REQUIRED if user specifies a city (e.g., 'Delhi' from 'weather in Delhi'). Only omit if user doesn't specify a city.",
+          ),
       }),
       execute: async ({ city }) => {
         try {
@@ -218,7 +243,8 @@ export function createChatTools(userId: string) {
           if (!targetCity) {
             return {
               needsLocation: true,
-              message: "I don't know your location yet. Please tell me which city you're in so I can give you the weather.",
+              message:
+                "I don't know your location yet. Please tell me which city you're in so I can give you the weather.",
             };
           }
 
@@ -234,7 +260,7 @@ export function createChatTools(userId: string) {
 
           // Fetch weather from Open-Meteo
           const weatherResponse = await fetch(
-            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,showers,snowfall,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m&timezone=auto`
+            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,showers,snowfall,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m&timezone=auto`,
           );
           const weather = await weatherResponse.json();
 
@@ -281,11 +307,13 @@ export function createChatTools(userId: string) {
             coordinates: { lat, lon },
             temperature: {
               celsius: current.temperature_2m,
-              fahrenheit: Math.round(current.temperature_2m * 9 / 5 + 32),
+              fahrenheit: Math.round((current.temperature_2m * 9) / 5 + 32),
             },
             feelsLike: {
               celsius: current.apparent_temperature,
-              fahrenheit: Math.round(current.apparent_temperature * 9 / 5 + 32),
+              fahrenheit: Math.round(
+                (current.apparent_temperature * 9) / 5 + 32,
+              ),
             },
             humidity: current.relative_humidity_2m,
             condition: weatherCodes[current.weather_code] || "Unknown",
@@ -302,7 +330,10 @@ export function createChatTools(userId: string) {
         } catch (error) {
           return {
             found: false,
-            error: error instanceof Error ? error.message : "Failed to fetch weather",
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to fetch weather",
           };
         }
       },
@@ -312,10 +343,19 @@ export function createChatTools(userId: string) {
      * Save user's location for future time/weather requests
      */
     set_user_location: tool({
-      description: "Save the user's location (city) for future time and weather requests. Use this after the user tells you their location.",
+      description:
+        "Save the user's location (city) for future time and weather requests. Use this after the user tells you their location.",
       parameters: z.object({
-        city: z.string().optional().describe("The city name to save as the user's location (e.g., 'Tokyo', 'New York', 'London')"),
-        location: z.string().optional().describe("Alternative parameter for city name"),
+        city: z
+          .string()
+          .optional()
+          .describe(
+            "The city name to save as the user's location (e.g., 'Tokyo', 'New York', 'London')",
+          ),
+        location: z
+          .string()
+          .optional()
+          .describe("Alternative parameter for city name"),
       }),
       execute: async ({ city, location }) => {
         // Accept either 'city' or 'location' parameter (Gemini sometimes uses 'location')
@@ -371,7 +411,8 @@ export function createChatTools(userId: string) {
      * Get user's location and context information
      */
     get_user_context: tool({
-      description: "Get the user's saved location, timezone, and other context information. Use this when you need to understand the user's location context.",
+      description:
+        "Get the user's saved location, timezone, and other context information. Use this when you need to understand the user's location context.",
       parameters: z.object({}),
       execute: async () => {
         try {
@@ -405,14 +446,19 @@ export function createChatTools(userId: string) {
             timezone: settings?.timezone || null,
             localTime,
             hasLocation: !!settings?.location,
-            currentPage: settings?.currentActiveUrl ? {
-              url: settings.currentActiveUrl,
-              title: settings.currentActiveTitle,
-            } : null,
+            currentPage: settings?.currentActiveUrl
+              ? {
+                  url: settings.currentActiveUrl,
+                  title: settings.currentActiveTitle,
+                }
+              : null,
           };
         } catch (error) {
           return {
-            error: error instanceof Error ? error.message : "Failed to get user context",
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to get user context",
           };
         }
       },
@@ -422,7 +468,8 @@ export function createChatTools(userId: string) {
      * Get the currently active website the user is viewing
      */
     get_active_website: tool({
-      description: "Get the website the user is currently viewing in their browser. Use this when the user asks 'what am I looking at', 'what site am I on', 'what's my current page', or similar questions about their current browsing context.",
+      description:
+        "Get the website the user is currently viewing in their browser. Use this when the user asks 'what am I looking at', 'what site am I on', 'what's my current page', or similar questions about their current browsing context.",
       parameters: z.object({}),
       execute: async () => {
         try {
@@ -438,7 +485,8 @@ export function createChatTools(userId: string) {
           if (!settings?.currentActiveUrl) {
             return {
               found: false,
-              message: "No active website detected. The user may not have any browser tabs open or the extension may not be tracking.",
+              message:
+                "No active website detected. The user may not have any browser tabs open or the extension may not be tracking.",
             };
           }
 
@@ -465,7 +513,10 @@ export function createChatTools(userId: string) {
         } catch (error) {
           return {
             found: false,
-            error: error instanceof Error ? error.message : "Failed to get active website",
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to get active website",
           };
         }
       },
@@ -475,7 +526,8 @@ export function createChatTools(userId: string) {
      * Get the user's current active focus topics
      */
     get_active_focus: tool({
-      description: "Get what the user is currently focused on. This returns the semantic topics/themes the user has been concentrating on based on their browsing activity. Use this when the user asks 'what am I working on', 'what's my current focus', 'what have I been doing', or similar questions about their current work context.",
+      description:
+        "Get what the user is currently focused on. This returns the semantic topics/themes the user has been concentrating on based on their browsing activity. Use this when the user asks 'what am I working on', 'what's my current focus', 'what have I been doing', or similar questions about their current work context.",
       parameters: z.object({}),
       execute: async () => {
         try {
@@ -484,7 +536,8 @@ export function createChatTools(userId: string) {
           if (activeFocuses.length === 0) {
             return {
               found: false,
-              message: "No active focus detected. The user may not have been browsing recently or their activity hasn't formed a clear focus pattern yet.",
+              message:
+                "No active focus detected. The user may not have been browsing recently or their activity hasn't formed a clear focus pattern yet.",
             };
           }
 
@@ -497,13 +550,18 @@ export function createChatTools(userId: string) {
               startedAt: focus.startedAt.toISOString(),
               duration: formatDuration(Date.now() - focus.startedAt.getTime()),
               lastActivity: focus.lastActivityAt.toISOString(),
-              lastActivityAgo: formatDuration(Date.now() - focus.lastActivityAt.getTime()),
+              lastActivityAgo: formatDuration(
+                Date.now() - focus.lastActivityAt.getTime(),
+              ),
             })),
           };
         } catch (error) {
           return {
             found: false,
-            error: error instanceof Error ? error.message : "Failed to get active focus",
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to get active focus",
           };
         }
       },
@@ -513,14 +571,23 @@ export function createChatTools(userId: string) {
      * Get user's recent browsing attention data with flexible time range
      */
     get_attention_data: tool({
-      description: "Get the user's browsing activity and attention data for a specific time period. This includes websites visited, text read, images viewed, and videos watched. Use this when the user asks about what they were reading, watching, browsing, or when you need context about their recent online activity. You can specify the time range in minutes.",
+      description:
+        "Get the user's browsing activity and attention data for a specific time period. This includes websites visited, text read, images viewed, and videos watched. Use this when the user asks about what they were reading, watching, browsing, or when you need context about their recent online activity. You can specify the time range in minutes.",
       parameters: z.object({
-        minutes: z.number().min(1).max(10080).optional().describe(
-          "Number of minutes to look back (1-10080, i.e., up to 7 days). Examples: 5 for last 5 minutes, 30 for last 30 minutes, 120 for last 2 hours. Default is 120 (2 hours)."
-        ),
-        preset: z.enum(["5m", "15m", "30m", "1h", "2h", "6h", "12h", "1d", "3d", "7d"]).optional().describe(
-          "Preset time ranges: '5m' (5 min), '15m' (15 min), '30m' (30 min), '1h' (1 hour), '2h' (2 hours), '6h' (6 hours), '12h' (12 hours), '1d' (1 day), '3d' (3 days), '7d' (7 days). If both minutes and preset are provided, minutes takes precedence."
-        ),
+        minutes: z
+          .number()
+          .min(1)
+          .max(10080)
+          .optional()
+          .describe(
+            "Number of minutes to look back (1-10080, i.e., up to 7 days). Examples: 5 for last 5 minutes, 30 for last 30 minutes, 120 for last 2 hours. Default is 120 (2 hours).",
+          ),
+        preset: z
+          .enum(["5m", "15m", "30m", "1h", "2h", "6h", "12h", "1d", "3d", "7d"])
+          .optional()
+          .describe(
+            "Preset time ranges: '5m' (5 min), '15m' (15 min), '30m' (30 min), '1h' (1 hour), '2h' (2 hours), '6h' (6 hours), '12h' (12 hours), '1d' (1 day), '3d' (3 days), '7d' (7 days). If both minutes and preset are provided, minutes takes precedence.",
+          ),
       }),
       execute: async ({ minutes, preset }) => {
         try {
@@ -538,11 +605,15 @@ export function createChatTools(userId: string) {
             "7d": 10080,
           };
 
-          const lookbackMinutes = minutes ?? (preset ? presetMinutes[preset] : 120);
+          const lookbackMinutes =
+            minutes ?? (preset ? presetMinutes[preset] : 120);
           const now = new Date();
           const from = new Date(now.getTime() - lookbackMinutes * 60 * 1000);
 
-          const attentionData = await getAttentionData(userId, { from, to: now });
+          const attentionData = await getAttentionData(userId, {
+            from,
+            to: now,
+          });
 
           if (attentionData.pages.length === 0) {
             return {
@@ -564,7 +635,10 @@ export function createChatTools(userId: string) {
         } catch (error) {
           return {
             found: false,
-            error: error instanceof Error ? error.message : "Failed to fetch attention data",
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to fetch attention data",
           };
         }
       },
@@ -574,23 +648,36 @@ export function createChatTools(userId: string) {
      * Get the user's focus history
      */
     get_focus_history: tool({
-      description: "Get the user's focus history - what topics they've been working on over time. Use this when the user asks about their past work sessions, productivity patterns, or wants to review what they've been focused on previously.",
+      description:
+        "Get the user's focus history - what topics they've been working on over time. Use this when the user asks about their past work sessions, productivity patterns, or wants to review what they've been focused on previously.",
       parameters: z.object({
-        limit: z.number().min(1).max(50).optional().describe(
-          "Maximum number of focus sessions to return (1-50). Default is 10."
-        ),
-        includeActive: z.boolean().optional().describe(
-          "Whether to include currently active focuses. Default is true."
-        ),
+        limit: z
+          .number()
+          .min(1)
+          .max(50)
+          .optional()
+          .describe(
+            "Maximum number of focus sessions to return (1-50). Default is 10.",
+          ),
+        includeActive: z
+          .boolean()
+          .optional()
+          .describe(
+            "Whether to include currently active focuses. Default is true.",
+          ),
       }),
       execute: async ({ limit = 10, includeActive = true }) => {
         try {
-          const focuses = await getUserFocusHistory(userId, { limit, includeActive });
+          const focuses = await getUserFocusHistory(userId, {
+            limit,
+            includeActive,
+          });
 
           if (focuses.length === 0) {
             return {
               found: false,
-              message: "No focus history found. The user may not have had any detected focus sessions yet.",
+              message:
+                "No focus history found. The user may not have had any detected focus sessions yet.",
             };
           }
 
@@ -604,14 +691,20 @@ export function createChatTools(userId: string) {
               startedAt: focus.startedAt.toISOString(),
               endedAt: focus.endedAt?.toISOString() || null,
               duration: focus.endedAt
-                ? formatDuration(focus.endedAt.getTime() - focus.startedAt.getTime())
-                : formatDuration(Date.now() - focus.startedAt.getTime()) + " (ongoing)",
+                ? formatDuration(
+                    focus.endedAt.getTime() - focus.startedAt.getTime(),
+                  )
+                : formatDuration(Date.now() - focus.startedAt.getTime()) +
+                  " (ongoing)",
             })),
           };
         } catch (error) {
           return {
             found: false,
-            error: error instanceof Error ? error.message : "Failed to fetch focus history",
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to fetch focus history",
           };
         }
       },
@@ -621,22 +714,43 @@ export function createChatTools(userId: string) {
      * Search browsing history by domain or keyword
      */
     search_browsing_history: tool({
-      description: "Search the user's browsing history for specific domains or keywords. Use this when the user asks about visits to a specific website, or wants to find pages related to a particular topic.",
+      description:
+        "Search the user's browsing history for specific domains or keywords. Use this when the user asks about visits to a specific website, or wants to find pages related to a particular topic.",
       parameters: z.object({
-        query: z.string().describe(
-          "Search query - can be a domain name (e.g., 'github.com'), partial URL, or keyword to search in page titles."
-        ),
-        searchIn: z.enum(["url", "title", "both"]).optional().describe(
-          "Where to search: 'url' for URLs only, 'title' for page titles only, 'both' for both (default)."
-        ),
-        minutes: z.number().min(1).max(10080).optional().describe(
-          "Number of minutes to look back (1-10080). Default is 1440 (24 hours)."
-        ),
-        limit: z.number().min(1).max(50).optional().describe(
-          "Maximum number of results to return (1-50). Default is 20."
-        ),
+        query: z
+          .string()
+          .describe(
+            "Search query - can be a domain name (e.g., 'github.com'), partial URL, or keyword to search in page titles.",
+          ),
+        searchIn: z
+          .enum(["url", "title", "both"])
+          .optional()
+          .describe(
+            "Where to search: 'url' for URLs only, 'title' for page titles only, 'both' for both (default).",
+          ),
+        minutes: z
+          .number()
+          .min(1)
+          .max(10080)
+          .optional()
+          .describe(
+            "Number of minutes to look back (1-10080). Default is 1440 (24 hours).",
+          ),
+        limit: z
+          .number()
+          .min(1)
+          .max(50)
+          .optional()
+          .describe(
+            "Maximum number of results to return (1-50). Default is 20.",
+          ),
       }),
-      execute: async ({ query, searchIn = "both", minutes = 1440, limit = 20 }) => {
+      execute: async ({
+        query,
+        searchIn = "both",
+        minutes = 1440,
+        limit = 20,
+      }) => {
         try {
           const now = new Date();
           const from = new Date(now.getTime() - minutes * 60 * 1000);
@@ -645,10 +759,14 @@ export function createChatTools(userId: string) {
           const searchConditions: any[] = [];
 
           if (searchIn === "url" || searchIn === "both") {
-            searchConditions.push({ url: { contains: query, mode: "insensitive" } });
+            searchConditions.push({
+              url: { contains: query, mode: "insensitive" },
+            });
           }
           if (searchIn === "title" || searchIn === "both") {
-            searchConditions.push({ title: { contains: query, mode: "insensitive" } });
+            searchConditions.push({
+              title: { contains: query, mode: "insensitive" },
+            });
           }
 
           const visits = await db.websiteVisit.findMany({
@@ -693,7 +811,10 @@ export function createChatTools(userId: string) {
         } catch (error) {
           return {
             found: false,
-            error: error instanceof Error ? error.message : "Failed to search browsing history",
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to search browsing history",
           };
         }
       },
@@ -703,14 +824,25 @@ export function createChatTools(userId: string) {
      * Get YouTube watch history
      */
     get_youtube_history: tool({
-      description: "Get the user's YouTube watch history. Use this when the user asks about videos they've watched, YouTube activity, or wants to recall a specific video.",
+      description:
+        "Get the user's YouTube watch history. Use this when the user asks about videos they've watched, YouTube activity, or wants to recall a specific video.",
       parameters: z.object({
-        minutes: z.number().min(1).max(10080).optional().describe(
-          "Number of minutes to look back (1-10080). Default is 1440 (24 hours)."
-        ),
-        limit: z.number().min(1).max(50).optional().describe(
-          "Maximum number of videos to return (1-50). Default is 20."
-        ),
+        minutes: z
+          .number()
+          .min(1)
+          .max(10080)
+          .optional()
+          .describe(
+            "Number of minutes to look back (1-10080). Default is 1440 (24 hours).",
+          ),
+        limit: z
+          .number()
+          .min(1)
+          .max(50)
+          .optional()
+          .describe(
+            "Maximum number of videos to return (1-50). Default is 20.",
+          ),
       }),
       execute: async ({ minutes = 1440, limit = 20 }) => {
         try {
@@ -756,14 +888,21 @@ export function createChatTools(userId: string) {
             }
             const video = videoMap.get(key)!;
 
-            if (yt.event === "active-watch-time-update" && yt.activeWatchTime !== null) {
-              video.activeWatchTime = Math.max(video.activeWatchTime, yt.activeWatchTime);
+            if (
+              yt.event === "active-watch-time-update" &&
+              yt.activeWatchTime !== null
+            ) {
+              video.activeWatchTime = Math.max(
+                video.activeWatchTime,
+                yt.activeWatchTime,
+              );
             }
             if (yt.event === "caption" && yt.caption) {
               video.captions.push(yt.caption);
             }
             if (yt.title && !video.title) video.title = yt.title;
-            if (yt.channelName && !video.channelName) video.channelName = yt.channelName;
+            if (yt.channelName && !video.channelName)
+              video.channelName = yt.channelName;
             if (yt.url && !video.url) video.url = yt.url;
             if (yt.timestamp < video.firstSeen) video.firstSeen = yt.timestamp;
             if (yt.timestamp > video.lastSeen) video.lastSeen = yt.timestamp;
@@ -789,18 +928,27 @@ export function createChatTools(userId: string) {
               title: video.title,
               channelName: video.channelName,
               videoId: video.videoId,
-              url: video.url || (video.videoId ? `https://www.youtube.com/watch?v=${video.videoId}` : null),
+              url:
+                video.url ||
+                (video.videoId
+                  ? `https://www.youtube.com/watch?v=${video.videoId}`
+                  : null),
               watchTime: formatDuration(video.activeWatchTime),
               watchedAt: video.lastSeen.toISOString(),
-              captionSummary: video.captions.length > 0
-                ? video.captions.slice(0, 10).join(" ").slice(0, 500) + (video.captions.length > 10 ? "..." : "")
-                : null,
+              captionSummary:
+                video.captions.length > 0
+                  ? video.captions.slice(0, 10).join(" ").slice(0, 500) +
+                    (video.captions.length > 10 ? "..." : "")
+                  : null,
             })),
           };
         } catch (error) {
           return {
             found: false,
-            error: error instanceof Error ? error.message : "Failed to fetch YouTube history",
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to fetch YouTube history",
           };
         }
       },
@@ -810,17 +958,31 @@ export function createChatTools(userId: string) {
      * Get reading activity (text attention)
      */
     get_reading_activity: tool({
-      description: "Get what the user has been reading online. This provides text excerpts and reading statistics. Use this when the user asks about articles they've read, text content they've engaged with, or wants to recall something they read.",
+      description:
+        "Get what the user has been reading online. This provides text excerpts and reading statistics. Use this when the user asks about articles they've read, text content they've engaged with, or wants to recall something they read.",
       parameters: z.object({
-        minutes: z.number().min(1).max(10080).optional().describe(
-          "Number of minutes to look back (1-10080). Default is 120 (2 hours)."
-        ),
-        domain: z.string().optional().describe(
-          "Filter to a specific domain (e.g., 'medium.com', 'news.ycombinator.com')."
-        ),
-        limit: z.number().min(1).max(100).optional().describe(
-          "Maximum number of text excerpts to return (1-100). Default is 30."
-        ),
+        minutes: z
+          .number()
+          .min(1)
+          .max(10080)
+          .optional()
+          .describe(
+            "Number of minutes to look back (1-10080). Default is 120 (2 hours).",
+          ),
+        domain: z
+          .string()
+          .optional()
+          .describe(
+            "Filter to a specific domain (e.g., 'medium.com', 'news.ycombinator.com').",
+          ),
+        limit: z
+          .number()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe(
+            "Maximum number of text excerpts to return (1-100). Default is 30.",
+          ),
       }),
       execute: async ({ minutes = 120, domain, limit = 30 }) => {
         try {
@@ -850,10 +1012,21 @@ export function createChatTools(userId: string) {
             };
           }
 
-          const totalWordsRead = textAttentions.reduce((sum, t) => sum + t.wordsRead, 0);
+          const totalWordsRead = textAttentions.reduce(
+            (sum, t) => sum + t.wordsRead,
+            0,
+          );
 
           // Group by URL for better organization
-          const byUrl = new Map<string, { url: string; domain: string; totalWords: number; excerpts: string[] }>();
+          const byUrl = new Map<
+            string,
+            {
+              url: string;
+              domain: string;
+              totalWords: number;
+              excerpts: string[];
+            }
+          >();
           for (const t of textAttentions) {
             const urlDomain = (() => {
               try {
@@ -864,12 +1037,19 @@ export function createChatTools(userId: string) {
             })();
 
             if (!byUrl.has(t.url)) {
-              byUrl.set(t.url, { url: t.url, domain: urlDomain, totalWords: 0, excerpts: [] });
+              byUrl.set(t.url, {
+                url: t.url,
+                domain: urlDomain,
+                totalWords: 0,
+                excerpts: [],
+              });
             }
             const entry = byUrl.get(t.url)!;
             entry.totalWords += t.wordsRead;
             if (entry.excerpts.length < 3) {
-              entry.excerpts.push(t.text.slice(0, 300) + (t.text.length > 300 ? "..." : ""));
+              entry.excerpts.push(
+                t.text.slice(0, 300) + (t.text.length > 300 ? "..." : ""),
+              );
             }
           }
 
@@ -888,7 +1068,10 @@ export function createChatTools(userId: string) {
         } catch (error) {
           return {
             found: false,
-            error: error instanceof Error ? error.message : "Failed to fetch reading activity",
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to fetch reading activity",
           };
         }
       },
@@ -903,7 +1086,9 @@ export function createChatTools(userId: string) {
       parameters: z.object({
         expression: z
           .string()
-          .describe("The mathematical expression to calculate. Use standard math notation."),
+          .describe(
+            "The mathematical expression to calculate. Use standard math notation.",
+          ),
       }),
       execute: async ({ expression }) => {
         try {
@@ -911,7 +1096,11 @@ export function createChatTools(userId: string) {
           const result = calc(expression);
 
           // Check if result is valid
-          if (result === null || result === undefined || (typeof result === "number" && isNaN(result))) {
+          if (
+            result === null ||
+            result === undefined ||
+            (typeof result === "number" && isNaN(result))
+          ) {
             return {
               success: false,
               error: `Could not evaluate expression: ${expression}`,
@@ -927,7 +1116,8 @@ export function createChatTools(userId: string) {
           return {
             success: false,
             expression,
-            error: error instanceof Error ? error.message : "Calculation failed",
+            error:
+              error instanceof Error ? error.message : "Calculation failed",
           };
         }
       },
@@ -941,7 +1131,10 @@ export type ChatTools = ReturnType<typeof createChatTools>;
  * Format a human-readable message for a tool result.
  * Used to show what data was retrieved by each tool.
  */
-export function formatToolResultMessage(toolName: string, result: unknown): string {
+export function formatToolResultMessage(
+  toolName: string,
+  result: unknown,
+): string {
   const r = result as Record<string, unknown>;
 
   // Handle error cases
@@ -952,18 +1145,19 @@ export function formatToolResultMessage(toolName: string, result: unknown): stri
   switch (toolName) {
     case "get_current_time":
       if (r.needsLocation) return "Needs location to get time";
-      if (!r.found) return r.error as string || "Time not found";
+      if (!r.found) return (r.error as string) || "Time not found";
       return `Time in ${r.location}: ${r.time}`;
 
     case "get_current_weather":
       if (r.needsLocation) return "Needs location to get weather";
-      if (!r.found) return r.error as string || "Weather not found";
+      if (!r.found) return (r.error as string) || "Weather not found";
       const temp = r.temperature as { celsius: number; fahrenheit: number };
       return `Weather in ${r.location}: ${r.condition}, ${temp.celsius}°C / ${temp.fahrenheit}°F`;
 
     case "set_user_location":
       if (!r.success) return `Failed to save location: ${r.error}`;
-      if (r.currentTime) return `Saved location: ${r.location} (${r.currentTime})`;
+      if (r.currentTime)
+        return `Saved location: ${r.location} (${r.currentTime})`;
       return `Saved location: ${r.location}`;
 
     case "get_user_context":
@@ -971,34 +1165,40 @@ export function formatToolResultMessage(toolName: string, result: unknown): stri
       return "User context: no location saved";
 
     case "get_active_website":
-      if (!r.found) return r.message as string || "No active website";
+      if (!r.found) return (r.message as string) || "No active website";
       return `Active website: ${r.title || r.domain || r.url}`;
 
     case "get_active_focus":
-      if (!r.found) return r.message as string || "No active focus";
+      if (!r.found) return (r.message as string) || "No active focus";
       const focuses = r.focuses as Array<{ item: string }>;
-      const focusItems = focuses.slice(0, 2).map((f) => f.item).join(", ");
+      const focusItems = focuses
+        .slice(0, 2)
+        .map((f) => f.item)
+        .join(", ");
       return `Active focus: ${focusItems}${focuses.length > 2 ? ` (+${focuses.length - 2} more)` : ""}`;
 
     case "get_attention_data":
-      if (!r.found) return r.message as string || "No attention data";
-      const stats = r.stats as { totalPages?: number; totalActiveTime?: number };
+      if (!r.found) return (r.message as string) || "No attention data";
+      const stats = r.stats as {
+        totalPages?: number;
+        totalActiveTime?: number;
+      };
       return `Browsing activity: ${stats.totalPages || 0} pages in ${r.timeRange}`;
 
     case "get_focus_history":
-      if (!r.found) return r.message as string || "No focus history";
+      if (!r.found) return (r.message as string) || "No focus history";
       return `Focus history: ${r.count} sessions retrieved`;
 
     case "search_browsing_history":
-      if (!r.found) return r.message as string || "No results";
+      if (!r.found) return (r.message as string) || "No results";
       return `Search results: ${r.count} pages matching "${r.query}"`;
 
     case "get_youtube_history":
-      if (!r.found) return r.message as string || "No YouTube history";
+      if (!r.found) return (r.message as string) || "No YouTube history";
       return `YouTube history: ${r.count} videos in ${r.timeRange}`;
 
     case "get_reading_activity":
-      if (!r.found) return r.message as string || "No reading activity";
+      if (!r.found) return (r.message as string) || "No reading activity";
       return `Reading activity: ${r.totalWordsRead} words across ${r.pagesRead} pages`;
 
     case "get_translation_language":

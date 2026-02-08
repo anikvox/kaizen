@@ -2,7 +2,12 @@ import { serve } from "@hono/node-server";
 import { env } from "./lib/index.js";
 import app from "./app.js";
 import { initTelemetry } from "./lib/llm/index.js";
-import { startBoss, stopBoss, registerHandlers, scheduleAllUserJobs } from "./lib/jobs/index.js";
+import {
+  startBoss,
+  stopBoss,
+  registerHandlers,
+  scheduleAllUserJobs,
+} from "./lib/jobs/index.js";
 import { initPomodoroListeners } from "./lib/pomodoro/index.js";
 
 // Initialize telemetry for LLM tracing (async, runs in background)

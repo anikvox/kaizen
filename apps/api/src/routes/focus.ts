@@ -1,6 +1,10 @@
 import { Hono } from "hono";
 import { db } from "../lib/index.js";
-import { getActiveFocuses, getUserFocusHistory, endUserFocus } from "../lib/focus/index.js";
+import {
+  getActiveFocuses,
+  getUserFocusHistory,
+  endUserFocus,
+} from "../lib/focus/index.js";
 
 // Combined variables type for routes that support both auth methods
 type CombinedAuthVariables = {
@@ -12,7 +16,9 @@ type CombinedAuthVariables = {
 const app = new Hono<{ Variables: CombinedAuthVariables }>();
 
 // Helper to get userId from either auth method
-async function getUserIdFromContext(c: { get: (key: string) => string | undefined }): Promise<string | null> {
+async function getUserIdFromContext(c: {
+  get: (key: string) => string | undefined;
+}): Promise<string | null> {
   // Check for device token auth first
   const deviceUserId = c.get("userId");
   if (deviceUserId) {

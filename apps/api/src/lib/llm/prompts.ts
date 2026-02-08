@@ -47,7 +47,9 @@ function serializePageAttention(page: AttentionSummary): string {
     lines.push("");
     lines.push(`### Audio Listened (${page.attention.audio.count})`);
     for (const audio of page.attention.audio.items) {
-      lines.push(`- ${audio.title} (played for ${audio.playbackDurationFormatted})`);
+      lines.push(
+        `- ${audio.title} (played for ${audio.playbackDurationFormatted})`,
+      );
     }
   }
 
@@ -142,7 +144,9 @@ export function serializeAttentionCompact(data: AttentionDataResponse): string {
   const fromDate = new Date(data.timeRange.from).toLocaleString();
   const toDate = new Date(data.timeRange.to).toLocaleString();
   lines.push(`# Recent Activity (${fromDate} - ${toDate})`);
-  lines.push(`Pages: ${data.summary.totalPages} | Time: ${data.summary.totalActiveTimeFormatted} | Words: ${data.summary.totalWordsRead}`);
+  lines.push(
+    `Pages: ${data.summary.totalPages} | Time: ${data.summary.totalActiveTimeFormatted} | Words: ${data.summary.totalWordsRead}`,
+  );
   lines.push("");
 
   // Group pages by domain for organization
@@ -186,33 +190,39 @@ function serializePageCompact(page: AttentionSummary): string {
     // Combine excerpts into a brief representation
     const combinedText = page.attention.text.excerpts
       .slice(0, 3) // Limit to first 3 excerpts
-      .map(e => e.text.slice(0, 150)) // Truncate each
+      .map((e) => e.text.slice(0, 150)) // Truncate each
       .join(" ... ");
     if (combinedText) {
-      parts.push(`Read: ${combinedText}${page.attention.text.excerpts.length > 3 ? " ..." : ""}`);
+      parts.push(
+        `Read: ${combinedText}${page.attention.text.excerpts.length > 3 ? " ..." : ""}`,
+      );
     }
   }
 
   // Images - prefer individual summaries, fall back to page-level imageSummary, then alt text
   if (page.attention.images.count > 0) {
     const imageSummaries = page.attention.images.items
-      .filter(img => img.summary)
-      .map(img => img.summary!);
+      .filter((img) => img.summary)
+      .map((img) => img.summary!);
 
     if (imageSummaries.length > 0) {
       // Use individual image summaries
-      parts.push(`Images (${page.attention.images.count}): ${imageSummaries.slice(0, 3).join("; ")}${imageSummaries.length > 3 ? " ..." : ""}`);
+      parts.push(
+        `Images (${page.attention.images.count}): ${imageSummaries.slice(0, 3).join("; ")}${imageSummaries.length > 3 ? " ..." : ""}`,
+      );
     } else if (page.imageSummary) {
       // Fall back to page-level image summary
       parts.push(`Images: ${page.imageSummary}`);
     } else {
       // Fall back to alt text
       const alts = page.attention.images.items
-        .filter(img => img.alt && img.alt !== "No description")
-        .map(img => img.alt)
+        .filter((img) => img.alt && img.alt !== "No description")
+        .map((img) => img.alt)
         .slice(0, 3);
       if (alts.length > 0) {
-        parts.push(`Images (${page.attention.images.count}): ${alts.join(", ")}${page.attention.images.count > 3 ? " ..." : ""}`);
+        parts.push(
+          `Images (${page.attention.images.count}): ${alts.join(", ")}${page.attention.images.count > 3 ? " ..." : ""}`,
+        );
       } else {
         parts.push(`Images: ${page.attention.images.count} viewed`);
       }
@@ -222,9 +232,11 @@ function serializePageCompact(page: AttentionSummary): string {
   // Audio - compact format
   if (page.attention.audio.count > 0) {
     const audioTitles = page.attention.audio.items
-      .map(a => a.title)
+      .map((a) => a.title)
       .slice(0, 3);
-    parts.push(`Audio (${page.attention.audio.count}): ${audioTitles.join(", ")}${page.attention.audio.count > 3 ? " ..." : ""}`);
+    parts.push(
+      `Audio (${page.attention.audio.count}): ${audioTitles.join(", ")}${page.attention.audio.count > 3 ? " ..." : ""}`,
+    );
   }
 
   // YouTube - compact with captions summary
@@ -232,20 +244,25 @@ function serializePageCompact(page: AttentionSummary): string {
     for (const video of page.attention.youtube.videos.slice(0, 2)) {
       const title = video.title || "Video";
       const channel = video.channelName ? ` (${video.channelName})` : "";
-      const watchTime = video.activeWatchTimeFormatted ? ` [${video.activeWatchTimeFormatted}]` : "";
+      const watchTime = video.activeWatchTimeFormatted
+        ? ` [${video.activeWatchTimeFormatted}]`
+        : "";
       parts.push(`YouTube: ${title}${channel}${watchTime}`);
 
       // Include brief caption summary if available
       if (video.captions.length > 0) {
         const captionPreview = video.captions.slice(0, 5).join(" ");
-        const truncated = captionPreview.length > 200
-          ? captionPreview.slice(0, 200) + "..."
-          : captionPreview;
+        const truncated =
+          captionPreview.length > 200
+            ? captionPreview.slice(0, 200) + "..."
+            : captionPreview;
         parts.push(`  Captions: ${truncated}`);
       }
     }
     if (page.attention.youtube.videos.length > 2) {
-      parts.push(`  ...and ${page.attention.youtube.videos.length - 2} more videos`);
+      parts.push(
+        `  ...and ${page.attention.youtube.videos.length - 2} more videos`,
+      );
     }
   }
 
@@ -259,7 +276,7 @@ function serializePageCompact(page: AttentionSummary): string {
  */
 export async function generateChatTitle(
   message: string,
-  provider?: LLMProvider
+  provider?: LLMProvider,
 ): Promise<string> {
   const llm = provider || getSystemProvider();
 

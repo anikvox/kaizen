@@ -18,7 +18,9 @@ type CombinedAuthVariables = {
 const app = new Hono<{ Variables: CombinedAuthVariables }>();
 
 // Helper to get userId from either auth method
-async function getUserIdFromContext(c: { get: (key: string) => string | undefined }): Promise<string | null> {
+async function getUserIdFromContext(c: {
+  get: (key: string) => string | undefined;
+}): Promise<string | null> {
   const deviceUserId = c.get("userId");
   if (deviceUserId) {
     return deviceUserId;

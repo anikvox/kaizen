@@ -32,6 +32,10 @@ export class AttentionEndpoint {
   }
 
   async activeTab(data: ActiveTabRequest): Promise<ActiveTabResponse> {
-    return this.http.post<ActiveTabResponse>("/attention/active-tab", data, true);
+    return this.http.post<ActiveTabResponse>(
+      "/attention/active-tab",
+      data,
+      true,
+    );
   }
 }

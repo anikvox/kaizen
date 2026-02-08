@@ -30,8 +30,10 @@ export class HttpClient {
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));
       const error = Object.assign(
-        new Error(errorBody.error || `HTTP ${response.status}: ${response.statusText}`),
-        { status: response.status, code: errorBody.code, ...errorBody }
+        new Error(
+          errorBody.error || `HTTP ${response.status}: ${response.statusText}`,
+        ),
+        { status: response.status, code: errorBody.code, ...errorBody },
       );
       throw error;
     }
@@ -48,8 +50,10 @@ export class HttpClient {
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));
       const error = Object.assign(
-        new Error(errorBody.error || `HTTP ${response.status}: ${response.statusText}`),
-        { status: response.status, code: errorBody.code, ...errorBody }
+        new Error(
+          errorBody.error || `HTTP ${response.status}: ${response.statusText}`,
+        ),
+        { status: response.status, code: errorBody.code, ...errorBody },
       );
       throw error;
     }
@@ -86,7 +90,7 @@ export class HttpClient {
     event: string,
     onMessage: (data: T) => void,
     onError?: (error: Event) => void,
-    token?: string
+    token?: string,
   ): EventSource {
     const url = new URL(`${this.baseUrl}${path}`);
     if (token) {
@@ -111,7 +115,7 @@ export class HttpClient {
     path: string,
     event: string,
     onMessage: (data: T) => void,
-    onError?: (error: Event) => void
+    onError?: (error: Event) => void,
   ): Promise<EventSource | null> {
     const url = new URL(`${this.baseUrl}${path}`);
 

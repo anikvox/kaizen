@@ -22,6 +22,6 @@ export interface BotCallbacks {
 export interface BotInterface {
   generateResponse(
     messages: BotMessage[],
-    callbacks: BotCallbacks
+    callbacks: BotCallbacks,
   ): Promise<void>;
 }

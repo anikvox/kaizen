@@ -3,6 +3,15 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth, SignInButton, useUser } from "@clerk/nextjs";
 import { createApiClient } from "@kaizen/api-client";
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Logo,
+} from "@kaizen/ui";
+import { Check, Copy, X, Loader2, Chrome } from "lucide-react";
 
 const apiUrl =
   process.env.NEXT_PUBLIC_KAIZEN_API_URL || "http://localhost:60092";
@@ -10,10 +19,13 @@ const apiUrl =
 export default function LinkExtension() {
   const { isSignedIn, isLoaded, getToken } = useAuth();
   const { user: clerkUser } = useUser();
-  const [status, setStatus] = useState<"loading" | "consent" | "linking" | "success" | "error">("loading");
+  const [status, setStatus] = useState<
+    "loading" | "consent" | "linking" | "success" | "error"
+  >("loading");
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [userSynced, setUserSynced] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const getTokenFn = useCallback(async () => {
     return getToken();
@@ -86,6 +98,8 @@ export default function LinkExtension() {
   const handleCopyToken = () => {
     if (token) {
       navigator.clipboard.writeText(token);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -95,166 +109,161 @@ export default function LinkExtension() {
 
   if (!isLoaded || status === "loading") {
     return (
-      <main style={{ padding: "2rem", textAlign: "center", maxWidth: 400, margin: "0 auto" }}>
-        <h1>Link Extension</h1>
-        <p>Loading...</p>
+      <main className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 text-center">
+            <Logo size="lg" className="mx-auto mb-4" />
+            <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
+            <p className="text-muted-foreground mt-2">Loading...</p>
+          </CardContent>
+        </Card>
       </main>
     );
   }
 
   if (status === "consent") {
     return (
-      <main style={{ padding: "2rem", maxWidth: 400, margin: "0 auto" }}>
-        <h1 style={{ textAlign: "center", marginBottom: "1.5rem" }}>Authorize Extension</h1>
-
-        <div style={{
-          padding: "1.5rem",
-          border: "1px solid #ddd",
-          borderRadius: 12,
-          background: "#fafafa",
-          marginBottom: "1.5rem"
-        }}>
-          <p style={{ margin: "0 0 1rem", fontWeight: 500, fontSize: "1.1rem" }}>
-            Kaizen Chrome Extension
-          </p>
-          <p style={{ margin: 0, color: "#666", fontSize: "0.9rem" }}>
-            wants to access your account
-          </p>
-        </div>
-
-        {!isSignedIn ? (
-          <>
-            <p style={{ textAlign: "center", marginBottom: "1rem", color: "#666" }}>
-              Sign in to continue
-            </p>
-            <div style={{ textAlign: "center" }}>
-              <SignInButton mode="modal" />
-            </div>
-          </>
-        ) : (
-          <>
-            <div style={{
-              padding: "1rem",
-              background: "#f0f7ff",
-              borderRadius: 8,
-              marginBottom: "1.5rem"
-            }}>
-              <p style={{ margin: "0 0 0.5rem", fontSize: "0.85rem", color: "#666" }}>
-                Signed in as
-              </p>
-              <p style={{ margin: 0, fontWeight: 500 }}>
-                {clerkUser?.fullName || clerkUser?.emailAddresses[0]?.emailAddress}
-              </p>
+      <main className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <Logo size="lg" className="mx-auto mb-2" />
+            <CardTitle>Authorize Extension</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="p-4 rounded-lg bg-muted mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
+                  <Chrome className="w-5 h-5 text-secondary" />
+                </div>
+                <div>
+                  <p className="font-medium">Kaizen Chrome Extension</p>
+                  <p className="text-sm text-muted-foreground">
+                    wants to access your account
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <p style={{ fontSize: "0.9rem", color: "#333", marginBottom: "1rem" }}>
-              This will allow the extension to:
-            </p>
-            <ul style={{ fontSize: "0.9rem", color: "#333", marginBottom: "1.5rem", paddingLeft: "1.5rem" }}>
-              <li>Access your account information</li>
-              <li>Perform actions on your behalf</li>
-            </ul>
+            {!isSignedIn ? (
+              <div className="text-center">
+                <p className="text-muted-foreground mb-4">
+                  Sign in to continue
+                </p>
+                <SignInButton mode="modal">
+                  <Button className="w-full">Sign In</Button>
+                </SignInButton>
+              </div>
+            ) : (
+              <>
+                <div className="p-3 rounded-lg bg-secondary/10 mb-6">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Signed in as
+                  </p>
+                  <p className="font-medium text-sm">
+                    {clerkUser?.fullName ||
+                      clerkUser?.emailAddresses[0]?.emailAddress}
+                  </p>
+                </div>
 
-            <div style={{ display: "flex", gap: "1rem" }}>
-              <button
-                onClick={handleDeny}
-                style={{
-                  flex: 1,
-                  padding: "12px 16px",
-                  background: "white",
-                  color: "#333",
-                  border: "1px solid #ddd",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                  fontSize: 14,
-                  fontWeight: 500
-                }}
-              >
-                Deny
-              </button>
-              <button
-                onClick={handleAuthorize}
-                style={{
-                  flex: 1,
-                  padding: "12px 16px",
-                  background: "#0070f3",
-                  color: "white",
-                  border: "none",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                  fontSize: 14,
-                  fontWeight: 500
-                }}
-              >
-                Authorize
-              </button>
-            </div>
-          </>
-        )}
+                <div className="mb-6">
+                  <p className="text-sm font-medium mb-2">
+                    This will allow the extension to:
+                  </p>
+                  <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                    <li>Access your account information</li>
+                    <li>Track your browsing for focus detection</li>
+                    <li>Send messages on your behalf</li>
+                  </ul>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={handleDeny}
+                    className="flex-1"
+                  >
+                    Deny
+                  </Button>
+                  <Button onClick={handleAuthorize} className="flex-1">
+                    Authorize
+                  </Button>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
       </main>
     );
   }
 
   if (status === "linking") {
     return (
-      <main style={{ padding: "2rem", textAlign: "center", maxWidth: 400, margin: "0 auto" }}>
-        <h1>Link Extension</h1>
-        <p>Authorizing...</p>
+      <main className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 text-center">
+            <Logo size="lg" className="mx-auto mb-4" />
+            <Loader2 className="w-6 h-6 animate-spin mx-auto text-secondary" />
+            <p className="text-muted-foreground mt-2">Authorizing...</p>
+          </CardContent>
+        </Card>
       </main>
     );
   }
 
   if (status === "error") {
     return (
-      <main style={{ padding: "2rem", textAlign: "center", maxWidth: 400, margin: "0 auto" }}>
-        <h1>Link Extension</h1>
-        <p style={{ color: "red" }}>{error}</p>
-        <button onClick={() => window.location.reload()}>Try Again</button>
+      <main className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 text-center">
+            <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+              <X className="w-6 h-6 text-destructive" />
+            </div>
+            <h2 className="text-xl font-semibold mb-2">Authorization Failed</h2>
+            <p className="text-destructive mb-4">{error}</p>
+            <Button onClick={() => window.location.reload()}>Try Again</Button>
+          </CardContent>
+        </Card>
       </main>
     );
   }
 
   return (
-    <main style={{ padding: "2rem", textAlign: "center", maxWidth: 400, margin: "0 auto" }}>
-      <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>&#10003;</div>
-      <h1>Extension Authorized</h1>
-      <p>Your Chrome extension has been linked to your account.</p>
-      <p style={{ color: "#22c55e", marginTop: "1rem" }}>
-        You can now close this window and return to the extension.
-      </p>
-      <div style={{ marginTop: "1.5rem", display: "flex", gap: "1rem", justifyContent: "center" }}>
-        <button
-          onClick={handleCloseWindow}
-          style={{
-            padding: "10px 20px",
-            background: "#0070f3",
-            color: "white",
-            border: "none",
-            borderRadius: 8,
-            cursor: "pointer",
-            fontSize: 14
-          }}
-        >
-          Close Window
-        </button>
-        <button
-          onClick={handleCopyToken}
-          style={{
-            padding: "10px 20px",
-            background: "white",
-            color: "#333",
-            border: "1px solid #ddd",
-            borderRadius: 8,
-            cursor: "pointer",
-            fontSize: 14
-          }}
-        >
-          Copy Token
-        </button>
-      </div>
-      <p style={{ fontSize: "0.8rem", color: "#666", marginTop: "1rem" }}>
-        If the extension didn&apos;t receive the token automatically, copy it manually.
-      </p>
+    <main className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md">
+        <CardContent className="pt-6 text-center">
+          <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-4">
+            <Check className="w-8 h-8 text-accent" />
+          </div>
+          <h2 className="text-xl font-semibold mb-2">Extension Authorized</h2>
+          <p className="text-muted-foreground mb-2">
+            Your Chrome extension has been linked to your account.
+          </p>
+          <p className="text-accent text-sm mb-6">
+            You can now close this window and return to the extension.
+          </p>
+
+          <div className="flex gap-3 justify-center">
+            <Button onClick={handleCloseWindow}>Close Window</Button>
+            <Button
+              variant="outline"
+              onClick={handleCopyToken}
+              className="gap-2"
+            >
+              {copied ? (
+                <Check className="w-4 h-4" />
+              ) : (
+                <Copy className="w-4 h-4" />
+              )}
+              {copied ? "Copied!" : "Copy Token"}
+            </Button>
+          </div>
+
+          <p className="text-xs text-muted-foreground mt-4">
+            If the extension didn&apos;t receive the token automatically, copy
+            it manually.
+          </p>
+        </CardContent>
+      </Card>
     </main>
   );
 }

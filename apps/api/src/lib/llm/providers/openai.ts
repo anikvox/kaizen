@@ -1,6 +1,10 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText, streamText } from "ai";
-import type { UserModelMessage, AssistantModelMessage, SystemModelMessage } from "@ai-sdk/provider-utils";
+import type {
+  UserModelMessage,
+  AssistantModelMessage,
+  SystemModelMessage,
+} from "@ai-sdk/provider-utils";
 import type {
   LLMProvider,
   LLMProviderConfig,
@@ -32,7 +36,10 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   async generate(options: LLMGenerateOptions): Promise<LLMResponse> {
-    const messages = this.formatMessages(options.messages, options.systemPrompt);
+    const messages = this.formatMessages(
+      options.messages,
+      options.systemPrompt,
+    );
 
     const result = await generateText({
       model: this.openai(this.model),
@@ -47,17 +54,21 @@ export class OpenAIProvider implements LLMProvider {
     });
 
     // Extract tool calls and results
-    const toolCalls: LLMToolCall[] | undefined = result.toolCalls?.map((tc) => ({
-      toolCallId: tc.toolCallId,
-      toolName: tc.toolName,
-      args: "args" in tc ? (tc.args as Record<string, unknown>) : {},
-    }));
+    const toolCalls: LLMToolCall[] | undefined = result.toolCalls?.map(
+      (tc) => ({
+        toolCallId: tc.toolCallId,
+        toolName: tc.toolName,
+        args: "args" in tc ? (tc.args as Record<string, unknown>) : {},
+      }),
+    );
 
-    const toolResults: LLMToolResult[] | undefined = result.toolResults?.map((tr) => ({
-      toolCallId: tr.toolCallId,
-      toolName: tr.toolName,
-      result: "result" in tr ? tr.result : undefined,
-    }));
+    const toolResults: LLMToolResult[] | undefined = result.toolResults?.map(
+      (tr) => ({
+        toolCallId: tr.toolCallId,
+        toolName: tr.toolName,
+        result: "result" in tr ? tr.result : undefined,
+      }),
+    );
 
     return {
       content: result.text,
@@ -73,7 +84,10 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   async stream(options: LLMStreamOptions): Promise<void> {
-    const messages = this.formatMessages(options.messages, options.systemPrompt);
+    const messages = this.formatMessages(
+      options.messages,
+      options.systemPrompt,
+    );
 
     try {
       const result = streamText({
@@ -121,7 +135,7 @@ export class OpenAIProvider implements LLMProvider {
 
   private formatMessages(
     messages: LLMGenerateOptions["messages"],
-    systemPrompt?: string
+    systemPrompt?: string,
   ): Message[] {
     const formatted: Message[] = [];
 
@@ -153,7 +167,9 @@ export class OpenAIProvider implements LLMProvider {
     return formatted;
   }
 
-  private formatUserContent(content: LLMMessageContent): UserModelMessage["content"] {
+  private formatUserContent(
+    content: LLMMessageContent,
+  ): UserModelMessage["content"] {
     // Simple string content
     if (typeof content === "string") {
       return content;

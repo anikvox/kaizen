@@ -13,8 +13,14 @@ export class WebsiteVisitsEndpoint {
     return this.http.post<WebsiteVisit>("/website-visits/opened", data, true);
   }
 
-  async updateActiveTime(data: WebsiteVisitActiveTimeRequest): Promise<WebsiteVisit> {
-    return this.http.post<WebsiteVisit>("/website-visits/active-time", data, true);
+  async updateActiveTime(
+    data: WebsiteVisitActiveTimeRequest,
+  ): Promise<WebsiteVisit> {
+    return this.http.post<WebsiteVisit>(
+      "/website-visits/active-time",
+      data,
+      true,
+    );
   }
 
   async closed(data: WebsiteVisitClosedRequest): Promise<WebsiteVisit> {

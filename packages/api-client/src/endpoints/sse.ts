@@ -25,7 +25,7 @@ export class SSEEndpoint {
   subscribeUnified(
     onMessage: (data: UnifiedSSEData) => void,
     onError?: (error: Event) => void,
-    deviceToken?: string
+    deviceToken?: string,
   ): EventSource {
     const url = new URL(`${this.http.getBaseUrl()}/sse/unified`);
     if (deviceToken) {

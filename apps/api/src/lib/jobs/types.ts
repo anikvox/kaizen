@@ -12,7 +12,7 @@ export const JOB_NAMES = {
   PULSE_GENERATION: "pulse-generation",
 } as const;
 
-export type JobName = typeof JOB_NAMES[keyof typeof JOB_NAMES];
+export type JobName = (typeof JOB_NAMES)[keyof typeof JOB_NAMES];
 
 // Job payloads
 export interface FocusCalculationPayload {

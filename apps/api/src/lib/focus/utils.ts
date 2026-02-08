@@ -31,7 +31,7 @@ export function focusToEventData(focus: Focus): FocusData {
 export function emitFocusChange(
   userId: string,
   focus: Focus | null,
-  changeType: "created" | "updated" | "ended"
+  changeType: "created" | "updated" | "ended",
 ): void {
   events.emitFocusChanged({
     userId,
@@ -43,16 +43,25 @@ export function emitFocusChange(
 /**
  * Extract focus settings from UserSettings, using defaults where needed.
  */
-export function extractFocusSettings(settings: UserSettings | null): FocusSettings {
+export function extractFocusSettings(
+  settings: UserSettings | null,
+): FocusSettings {
   if (!settings) {
     return DEFAULT_FOCUS_SETTINGS;
   }
 
   return {
-    focusCalculationEnabled: settings.focusCalculationEnabled ?? DEFAULT_FOCUS_SETTINGS.focusCalculationEnabled,
-    focusCalculationIntervalMs: settings.focusCalculationIntervalMs ?? DEFAULT_FOCUS_SETTINGS.focusCalculationIntervalMs,
-    focusInactivityThresholdMs: settings.focusInactivityThresholdMs ?? DEFAULT_FOCUS_SETTINGS.focusInactivityThresholdMs,
-    focusMinDurationMs: settings.focusMinDurationMs ?? DEFAULT_FOCUS_SETTINGS.focusMinDurationMs,
+    focusCalculationEnabled:
+      settings.focusCalculationEnabled ??
+      DEFAULT_FOCUS_SETTINGS.focusCalculationEnabled,
+    focusCalculationIntervalMs:
+      settings.focusCalculationIntervalMs ??
+      DEFAULT_FOCUS_SETTINGS.focusCalculationIntervalMs,
+    focusInactivityThresholdMs:
+      settings.focusInactivityThresholdMs ??
+      DEFAULT_FOCUS_SETTINGS.focusInactivityThresholdMs,
+    focusMinDurationMs:
+      settings.focusMinDurationMs ?? DEFAULT_FOCUS_SETTINGS.focusMinDurationMs,
   };
 }
 
@@ -76,7 +85,9 @@ export function hashAttentionData(data: RawAttentionData): string {
  * Format raw attention data into structured items for LLM prompts.
  * Groups attention by URL and extracts relevant content.
  */
-export function formatAttentionData(raw: RawAttentionData): FormattedAttentionItem[] {
+export function formatAttentionData(
+  raw: RawAttentionData,
+): FormattedAttentionItem[] {
   const urlMap = new Map<string, FormattedAttentionItem>();
 
   // Helper to ensure URL entry exists
@@ -115,7 +126,8 @@ export function formatAttentionData(raw: RawAttentionData): FormattedAttentionIt
   // Process image attentions
   for (const image of raw.imageAttentions) {
     const item = ensureUrl(image.url, image.timestamp);
-    const description = image.summary || image.alt || image.title || "Image viewed";
+    const description =
+      image.summary || image.alt || image.title || "Image viewed";
     if (description.trim().length > 0) {
       item.imageDescriptions.push(description.trim());
     }
@@ -132,7 +144,9 @@ export function formatAttentionData(raw: RawAttentionData): FormattedAttentionIt
     if (yt.event === "caption" && yt.caption) {
       item.youtubeContent.push(`Caption: ${yt.caption}`);
     } else if (yt.event === "opened" && yt.title) {
-      item.youtubeContent.push(`Video: ${yt.title}${yt.channelName ? ` by ${yt.channelName}` : ""}`);
+      item.youtubeContent.push(
+        `Video: ${yt.title}${yt.channelName ? ` by ${yt.channelName}` : ""}`,
+      );
     }
 
     if (yt.timestamp < item.timestamp) {
@@ -142,7 +156,7 @@ export function formatAttentionData(raw: RawAttentionData): FormattedAttentionIt
 
   // Convert to array and sort by timestamp (most recent first)
   return Array.from(urlMap.values()).sort(
-    (a, b) => b.timestamp.getTime() - a.timestamp.getTime()
+    (a, b) => b.timestamp.getTime() - a.timestamp.getTime(),
   );
 }
 
@@ -197,7 +211,10 @@ export function parseDriftResponse(response: string): boolean {
  * Deduplicate and limit keywords array.
  * Returns unique keywords with a maximum count.
  */
-export function deduplicateKeywords(keywords: string[], maxCount: number = 20): string[] {
+export function deduplicateKeywords(
+  keywords: string[],
+  maxCount: number = 20,
+): string[] {
   // Normalize keywords for comparison
   const normalizedMap = new Map<string, string>();
 
@@ -218,18 +235,21 @@ export function deduplicateKeywords(keywords: string[], maxCount: number = 20): 
  */
 export function hasMinimalContent(raw: RawAttentionData): boolean {
   // Check for any text content
-  const totalTextLength = raw.textAttentions.reduce((sum, t) => sum + t.text.length, 0);
+  const totalTextLength = raw.textAttentions.reduce(
+    (sum, t) => sum + t.text.length,
+    0,
+  );
   if (totalTextLength >= 50) return true;
 
   // Check for meaningful images with descriptions
   const meaningfulImages = raw.imageAttentions.filter(
-    (img) => (img.summary || img.alt || img.title) && img.hoverDuration > 1000
+    (img) => (img.summary || img.alt || img.title) && img.hoverDuration > 1000,
   );
   if (meaningfulImages.length >= 2) return true;
 
   // Check for YouTube captions
   const youtubeCaptions = raw.youtubeAttentions.filter(
-    (yt) => yt.event === "caption" && yt.caption
+    (yt) => yt.event === "caption" && yt.caption,
   );
   if (youtubeCaptions.length >= 3) return true;
 

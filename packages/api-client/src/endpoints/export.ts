@@ -20,19 +20,19 @@ export class ExportEndpoint {
    * @param params.to - End of time range (default: now)
    */
   async getWebsiteActivity(
-    params: ExportTimeRangeParams = {}
+    params: ExportTimeRangeParams = {},
   ): Promise<WebsiteActivityResponse> {
     const queryParams = new URLSearchParams();
     if (params.from) {
       queryParams.set(
         "from",
-        params.from instanceof Date ? params.from.toISOString() : params.from
+        params.from instanceof Date ? params.from.toISOString() : params.from,
       );
     }
     if (params.to) {
       queryParams.set(
         "to",
-        params.to instanceof Date ? params.to.toISOString() : params.to
+        params.to instanceof Date ? params.to.toISOString() : params.to,
       );
     }
 
@@ -49,19 +49,19 @@ export class ExportEndpoint {
    * @param params.to - End of time range (default: now)
    */
   async getAttention(
-    params: ExportTimeRangeParams = {}
+    params: ExportTimeRangeParams = {},
   ): Promise<AttentionResponse> {
     const queryParams = new URLSearchParams();
     if (params.from) {
       queryParams.set(
         "from",
-        params.from instanceof Date ? params.from.toISOString() : params.from
+        params.from instanceof Date ? params.from.toISOString() : params.from,
       );
     }
     if (params.to) {
       queryParams.set(
         "to",
-        params.to instanceof Date ? params.to.toISOString() : params.to
+        params.to instanceof Date ? params.to.toISOString() : params.to,
       );
     }
 

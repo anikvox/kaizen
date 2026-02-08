@@ -22,7 +22,7 @@ const FETCH_TIMEOUT = 10000; // 10 seconds
  * Returns null if the image cannot be fetched or is not a supported type.
  */
 export async function fetchImageAsBase64(
-  imageUrl: string
+  imageUrl: string,
 ): Promise<FetchedImage | null> {
   try {
     const controller = new AbortController();
@@ -40,7 +40,7 @@ export async function fetchImageAsBase64(
 
     if (!response.ok) {
       console.warn(
-        `Failed to fetch image from ${imageUrl}: ${response.status}`
+        `Failed to fetch image from ${imageUrl}: ${response.status}`,
       );
       return null;
     }
@@ -50,18 +50,14 @@ export async function fetchImageAsBase64(
     const mimeType = contentType.split(";")[0].trim().toLowerCase();
 
     if (!SUPPORTED_MIME_TYPES.includes(mimeType)) {
-      console.warn(
-        `Unsupported image type for ${imageUrl}: ${mimeType}`
-      );
+      console.warn(`Unsupported image type for ${imageUrl}: ${mimeType}`);
       return null;
     }
 
     // Check content length if available
     const contentLength = response.headers.get("content-length");
     if (contentLength && parseInt(contentLength) > MAX_IMAGE_SIZE) {
-      console.warn(
-        `Image too large at ${imageUrl}: ${contentLength} bytes`
-      );
+      console.warn(`Image too large at ${imageUrl}: ${contentLength} bytes`);
       return null;
     }
 
@@ -71,7 +67,7 @@ export async function fetchImageAsBase64(
     // Check actual size
     if (arrayBuffer.byteLength > MAX_IMAGE_SIZE) {
       console.warn(
-        `Image too large at ${imageUrl}: ${arrayBuffer.byteLength} bytes`
+        `Image too large at ${imageUrl}: ${arrayBuffer.byteLength} bytes`,
       );
       return null;
     }

@@ -16,7 +16,7 @@ export async function generateTextSummary(
   textContent: string,
   pageTitle: string,
   pageUrl: string,
-  settings: UserSettings | null
+  settings: UserSettings | null,
 ): Promise<string> {
   const llmService = createLLMService(settings);
   const provider = llmService.getProvider();
@@ -53,10 +53,15 @@ Provide a concise summary (2-4 sentences) of what the user was reading about.`;
  * Generate a summary for image attention data from a website visit.
  */
 export async function generateImageSummary(
-  images: Array<{ src: string; alt: string; title: string; hoverDuration: number }>,
+  images: Array<{
+    src: string;
+    alt: string;
+    title: string;
+    hoverDuration: number;
+  }>,
   pageTitle: string,
   pageUrl: string,
-  settings: UserSettings | null
+  settings: UserSettings | null,
 ): Promise<string> {
   const llmService = createLLMService(settings);
   const provider = llmService.getProvider();
@@ -105,7 +110,7 @@ export async function generateIndividualImageSummary(
   imageSrc: string,
   imageAlt: string,
   imageTitle: string,
-  settings: UserSettings | null
+  settings: UserSettings | null,
 ): Promise<string | null> {
   // Fetch the image
   const fetchedImage = await fetchImageAsBase64(imageSrc);
@@ -126,9 +131,10 @@ export async function generateIndividualImageSummary(
     contextParts.push(`Title: "${imageTitle}"`);
   }
 
-  const contextText = contextParts.length > 0
-    ? `\n\nImage metadata:\n${contextParts.join("\n")}`
-    : "";
+  const contextText =
+    contextParts.length > 0
+      ? `\n\nImage metadata:\n${contextParts.join("\n")}`
+      : "";
 
   const prompt = `Describe this image concisely.${contextText}`;
 
@@ -141,7 +147,11 @@ export async function generateIndividualImageSummary(
         {
           role: "user",
           content: [
-            { type: "image", mimeType: fetchedImage.mimeType, data: fetchedImage.data },
+            {
+              type: "image",
+              mimeType: fetchedImage.mimeType,
+              data: fetchedImage.data,
+            },
             { type: "text", text: prompt },
           ],
         },
@@ -163,7 +173,9 @@ export async function generateIndividualImageSummary(
 /**
  * Process individual image attentions that need summarization for a user.
  */
-export async function processUserImageSummarization(userId: string): Promise<number> {
+export async function processUserImageSummarization(
+  userId: string,
+): Promise<number> {
   // Get user settings
   const settings = await db.userSettings.findUnique({
     where: { userId },
@@ -193,7 +205,7 @@ export async function processUserImageSummarization(userId: string): Promise<num
         image.src,
         image.alt,
         image.title,
-        settings
+        settings,
       );
 
       if (summary) {
@@ -225,7 +237,9 @@ export async function processUserImageSummarization(userId: string): Promise<num
 /**
  * Process website visits that need summarization for a specific user.
  */
-export async function processUserSummarization(userId: string): Promise<number> {
+export async function processUserSummarization(
+  userId: string,
+): Promise<number> {
   // Get user settings
   const settings = await db.userSettings.findUnique({
     where: { userId },
@@ -295,10 +309,13 @@ export async function processUserSummarization(userId: string): Promise<number> 
             textContent,
             visit.title,
             visit.url,
-            settings
+            settings,
           );
         } catch (error) {
-          console.error(`Failed to generate text summary for visit ${visit.id}:`, error);
+          console.error(
+            `Failed to generate text summary for visit ${visit.id}:`,
+            error,
+          );
         }
       }
     }
@@ -317,10 +334,13 @@ export async function processUserSummarization(userId: string): Promise<number> 
           images,
           visit.title,
           visit.url,
-          settings
+          settings,
         );
       } catch (error) {
-        console.error(`Failed to generate image summary for visit ${visit.id}:`, error);
+        console.error(
+          `Failed to generate image summary for visit ${visit.id}:`,
+          error,
+        );
       }
     }
 
@@ -372,12 +392,17 @@ export async function processAllUsersSummarization(): Promise<{
   let totalImagesSummarized = 0;
 
   for (const userSettings of usersWithSummarization) {
-    const { userId, attentionSummarizationIntervalMs, lastSummarizationCalculatedAt } = userSettings;
+    const {
+      userId,
+      attentionSummarizationIntervalMs,
+      lastSummarizationCalculatedAt,
+    } = userSettings;
     const intervalMs = attentionSummarizationIntervalMs || 60000;
 
     // Check if user's individual interval has elapsed
     if (lastSummarizationCalculatedAt) {
-      const timeSinceLastCalc = now.getTime() - lastSummarizationCalculatedAt.getTime();
+      const timeSinceLastCalc =
+        now.getTime() - lastSummarizationCalculatedAt.getTime();
       if (timeSinceLastCalc < intervalMs) {
         // User's interval hasn't elapsed yet, skip
         skippedIntervalNotElapsed++;
@@ -402,7 +427,10 @@ export async function processAllUsersSummarization(): Promise<{
 
       usersProcessed++;
     } catch (error) {
-      console.error(`Failed to process summarization for user ${userId}:`, error);
+      console.error(
+        `Failed to process summarization for user ${userId}:`,
+        error,
+      );
     }
   }
 

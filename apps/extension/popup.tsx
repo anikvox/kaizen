@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react"
 import { Storage } from "@plasmohq/storage"
+import { Button, Logo, Card, CardContent } from "@kaizen/ui"
+import "./styles.css"
 
 const webUrl = process.env.PLASMO_PUBLIC_KAIZEN_WEB_URL || "http://localhost:60091"
 
@@ -61,34 +63,25 @@ function IndexPopup() {
 
   if (loading) {
     return (
-      <div style={{ padding: 16, minWidth: 300 }}>
-        <h2>Kaizen</h2>
-        <p>Loading...</p>
+      <div className="p-4 min-w-[300px]">
+        <Logo size="md" showText />
+        <p className="text-muted-foreground mt-2">Loading...</p>
       </div>
     )
   }
 
   return (
-    <div style={{ padding: 16, minWidth: 300 }}>
-      <h2>Kaizen</h2>
-      <p style={{ marginBottom: 16 }}>Link this extension to your Kaizen account to get started.</p>
-      {error && <p style={{ color: "red", marginBottom: 8 }}>{error}</p>}
-      <button
-        onClick={handleLinkExtension}
-        style={{
-          width: "100%",
-          padding: "10px 16px",
-          background: "#0070f3",
-          color: "white",
-          border: "none",
-          borderRadius: 6,
-          cursor: "pointer",
-          fontSize: 14,
-          fontWeight: 500
-        }}
-      >
+    <div className="p-4 min-w-[300px]">
+      <Logo size="md" showText className="mb-4" />
+      <p className="text-sm text-muted-foreground mb-4">
+        Link this extension to your Kaizen account to get started.
+      </p>
+      {error && (
+        <p className="text-destructive text-sm mb-2">{error}</p>
+      )}
+      <Button onClick={handleLinkExtension} className="w-full">
         Link Extension
-      </button>
+      </Button>
     </div>
   )
 }

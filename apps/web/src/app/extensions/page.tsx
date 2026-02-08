@@ -2,8 +2,21 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth, SignInButton, useUser } from "@clerk/nextjs";
-import { createApiClient, type DeviceToken, type UnifiedSSEData } from "@kaizen/api-client";
+import {
+  createApiClient,
+  type DeviceToken,
+  type UnifiedSSEData,
+} from "@kaizen/api-client";
 import Link from "next/link";
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Logo,
+} from "@kaizen/ui";
+import { ArrowLeft, Loader2, Chrome, Trash2, Link2, Clock } from "lucide-react";
 
 const apiUrl =
   process.env.NEXT_PUBLIC_KAIZEN_API_URL || "http://localhost:60092";
@@ -80,7 +93,7 @@ export default function Extensions() {
         (error) => {
           console.error("SSE error:", error);
         },
-        token
+        token,
       );
     };
 
@@ -92,7 +105,11 @@ export default function Extensions() {
   }, [isSignedIn, clerkUser, getToken, fetchTokens]);
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to unlink this extension? It will no longer be able to access your account.")) {
+    if (
+      !confirm(
+        "Are you sure you want to unlink this extension? It will no longer be able to access your account.",
+      )
+    ) {
       return;
     }
 
@@ -122,82 +139,116 @@ export default function Extensions() {
 
   if (!isLoaded || loading) {
     return (
-      <main style={{ padding: "2rem" }}>
-        <h1>Linked Extensions</h1>
-        <p>Loading...</p>
+      <main className="min-h-screen bg-background p-8 max-w-6xl mx-auto">
+        <Logo size="md" className="mb-6" />
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span>Loading...</span>
+        </div>
       </main>
     );
   }
 
   if (!isSignedIn) {
     return (
-      <main style={{ padding: "2rem" }}>
-        <h1>Linked Extensions</h1>
-        <p>Sign in to manage your linked extensions.</p>
-        <div style={{ marginTop: "1rem" }}>
-          <SignInButton mode="modal" />
-        </div>
+      <main className="min-h-screen bg-background p-8 max-w-6xl mx-auto">
+        <Logo size="md" className="mb-6" />
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Chrome className="w-5 h-5" />
+              Linked Extensions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-4">
+              Sign in to manage your linked extensions.
+            </p>
+            <SignInButton mode="modal">
+              <Button>Sign In</Button>
+            </SignInButton>
+          </CardContent>
+        </Card>
       </main>
     );
   }
 
   return (
-    <main style={{ padding: "2rem" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-        <h1 style={{ margin: 0 }}>Linked Extensions</h1>
-        <Link href="/" style={{ color: "#666" }}>Back to Home</Link>
+    <main className="min-h-screen bg-background p-8 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <Logo size="md" />
+          <h1 className="text-2xl font-bold">Linked Extensions</h1>
+        </div>
+        <Link
+          href="/"
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Home
+        </Link>
       </div>
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && (
+        <div className="mb-6 p-4 rounded-lg bg-destructive/10 text-destructive">
+          {error}
+        </div>
+      )}
 
       {tokens.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "2rem", background: "#f5f5f5", borderRadius: "8px" }}>
-          <p>No extensions linked to your account.</p>
-          <p style={{ fontSize: "0.9rem", color: "#666" }}>
-            Open the Kaizen Chrome extension and click &quot;Link Extension&quot; to connect it to your account.
-          </p>
-        </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          {tokens.map((token) => (
-            <div
-              key={token.id}
-              style={{
-                padding: "1rem",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <div>
-                <p style={{ margin: 0, fontWeight: "bold" }}>{token.name}</p>
-                <p style={{ margin: "0.25rem 0 0", fontSize: "0.85rem", color: "#666" }}>
-                  Linked: {formatDate(token.createdAt)}
-                </p>
-                {token.lastUsedAt && (
-                  <p style={{ margin: "0.25rem 0 0", fontSize: "0.85rem", color: "#666" }}>
-                    Last used: {formatDate(token.lastUsedAt)}
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={() => handleDelete(token.id)}
-                disabled={deleting === token.id}
-                style={{
-                  background: "#dc3545",
-                  color: "white",
-                  border: "none",
-                  padding: "0.5rem 1rem",
-                  borderRadius: "4px",
-                  cursor: deleting === token.id ? "not-allowed" : "pointer",
-                  opacity: deleting === token.id ? 0.6 : 1,
-                }}
-              >
-                {deleting === token.id ? "Unlinking..." : "Unlink"}
-              </button>
+        <Card>
+          <CardContent className="py-12 text-center">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+              <Link2 className="w-8 h-8 text-muted-foreground" />
             </div>
+            <h2 className="text-lg font-semibold mb-2">No extensions linked</h2>
+            <p className="text-muted-foreground max-w-sm mx-auto">
+              Open the Kaizen Chrome extension and click &quot;Link
+              Extension&quot; to connect it to your account.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {tokens.map((token) => (
+            <Card key={token.id}>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center flex-shrink-0">
+                      <Chrome className="w-5 h-5 text-secondary" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">{token.name}</p>
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                        <Link2 className="w-3 h-3" />
+                        <span>Linked: {formatDate(token.createdAt)}</span>
+                      </div>
+                      {token.lastUsedAt && (
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground mt-0.5">
+                          <Clock className="w-3 h-3" />
+                          <span>Last used: {formatDate(token.lastUsedAt)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => handleDelete(token.id)}
+                    disabled={deleting === token.id}
+                    variant="destructive"
+                    size="sm"
+                    className="gap-2"
+                  >
+                    {deleting === token.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                    {deleting === token.id ? "Unlinking..." : "Unlink"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}

@@ -24,7 +24,9 @@ function getSanitizer(): PiiSanitizer {
 /**
  * Add custom PII patterns to the sanitizer
  */
-export function addAnonymizeRules(patterns: Array<{ name: string; regex: RegExp }>): void {
+export function addAnonymizeRules(
+  patterns: Array<{ name: string; regex: RegExp }>,
+): void {
   sanitizer = new PiiSanitizer({
     replacementTemplate: "[REDACTED:{name}]",
     patterns,

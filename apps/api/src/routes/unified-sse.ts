@@ -101,24 +101,25 @@ app.get("/", async (c) => {
     let id = 0;
 
     // Gather initial state
-    const [settings, focuses, pomodoroStatus, pulses, insights] = await Promise.all([
-      db.userSettings.upsert({
-        where: { userId },
-        update: {},
-        create: {
-          userId,
-          cognitiveAttentionDebugMode: false,
-          cognitiveAttentionShowOverlay: false,
-        },
-      }),
-      db.focus.findMany({
-        where: { userId, isActive: true },
-        orderBy: { startedAt: "desc" },
-      }),
-      getPomodoroStatus(userId),
-      getUserPulses(userId),
-      getUserInsights(userId),
-    ]);
+    const [settings, focuses, pomodoroStatus, pulses, insights] =
+      await Promise.all([
+        db.userSettings.upsert({
+          where: { userId },
+          update: {},
+          create: {
+            userId,
+            cognitiveAttentionDebugMode: false,
+            cognitiveAttentionShowOverlay: false,
+          },
+        }),
+        db.focus.findMany({
+          where: { userId, isActive: true },
+          orderBy: { startedAt: "desc" },
+        }),
+        getPomodoroStatus(userId),
+        getUserPulses(userId),
+        getUserInsights(userId),
+      ]);
 
     // Send initial connection with all state
     await stream.writeSSE({
@@ -134,7 +135,8 @@ app.get("/", async (c) => {
           cognitiveAttentionShowOverlay: settings.cognitiveAttentionShowOverlay,
           attentionTrackingIgnoreList: settings.attentionTrackingIgnoreList,
           attentionSummarizationEnabled: settings.attentionSummarizationEnabled,
-          attentionSummarizationIntervalMs: settings.attentionSummarizationIntervalMs,
+          attentionSummarizationIntervalMs:
+            settings.attentionSummarizationIntervalMs,
           focusCalculationEnabled: settings.focusCalculationEnabled,
           focusCalculationIntervalMs: settings.focusCalculationIntervalMs,
           focusInactivityThresholdMs: settings.focusInactivityThresholdMs,
@@ -190,7 +192,7 @@ app.get("/", async (c) => {
             id: String(id++),
           });
         }
-      })
+      }),
     );
 
     // Focus changed
@@ -207,7 +209,7 @@ app.get("/", async (c) => {
             id: String(id++),
           });
         }
-      })
+      }),
     );
 
     // Pomodoro status changed
@@ -223,7 +225,7 @@ app.get("/", async (c) => {
             id: String(id++),
           });
         }
-      })
+      }),
     );
 
     // Chat session created
@@ -240,7 +242,7 @@ app.get("/", async (c) => {
             id: String(id++),
           });
         }
-      })
+      }),
     );
 
     // Chat session updated
@@ -257,7 +259,7 @@ app.get("/", async (c) => {
             id: String(id++),
           });
         }
-      })
+      }),
     );
 
     // Chat session deleted
@@ -273,7 +275,7 @@ app.get("/", async (c) => {
             id: String(id++),
           });
         }
-      })
+      }),
     );
 
     // Chat message created
@@ -290,7 +292,7 @@ app.get("/", async (c) => {
             id: String(id++),
           });
         }
-      })
+      }),
     );
 
     // Chat message updated
@@ -308,7 +310,7 @@ app.get("/", async (c) => {
             id: String(id++),
           });
         }
-      })
+      }),
     );
 
     // Tool call started
@@ -326,7 +328,7 @@ app.get("/", async (c) => {
             id: String(id++),
           });
         }
-      })
+      }),
     );
 
     // Device token revoked (only relevant for device token auth)
@@ -342,7 +344,7 @@ app.get("/", async (c) => {
             id: String(id++),
           });
         }
-      })
+      }),
     );
 
     // Device list changed
@@ -359,7 +361,7 @@ app.get("/", async (c) => {
             id: String(id++),
           });
         }
-      })
+      }),
     );
 
     // Pulses updated
@@ -379,7 +381,7 @@ app.get("/", async (c) => {
             id: String(id++),
           });
         }
-      })
+      }),
     );
 
     // Insight created
@@ -400,7 +402,7 @@ app.get("/", async (c) => {
             id: String(id++),
           });
         }
-      })
+      }),
     );
 
     // Active tab changed
@@ -418,7 +420,7 @@ app.get("/", async (c) => {
             id: String(id++),
           });
         }
-      })
+      }),
     );
 
     // Keep-alive ping and pomodoro ticks
@@ -428,7 +430,10 @@ app.get("/", async (c) => {
         const currentStatus = await getPomodoroStatus(userId);
 
         // Only send tick if pomodoro is active (running or cooldown)
-        if (currentStatus.state === "running" || currentStatus.state === "cooldown") {
+        if (
+          currentStatus.state === "running" ||
+          currentStatus.state === "cooldown"
+        ) {
           await stream.writeSSE({
             data: JSON.stringify({
               type: "pomodoro-tick",

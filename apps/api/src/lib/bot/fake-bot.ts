@@ -19,7 +19,7 @@ function sleep(ms: number): Promise<void> {
 export class FakeBot implements BotInterface {
   async generateResponse(
     messages: BotMessage[],
-    callbacks: BotCallbacks
+    callbacks: BotCallbacks,
   ): Promise<void> {
     try {
       // Start typing
@@ -29,7 +29,8 @@ export class FakeBot implements BotInterface {
       await sleep(TYPING_DURATION_MS);
 
       // Pick a random response
-      const response = FAKE_RESPONSES[Math.floor(Math.random() * FAKE_RESPONSES.length)];
+      const response =
+        FAKE_RESPONSES[Math.floor(Math.random() * FAKE_RESPONSES.length)];
       const words = response.split(" ");
 
       // Stream words one by one
@@ -45,7 +46,9 @@ export class FakeBot implements BotInterface {
       // Finished
       await callbacks.onFinished(fullContent);
     } catch (error) {
-      await callbacks.onError(error instanceof Error ? error : new Error(String(error)));
+      await callbacks.onError(
+        error instanceof Error ? error : new Error(String(error)),
+      );
     }
   }
 }

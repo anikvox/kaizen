@@ -1,4 +1,12 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+  afterEach,
+} from "vitest";
 import app from "../app.js";
 import { db } from "../lib/index.js";
 import crypto from "crypto";
@@ -196,10 +204,14 @@ describe("Chat API E2E Tests", () => {
       while (elapsed < maxWait && !botFinished) {
         const res = await authFetch(`/chats/${testSessionId}`);
         const data = await res.json();
-        const assistantMessages = data.messages.filter((m: any) => m.role === "assistant");
+        const assistantMessages = data.messages.filter(
+          (m: any) => m.role === "assistant",
+        );
 
         // Check if any bot message is finished
-        const finishedAssistant = assistantMessages.find((m: any) => m.status === "finished");
+        const finishedAssistant = assistantMessages.find(
+          (m: any) => m.status === "finished",
+        );
         if (finishedAssistant) {
           botFinished = true;
           expect(finishedAssistant.content).toBeTruthy();
