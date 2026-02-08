@@ -416,6 +416,17 @@ export type ChatMessageStatus =
  */
 export type ChatAttentionRange = "30m" | "2h" | "1d" | "all";
 
+/**
+ * File attachment for chat messages.
+ * Files are stored as base64 in the database.
+ */
+export interface ChatAttachment {
+  filename: string;
+  mimeType: string;
+  size: number; // Size in bytes (before base64 encoding)
+  data: string; // Base64 encoded file data
+}
+
 export interface ChatMessage {
   id: string;
   role: ChatMessageRole;
@@ -426,6 +437,8 @@ export interface ChatMessage {
   toolCallId?: string | null;
   /** Tool name for tool messages */
   toolName?: string | null;
+  /** File attachments (for user messages) */
+  attachments?: ChatAttachment[] | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -455,6 +468,8 @@ export interface SendMessageRequest {
   sessionId?: string;
   content: string;
   attentionRange?: ChatAttentionRange;
+  /** File attachments (max 5 files, max 5MB each) */
+  attachments?: ChatAttachment[];
 }
 
 export interface SendMessageResponse {

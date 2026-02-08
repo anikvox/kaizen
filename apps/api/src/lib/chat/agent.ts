@@ -1,9 +1,9 @@
 /**
  * Agentic chat implementation using Vercel AI SDK.
- * Supports tool calling with streaming responses.
+ * Supports tool calling with streaming responses and multimodal content (images).
  */
 
-import { streamText, type CoreMessage } from "ai";
+import { streamText, type CoreMessage, type ImagePart, type TextPart } from "ai";
 import type { UserSettings } from "@prisma/client";
 import { createAgentProvider, getAgentModelId } from "../agent/index.js";
 import {
@@ -13,6 +13,16 @@ import {
 } from "../llm/index.js";
 import { createChatTools } from "./tools.js";
 import { db } from "../db.js";
+
+/**
+ * File attachment for chat messages.
+ */
+export interface ChatAttachment {
+  filename: string;
+  mimeType: string;
+  size: number;
+  data: string; // Base64 encoded
+}
 
 /**
  * Build user context section to append to system prompt
@@ -72,6 +82,7 @@ export interface ChatAgentCallbacks {
 export interface ChatAgentMessage {
   role: "user" | "assistant";
   content: string;
+  attachments?: ChatAttachment[];
 }
 
 /**
@@ -97,10 +108,60 @@ export async function runChatAgent(
   const tools = createChatTools(userId);
 
   // Convert messages to CoreMessage format (only user and assistant messages)
-  const coreMessages: CoreMessage[] = messages.map((msg) => ({
-    role: msg.role,
-    content: msg.content,
-  }));
+  // Handle multimodal content for messages with image attachments
+  const coreMessages: CoreMessage[] = messages.map((msg) => {
+    // Check if message has image attachments
+    const imageAttachments = msg.attachments?.filter((a) =>
+      a.mimeType.startsWith("image/"),
+    );
+    const nonImageAttachments = msg.attachments?.filter(
+      (a) => !a.mimeType.startsWith("image/"),
+    );
+
+    // If no attachments, use simple text content
+    if (!msg.attachments || msg.attachments.length === 0) {
+      return {
+        role: msg.role,
+        content: msg.content,
+      };
+    }
+
+    // Build content array for multimodal message
+    const contentParts: (TextPart | ImagePart)[] = [];
+
+    // Add text content first
+    let textContent = msg.content;
+
+    // Add non-image attachment info to text
+    if (nonImageAttachments && nonImageAttachments.length > 0) {
+      const attachmentInfo = nonImageAttachments
+        .map(
+          (a) =>
+            `[Attached file: ${a.filename} (${a.mimeType}, ${(a.size / 1024).toFixed(1)}KB)]`,
+        )
+        .join("\n");
+      textContent = `${textContent}\n\n${attachmentInfo}`;
+    }
+
+    contentParts.push({ type: "text", text: textContent });
+
+    // Add image attachments
+    if (imageAttachments && imageAttachments.length > 0) {
+      for (const img of imageAttachments) {
+        // Create data URL from base64
+        const dataUrl = `data:${img.mimeType};base64,${img.data}`;
+        contentParts.push({
+          type: "image",
+          image: dataUrl,
+        } as ImagePart);
+      }
+    }
+
+    return {
+      role: msg.role,
+      content: contentParts,
+    } as CoreMessage;
+  });
 
   // Fetch prompt from Opik (with local fallback) and get metadata for trace linking
   const promptData = await getPromptWithMetadata(PROMPT_NAMES.CHAT_AGENT);

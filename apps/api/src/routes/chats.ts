@@ -1,10 +1,14 @@
 import { Hono } from "hono";
 import type { UserSettings } from "@prisma/client";
 import { db, events, generateChatTitle, runChatAgent } from "../lib/index.js";
-import type { ChatAgentMessage } from "../lib/index.js";
+import type { ChatAgentMessage, ChatAttachment } from "../lib/index.js";
 
 // Timeout for bot typing state (1 minute)
 const BOT_TYPING_TIMEOUT_MS = 60 * 1000;
+
+// Attachment limits
+const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_ATTACHMENTS_PER_MESSAGE = 5;
 
 // Track active bot responses for timeout handling
 const activeBotResponses = new Map<string, NodeJS.Timeout>();
@@ -146,6 +150,7 @@ app.get("/:sessionId", dualAuthMiddleware, async (c) => {
       errorMessage: m.errorMessage,
       toolCallId: m.toolCallId,
       toolName: m.toolName,
+      attachments: m.attachments || undefined,
       createdAt: m.createdAt.toISOString(),
       updatedAt: m.updatedAt.toISOString(),
     })),
@@ -163,10 +168,34 @@ app.post("/", dualAuthMiddleware, async (c) => {
     sessionId?: string;
     content: string;
     attentionRange?: string;
+    attachments?: ChatAttachment[];
   }>();
 
   if (!body.content?.trim()) {
     return c.json({ error: "Message content is required" }, 400);
+  }
+
+  // Validate attachments if provided
+  const attachments = body.attachments || [];
+  if (attachments.length > MAX_ATTACHMENTS_PER_MESSAGE) {
+    return c.json(
+      { error: `Maximum ${MAX_ATTACHMENTS_PER_MESSAGE} attachments allowed` },
+      400,
+    );
+  }
+
+  for (const attachment of attachments) {
+    if (!attachment.filename || !attachment.mimeType || !attachment.data) {
+      return c.json({ error: "Invalid attachment format" }, 400);
+    }
+    if (attachment.size > MAX_ATTACHMENT_SIZE) {
+      return c.json(
+        {
+          error: `Attachment "${attachment.filename}" exceeds ${MAX_ATTACHMENT_SIZE / 1024 / 1024}MB limit`,
+        },
+        400,
+      );
+    }
   }
 
   let sessionId = body.sessionId;
@@ -211,13 +240,14 @@ app.post("/", dualAuthMiddleware, async (c) => {
     sessionAttentionRange = existingSession.attentionRange || "2h";
   }
 
-  // Create user message
+  // Create user message with attachments
   const userMessage = await db.chatMessage.create({
     data: {
       sessionId,
       role: "user",
       content: body.content.trim(),
       status: "sent",
+      attachments: attachments.length > 0 ? attachments : undefined,
     },
   });
 
@@ -230,6 +260,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
       role: "user",
       content: userMessage.content,
       status: "sent",
+      attachments: attachments.length > 0 ? attachments : undefined,
       createdAt: userMessage.createdAt.toISOString(),
       updatedAt: userMessage.updatedAt.toISOString(),
     },
@@ -303,6 +334,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
     .map((m) => ({
       role: (m.role === "bot" ? "assistant" : m.role) as "user" | "assistant",
       content: m.content,
+      attachments: (m.attachments as ChatAttachment[] | null) || undefined,
     }));
 
   // Fetch user settings for LLM configuration
@@ -338,6 +370,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
       role: "user",
       content: userMessage.content,
       status: "sent",
+      attachments: attachments.length > 0 ? attachments : undefined,
       createdAt: userMessage.createdAt.toISOString(),
       updatedAt: userMessage.updatedAt.toISOString(),
     },

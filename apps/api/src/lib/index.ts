@@ -81,4 +81,8 @@ export type {
 
 // Chat agent exports
 export { runChatAgent } from "./chat/index.js";
-export type { ChatAgentCallbacks, ChatAgentMessage } from "./chat/index.js";
+export type {
+  ChatAgentCallbacks,
+  ChatAgentMessage,
+  ChatAttachment,
+} from "./chat/index.js";
