@@ -188,13 +188,23 @@ function SidePanel() {
     const newValue = !settings[key]
 
     try {
-      await sendToBackground({
-        name: "update-settings",
-        body: { [key]: newValue }
-      })
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Request timeout")), 5000)
+      )
+
+      await Promise.race([
+        sendToBackground({
+          name: "update-settings",
+          body: { [key]: newValue }
+        }),
+        timeoutPromise
+      ])
       setSettings({ ...settings, [key]: newValue })
     } catch (error) {
       console.error("Failed to update setting:", error)
+      // Still update local state on error so UI isn't stuck
+      setSettings({ ...settings, [key]: newValue })
     } finally {
       setSavingSettings(false)
     }
@@ -206,13 +216,23 @@ function SidePanel() {
     setSavingSettings(true)
 
     try {
-      await sendToBackground({
-        name: "update-settings",
-        body: { attentionTrackingIgnoreList: value }
-      })
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Request timeout")), 5000)
+      )
+
+      await Promise.race([
+        sendToBackground({
+          name: "update-settings",
+          body: { attentionTrackingIgnoreList: value }
+        }),
+        timeoutPromise
+      ])
       setSettings({ ...settings, attentionTrackingIgnoreList: value })
     } catch (error) {
       console.error("Failed to update ignore list:", error)
+      // Still update local state on error
+      setSettings({ ...settings, attentionTrackingIgnoreList: value })
     } finally {
       setSavingSettings(false)
     }
