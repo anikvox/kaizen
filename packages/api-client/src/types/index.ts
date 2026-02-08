@@ -610,7 +610,7 @@ export interface QuizHistoryResponse {
 }
 
 // Task Queue Types
-export type TaskType = "focus_calculation" | "quiz_generation" | "summarization" | "image_summarization";
+export type TaskType = "focus_calculation" | "quiz_generation" | "summarization";
 export type TaskStatus = "pending" | "processing" | "completed" | "failed" | "cancelled";
 
 export interface TaskQueueItem {

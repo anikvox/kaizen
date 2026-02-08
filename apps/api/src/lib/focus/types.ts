@@ -104,8 +104,15 @@ export const MAX_KEYWORDS_BEFORE_SUMMARIZATION = 10;
 
 /**
  * Maximum attention window in milliseconds (10 minutes)
+ * Used when there's already an active focus
  */
 export const MAX_ATTENTION_WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * Extended attention window when no active focus exists (1 hour)
+ * Used to provide more context for determining initial focus
+ */
+export const NO_FOCUS_ATTENTION_WINDOW_MS = 60 * 60 * 1000;
 
 /**
  * Minimum text content length to be considered meaningful

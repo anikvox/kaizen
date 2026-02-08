@@ -558,16 +558,3 @@ export async function pushSummarization(
   });
 }
 
-/**
- * Push an image summarization task
- */
-export async function pushImageSummarization(
-  userId: string,
-  imageAttentionIds?: string[]
-): Promise<TaskQueueItem> {
-  return pushTask({
-    userId,
-    type: TASK_TYPES.IMAGE_SUMMARIZATION,
-    payload: { imageAttentionIds },
-  });
-}

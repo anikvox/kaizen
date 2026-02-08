@@ -15,7 +15,6 @@ import {
   pushFocusCalculation,
   pushQuizGeneration,
   pushSummarization,
-  pushImageSummarization,
   getWorkerStatus,
   TASK_TYPES,
   type TaskType,
@@ -268,33 +267,6 @@ app.post("/summarize", dualAuthMiddleware, async (c) => {
     return c.json({ error: "Failed to create task" }, 500);
   }
 });
-
-/**
- * POST /tasks/image-summarize
- * Trigger an image summarization task.
- */
-app.post("/image-summarize", dualAuthMiddleware, async (c) => {
-  const userId = await getUserIdFromContext(c);
-
-  if (!userId) {
-    return c.json({ error: "User not found" }, 404);
-  }
-
-  try {
-    const body = await c.req.json<{ imageAttentionIds?: string[] }>().catch(() => ({} as { imageAttentionIds?: string[] }));
-    const task = await pushImageSummarization(userId, body.imageAttentionIds);
-
-    return c.json({
-      taskId: task.id,
-      status: task.status,
-      type: task.type,
-    });
-  } catch (error) {
-    console.error("[Tasks] Error creating image summarization task:", error);
-    return c.json({ error: "Failed to create task" }, 500);
-  }
-});
-
 
 // ============================================================================
 // Admin/Debug Endpoints

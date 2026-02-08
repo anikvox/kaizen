@@ -246,7 +246,6 @@ async function scheduleRecurringTasks(): Promise<void> {
 
         if (!lastCalc || now.getTime() - lastCalc.getTime() >= interval) {
           await scheduleRecurringTask(settings.userId, TASK_TYPES.SUMMARIZATION);
-          await scheduleRecurringTask(settings.userId, TASK_TYPES.IMAGE_SUMMARIZATION);
         }
       }
     }

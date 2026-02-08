@@ -52,6 +52,50 @@ export function createFocusTools(userId: string, inactivityThresholdMs: number, 
         keywords: z.array(z.string()).describe("Initial keywords for this focus"),
       }),
       execute: async ({ item, keywords }: { item: string; keywords: string[] }) => {
+        // Check for existing active focus with similar item name
+        const existingFocuses = await db.focus.findMany({
+          where: {
+            userId,
+            isActive: true,
+          },
+        });
+
+        // Check for duplicate by comparing item names (case-insensitive)
+        const normalizedItem = item.toLowerCase().trim();
+        const duplicateFocus = existingFocuses.find((f) =>
+          f.item.toLowerCase().trim() === normalizedItem
+        );
+
+        if (duplicateFocus) {
+          // Instead of creating a duplicate, update the existing focus
+          const now = new Date();
+          const mergedKeywords = [...new Set([...keywords, ...duplicateFocus.keywords])].slice(0, 20);
+
+          const updatedFocus = await db.focus.update({
+            where: { id: duplicateFocus.id },
+            data: {
+              keywords: mergedKeywords,
+              lastCalculatedAt: now,
+              lastActivityAt: activityTime,
+            },
+          });
+
+          emitFocusChange(userId, updatedFocus, "updated");
+
+          return {
+            success: true,
+            message: `Found existing focus "${duplicateFocus.item}", updated it instead of creating duplicate`,
+            focus: {
+              id: updatedFocus.id,
+              item: updatedFocus.item,
+              keywords: updatedFocus.keywords,
+              isActive: updatedFocus.isActive,
+              startedAt: updatedFocus.startedAt.toISOString(),
+              lastActivityAt: updatedFocus.lastActivityAt.toISOString(),
+            },
+          };
+        }
+
         const now = new Date();
         // Use the earliest attention time as the start time (when the user actually started focusing)
         // Fall back to now if not provided

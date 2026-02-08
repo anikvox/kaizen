@@ -16,10 +16,7 @@ import {
   getLatestTimestamp,
 } from "../focus/utils.js";
 import { MAX_ATTENTION_WINDOW_MS } from "../focus/types.js";
-import {
-  processUserSummarization,
-  processUserImageSummarization,
-} from "../summarization.js";
+import { processUserSummarization } from "../summarization.js";
 import { generateQuiz } from "../quiz/service.js";
 import { registerTaskHandler } from "./worker.js";
 import {
@@ -28,11 +25,9 @@ import {
   type FocusCalculationResult,
   type QuizGenerationResult,
   type SummarizationResult,
-  type ImageSummarizationResult,
   type FocusCalculationPayload,
   type QuizGenerationPayload,
   type SummarizationPayload,
-  type ImageSummarizationPayload,
 } from "./types.js";
 
 // Cache processed attention hashes to avoid reprocessing
@@ -218,31 +213,6 @@ async function handleSummarization(task: TaskQueueItem): Promise<SummarizationRe
 }
 
 // ============================================================================
-// Image Summarization Handler
-// ============================================================================
-
-async function handleImageSummarization(task: TaskQueueItem): Promise<ImageSummarizationResult> {
-  const { userId } = task;
-  const payload = task.payload as ImageSummarizationPayload;
-
-  // Get user settings to check if enabled
-  const settings = await db.userSettings.findUnique({
-    where: { userId },
-  });
-
-  if (!settings?.attentionSummarizationEnabled && payload.isScheduled) {
-    return { imagesSummarized: 0, skippedOrFailed: 0 };
-  }
-
-  const imagesSummarized = await processUserImageSummarization(userId);
-
-  return {
-    imagesSummarized,
-    skippedOrFailed: 0, // We don't track this separately for now
-  };
-}
-
-// ============================================================================
 // Register All Handlers
 // ============================================================================
 
@@ -250,7 +220,6 @@ export function registerAllHandlers(): void {
   registerTaskHandler(TASK_TYPES.FOCUS_CALCULATION, handleFocusCalculation);
   registerTaskHandler(TASK_TYPES.QUIZ_GENERATION, handleQuizGeneration);
   registerTaskHandler(TASK_TYPES.SUMMARIZATION, handleSummarization);
-  registerTaskHandler(TASK_TYPES.IMAGE_SUMMARIZATION, handleImageSummarization);
 
   console.log("[TaskQueue] All handlers registered");
 }

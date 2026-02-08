@@ -18,7 +18,6 @@ const TASK_TYPE_LABELS: Record<string, string> = {
   focus_calculation: "Focus Calculation",
   quiz_generation: "Quiz Generation",
   summarization: "Summarization",
-  image_summarization: "Image Summarization",
 };
 
 const TASK_STATUS_COLORS: Record<string, string> = {

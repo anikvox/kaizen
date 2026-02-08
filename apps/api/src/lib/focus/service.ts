@@ -12,6 +12,7 @@ import {
 } from "./utils.js";
 import {
   MAX_ATTENTION_WINDOW_MS,
+  NO_FOCUS_ATTENTION_WINDOW_MS,
   type ProcessUserFocusResult,
   type ProcessAllUsersResult,
 } from "./types.js";
@@ -101,12 +102,43 @@ export async function processUserFocus(userId: string): Promise<ProcessUserFocus
       result.inactivityDetected = true;
     }
 
-    // Use user-level marker for attention window
-    const lastCalculatedAt = settings?.lastFocusCalculatedAt || new Date(now.getTime() - MAX_ATTENTION_WINDOW_MS);
+    // Check if user has any active focuses
+    const activeFocuses = await getActiveFocuses(userId);
+    const hasActiveFocus = activeFocuses.length > 0;
 
-    // Fetch attention data only since last calculation
+    let attentionFrom: Date;
+
+    if (hasActiveFocus) {
+      // If there's an active focus, use the standard calculation window
+      attentionFrom = settings?.lastFocusCalculatedAt || new Date(now.getTime() - MAX_ATTENTION_WINDOW_MS);
+    } else {
+      // No active focus - get activity since last focus ended (or all activity if no previous focus)
+      const lastEndedFocus = await db.focus.findFirst({
+        where: {
+          userId,
+          isActive: false,
+          endedAt: { not: null },
+        },
+        orderBy: {
+          endedAt: "desc",
+        },
+        select: {
+          endedAt: true,
+        },
+      });
+
+      if (lastEndedFocus?.endedAt) {
+        // Use the time when the last focus ended
+        attentionFrom = lastEndedFocus.endedAt;
+      } else {
+        // No previous focus - use extended window to get more context for initial focus detection
+        attentionFrom = new Date(now.getTime() - NO_FOCUS_ATTENTION_WINDOW_MS);
+      }
+    }
+
+    // Fetch attention data
     const attentionData = await fetchRawAttentionData(userId, {
-      from: lastCalculatedAt,
+      from: attentionFrom,
       to: now,
     });
 

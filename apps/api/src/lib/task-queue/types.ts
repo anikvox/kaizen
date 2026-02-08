@@ -17,7 +17,6 @@ export const TASK_TYPES = {
   FOCUS_CALCULATION: "focus_calculation",
   QUIZ_GENERATION: "quiz_generation",
   SUMMARIZATION: "summarization",
-  IMAGE_SUMMARIZATION: "image_summarization",
 } as const;
 
 export type TaskType = typeof TASK_TYPES[keyof typeof TASK_TYPES];
@@ -74,18 +73,10 @@ export interface SummarizationPayload {
   visitIds?: string[];
 }
 
-export interface ImageSummarizationPayload {
-  // Whether this is a scheduled recurring task
-  isScheduled?: boolean;
-  // Limit to specific image attention IDs
-  imageAttentionIds?: string[];
-}
-
 export type TaskPayload =
   | FocusCalculationPayload
   | QuizGenerationPayload
-  | SummarizationPayload
-  | ImageSummarizationPayload;
+  | SummarizationPayload;
 
 // ============================================================================
 // Task Results (type-safe output for each task type)
@@ -113,16 +104,10 @@ export interface SummarizationResult {
   skippedNoContent: number;
 }
 
-export interface ImageSummarizationResult {
-  imagesSummarized: number;
-  skippedOrFailed: number;
-}
-
 export type TaskResult =
   | FocusCalculationResult
   | QuizGenerationResult
-  | SummarizationResult
-  | ImageSummarizationResult;
+  | SummarizationResult;
 
 // ============================================================================
 // Task Configuration
@@ -160,13 +145,6 @@ export const TASK_CONFIG: Record<TaskType, TaskTypeConfig> = {
     defaultPriority: TASK_PRIORITY.NORMAL,
     maxAttempts: 3,
     timeoutMs: 60000, // 1 minute
-    allowMultiplePending: false,
-    recurringIntervalMs: 60000, // 1 minute default
-  },
-  [TASK_TYPES.IMAGE_SUMMARIZATION]: {
-    defaultPriority: TASK_PRIORITY.LOW,
-    maxAttempts: 2,
-    timeoutMs: 90000, // 1.5 minutes (image fetching + LLM)
     allowMultiplePending: false,
     recurringIntervalMs: 60000, // 1 minute default
   },

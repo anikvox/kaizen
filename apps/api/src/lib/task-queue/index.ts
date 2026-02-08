@@ -28,7 +28,6 @@ export {
   pushFocusCalculation,
   pushQuizGeneration,
   pushSummarization,
-  pushImageSummarization,
 } from "./service.js";
 
 // Worker

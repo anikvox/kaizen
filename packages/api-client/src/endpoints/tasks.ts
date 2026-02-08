@@ -56,13 +56,6 @@ export class TasksEndpoint {
   }
 
   /**
-   * Trigger an image summarization task.
-   */
-  async triggerImageSummarization(imageAttentionIds?: string[]): Promise<TaskCreatedResponse> {
-    return this.http.post<TaskCreatedResponse>("/tasks/image-summarize", { imageAttentionIds }, true);
-  }
-
-  /**
    * Subscribe to task queue changes via SSE.
    */
   subscribeTasks(
