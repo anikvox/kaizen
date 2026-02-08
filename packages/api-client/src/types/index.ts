@@ -449,6 +449,7 @@ export interface ChatSessionListItem {
 export interface SendMessageRequest {
   sessionId?: string;
   content: string;
+  attentionRange?: ChatAttentionRange;
 }
 
 export interface SendMessageResponse {
