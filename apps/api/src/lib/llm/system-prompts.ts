@@ -14,6 +14,8 @@ export const CHAT_AGENT_SYSTEM_PROMPT = `${CHAT_SYSTEM_PROMPT}
 
 You have access to tools that can help you provide better responses:
 
+NOTE: Avoid over-reliance on tools.
+
 ## Available Tools
 
 ### Context, Time & Location
