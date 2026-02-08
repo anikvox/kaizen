@@ -165,6 +165,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
   const body = await c.req.json<{
     sessionId?: string;
     content: string;
+    attentionRange?: string;
   }>();
 
   if (!body.content?.trim()) {
@@ -173,6 +174,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
 
   let sessionId = body.sessionId;
   let isNewSession = false;
+  let sessionAttentionRange = body.attentionRange || "2h";
 
   // Create new session if not provided
   if (!sessionId) {
@@ -180,6 +182,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
       data: {
         userId,
         title: "New Chat", // Will be updated by bot after first response
+        attentionRange: sessionAttentionRange,
       },
     });
     sessionId = session.id;
@@ -192,13 +195,13 @@ app.post("/", dualAuthMiddleware, async (c) => {
       session: {
         id: session.id,
         title: session.title,
-        attentionRange: "2h", // Default for backwards compatibility
+        attentionRange: sessionAttentionRange,
         createdAt: session.createdAt.toISOString(),
         updatedAt: session.updatedAt.toISOString(),
       },
     });
   } else {
-    // Verify session belongs to user
+    // Verify session belongs to user and get its attention range
     const existingSession = await db.chatSession.findFirst({
       where: { id: sessionId, userId },
     });
@@ -206,6 +209,9 @@ app.post("/", dualAuthMiddleware, async (c) => {
     if (!existingSession) {
       return c.json({ error: "Chat session not found" }, 404);
     }
+
+    // Use the session's stored attention range
+    sessionAttentionRange = existingSession.attentionRange || "2h";
   }
 
   // Create user message
@@ -311,7 +317,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
   // The agent will use tools to get attention data when needed
   // Pass first user message for title generation if this is a new session
   const firstUserMessage = isNewSession ? body.content.trim() : undefined;
-  generateAgentResponse(userId, sessionId, assistantMessage.id, agentMessages, firstUserMessage, userSettings);
+  generateAgentResponse(userId, sessionId, assistantMessage.id, agentMessages, firstUserMessage, userSettings, sessionAttentionRange);
 
   // Update session updatedAt
   await db.chatSession.update({
@@ -379,14 +385,19 @@ async function generateAgentResponse(
   conversationHistory: ChatAgentMessage[],
   firstUserMessage?: string, // If provided, generate title after response
   userSettings?: UserSettings | null,
-  systemPrompt?: string
+  attentionRange?: string // User's selected time range for activity context
 ) {
+  // Build context about the user's selected attention range
+  const attentionRangeContext = attentionRange
+    ? `\n\n## Attention Range Context\nThe user has selected "${attentionRange}" as their attention range for this conversation. When querying browsing activity or attention data, use this time range:\n- "30m" = last 30 minutes\n- "2h" = last 2 hours\n- "1d" = last 24 hours\n- "all" = all available data\n\nUse the appropriate preset or minutes value when calling get_attention_data or similar tools.`
+    : "";
+
   try {
     await runChatAgent(
       userId,
       conversationHistory,
       userSettings || null,
-      systemPrompt,
+      attentionRangeContext || undefined,
       {
         onTextChunk: async (chunk: string, fullContent: string) => {
           // Clear timeout on first chunk

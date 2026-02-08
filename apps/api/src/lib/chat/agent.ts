@@ -67,7 +67,7 @@ export async function runChatAgent(
   userId: string,
   messages: ChatAgentMessage[],
   settings: UserSettings | null,
-  systemPromptOverride?: string,
+  additionalContext?: string,
   callbacks?: ChatAgentCallbacks
 ): Promise<{ content: string; toolCalls: Array<{ id: string; name: string; args: unknown; result: unknown }> }> {
   const provider = createAgentProvider(settings);
@@ -85,7 +85,7 @@ export async function runChatAgent(
 
   // Build user context and append to system prompt
   const userContext = await buildUserContext(userId);
-  const systemPrompt = (systemPromptOverride || promptData.content) + userContext;
+  const systemPrompt = promptData.content + userContext + (additionalContext || "");
 
   // Start trace for this agent run (don't include userId for privacy)
   const trace = startTrace({

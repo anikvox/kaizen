@@ -833,28 +833,13 @@ export function Dashboard({ initialTab }: DashboardProps) {
       {/* Header */}
       <header className="border-b border-border/40 bg-background flex-shrink-0 z-50">
         <div className="max-w-6xl mx-auto px-6">
-          <div className="h-16 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Logo size="md" />
-              <div>
-                <h1 className="text-lg font-semibold text-secondary">
-                  Good {getTimeOfDay()}, {firstName || "there"}
-                </h1>
-                <p className="text-xs text-muted-foreground">{formatDate()}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-xl font-mono font-medium">
-                {time ? new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "--:--"}
-              </span>
-              <div className="flex items-center gap-2">
-                <SignOutButton>
-                  <Button variant="ghost" size="sm" className="w-9 h-9 p-0">
-                    <LogOut className="w-4 h-4" />
-                  </Button>
-                </SignOutButton>
-              </div>
-            </div>
+          <div className="h-14 flex items-center justify-between">
+            <Logo size="md" />
+            <SignOutButton>
+              <Button variant="ghost" size="sm" className="w-9 h-9 p-0">
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </SignOutButton>
           </div>
 
           {/* Tabs */}
@@ -863,11 +848,10 @@ export function Dashboard({ initialTab }: DashboardProps) {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === tab.id
+                className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id
                     ? "border-secondary text-secondary"
                     : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
+                  }`}
               >
                 {tab.label}
               </button>
@@ -883,110 +867,109 @@ export function Dashboard({ initialTab }: DashboardProps) {
             {/* Chat Sidebar */}
             <aside className="w-64 border-r border-border flex flex-col bg-muted/30 flex-shrink-0">
               <div className="p-3 border-b border-border">
-              <Button onClick={handleNewChat} className="w-full gap-2" size="sm">
-                <Plus className="w-4 h-4" />
-                New Chat
-              </Button>
-            </div>
-
-            <div className="flex-1 overflow-auto">
-              {chatSessions.length === 0 ? (
-                <p className="p-4 text-sm text-muted-foreground text-center">No chats yet</p>
-              ) : (
-                chatSessions.map((session) => (
-                  <div
-                    key={session.id}
-                    onClick={() => setActiveChatSessionId(session.id)}
-                    className={`p-3 cursor-pointer flex items-center justify-between border-b border-border/50 hover:bg-muted/50 transition-colors ${
-                      activeChatSessionId === session.id ? "bg-secondary/10" : ""
-                    }`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {session.title || "New Chat"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {session.messageCount} msgs
-                      </p>
-                    </div>
-                    <button
-                      onClick={(e) => handleDeleteChatSession(session.id, e)}
-                      className="p-1 text-muted-foreground hover:text-destructive transition-colors"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </aside>
-
-          {/* Chat Main Area */}
-          <div className="flex-1 flex flex-col min-w-0 min-h-0">
-            {error && (
-              <div className="p-3 px-4 bg-destructive/10 text-destructive text-sm">
-                {error}
+                <Button onClick={handleNewChat} className="w-full gap-2" size="sm">
+                  <Plus className="w-4 h-4" />
+                  New Chat
+                </Button>
               </div>
-            )}
 
-            {/* Messages */}
-            <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
-              {chatMessages.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-center">
-                  <MessageSquare className="w-12 h-12 text-muted-foreground/50 mb-4" />
-                  <p className="text-lg font-medium">Start a conversation</p>
-                  <p className="text-sm text-muted-foreground mb-6">
-                    Select the time range of activity context
-                  </p>
-                  <div className="flex gap-2 flex-wrap justify-center">
-                    {(["30m", "2h", "1d", "all"] as ChatAttentionRange[]).map((range) => (
-                      <Button
-                        key={range}
-                        onClick={() => setSelectedAttentionRange(range)}
-                        variant={selectedAttentionRange === range ? "default" : "outline"}
-                        size="sm"
+              <div className="flex-1 overflow-auto">
+                {chatSessions.length === 0 ? (
+                  <p className="p-4 text-sm text-muted-foreground text-center">No chats yet</p>
+                ) : (
+                  chatSessions.map((session) => (
+                    <div
+                      key={session.id}
+                      onClick={() => setActiveChatSessionId(session.id)}
+                      className={`p-3 cursor-pointer flex items-center justify-between border-b border-border/50 hover:bg-muted/50 transition-colors ${activeChatSessionId === session.id ? "bg-secondary/10" : ""
+                        }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {session.title || "New Chat"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {session.messageCount} msgs
+                        </p>
+                      </div>
+                      <button
+                        onClick={(e) => handleDeleteChatSession(session.id, e)}
+                        className="p-1 text-muted-foreground hover:text-destructive transition-colors"
                       >
-                        {ATTENTION_RANGE_LABELS[range]}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {chatMessages.map((message) => (
-                    <MessageBubble key={message.id} message={message} />
-                  ))}
-                  {pendingToolCalls.map((tool) => (
-                    <PendingToolLine key={tool.toolCallId} toolName={tool.toolName} />
-                  ))}
-                </>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </aside>
 
-            {/* Input */}
-            <div className="p-4 border-t border-border flex gap-2 bg-background">
-              <textarea
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={handleChatKeyDown}
-                placeholder="Type a message..."
-                disabled={chatSending}
-                className="flex-1 p-3 rounded-lg border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-                rows={1}
-              />
-              <Button
-                onClick={handleChatSend}
-                disabled={!chatInput.trim() || chatSending}
-              >
-                {chatSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              </Button>
+            {/* Chat Main Area */}
+            <div className="flex-1 flex flex-col min-w-0 min-h-0">
+              {error && (
+                <div className="p-3 px-4 bg-destructive/10 text-destructive text-sm">
+                  {error}
+                </div>
+              )}
+
+              {/* Messages */}
+              <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
+                {chatMessages.length === 0 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center">
+                    <MessageSquare className="w-12 h-12 text-muted-foreground/50 mb-4" />
+                    <p className="text-lg font-medium">Start a conversation</p>
+                    <p className="text-sm text-muted-foreground mb-6">
+                      Select the time range of activity context
+                    </p>
+                    <div className="flex gap-2 flex-wrap justify-center">
+                      {(["30m", "2h", "1d", "all"] as ChatAttentionRange[]).map((range) => (
+                        <Button
+                          key={range}
+                          onClick={() => setSelectedAttentionRange(range)}
+                          variant={selectedAttentionRange === range ? "default" : "outline"}
+                          size="sm"
+                        >
+                          {ATTENTION_RANGE_LABELS[range]}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {chatMessages.map((message) => (
+                      <MessageBubble key={message.id} message={message} />
+                    ))}
+                    {pendingToolCalls.map((tool) => (
+                      <PendingToolLine key={tool.toolCallId} toolName={tool.toolName} />
+                    ))}
+                  </>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Input */}
+              <div className="p-4 border-t border-border flex gap-2 bg-background">
+                <textarea
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={handleChatKeyDown}
+                  placeholder="Type a message..."
+                  disabled={chatSending}
+                  className="flex-1 p-3 rounded-lg border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+                  rows={1}
+                />
+                <Button
+                  onClick={handleChatSend}
+                  disabled={!chatInput.trim() || chatSending}
+                >
+                  {chatSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                </Button>
+              </div>
             </div>
-          </div>
           </div>
         </div>
       ) : (
-        <div className="flex-1 min-h-0 max-w-6xl mx-auto w-full px-6 py-6">
+        <div className="flex-1 min-h-0 max-w-6xl mx-auto w-full px-6 py-6 pb-12">
           {error && (
             <div className="mb-4 p-4 rounded-xl bg-destructive/10 text-destructive text-sm">
               {error}
@@ -994,13 +977,21 @@ export function Dashboard({ initialTab }: DashboardProps) {
           )}
 
           {activeTab === "dashboard" && (
-            <div className="grid lg:grid-cols-2 gap-4">
+            <div className="space-y-6">
+              {/* Greeting */}
+              <div>
+                <h1 className="text-2xl font-semibold">
+                  Good {getTimeOfDay()}, {firstName || "there"}
+                </h1>
+                <p className="text-sm text-muted-foreground">{formatDate()}</p>
+              </div>
+
+              <div className="grid lg:grid-cols-2 gap-4">
               {/* Left Column */}
               <div className="space-y-4">
                 {/* Focus Card */}
-                <div className={`rounded-2xl border p-6 ${
-                  hasFocus ? "bg-focus/5 border-focus/20" : "bg-card border-border"
-                }`}>
+                <div className={`rounded-2xl border p-6 ${hasFocus ? "bg-focus/5 border-focus/20" : "bg-card border-border"
+                  }`}>
                   {hasFocus ? (
                     <>
                       <div className="flex items-center gap-2 mb-4">
@@ -1039,9 +1030,8 @@ export function Dashboard({ initialTab }: DashboardProps) {
                 </div>
 
                 {/* Attention Progress / Pomodoro */}
-                <div className={`rounded-2xl border p-6 ${
-                  isPomodoroActive ? "bg-pomodoro/5 border-pomodoro/20" : "bg-card border-border"
-                }`}>
+                <div className={`rounded-2xl border p-6 ${isPomodoroActive ? "bg-pomodoro/5 border-pomodoro/20" : "bg-card border-border"
+                  }`}>
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       <TrendingUp className="w-4 h-4 text-muted-foreground" />
@@ -1050,11 +1040,10 @@ export function Dashboard({ initialTab }: DashboardProps) {
                       </span>
                     </div>
                     {isPomodoroActive && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        isRunning ? "bg-pomodoro/20 text-pomodoro" :
-                        isPaused ? "bg-amber-500/20 text-amber-600" :
-                        "bg-cyan-500/20 text-cyan-600"
-                      }`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${isRunning ? "bg-pomodoro/20 text-pomodoro" :
+                          isPaused ? "bg-amber-500/20 text-amber-600" :
+                            "bg-cyan-500/20 text-cyan-600"
+                        }`}>
                         {pomodoroStatus?.state}
                       </span>
                     )}
@@ -1063,11 +1052,10 @@ export function Dashboard({ initialTab }: DashboardProps) {
                   {isPomodoroActive ? (
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className={`text-4xl font-bold font-mono ${
-                          isRunning ? "text-pomodoro" :
-                          isPaused ? "text-amber-500" :
-                          "text-cyan-500"
-                        }`}>
+                        <p className={`text-4xl font-bold font-mono ${isRunning ? "text-pomodoro" :
+                            isPaused ? "text-amber-500" :
+                              "text-cyan-500"
+                          }`}>
                           {formatTime(pomodoroStatus?.elapsedSeconds || 0)}
                         </p>
                         <p className="text-sm text-muted-foreground mt-1">Focus time today</p>
@@ -1132,9 +1120,8 @@ export function Dashboard({ initialTab }: DashboardProps) {
                             {pulses.slice(0, 5).map((_, i) => (
                               <span
                                 key={i}
-                                className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                                  i === pulseIndex ? "bg-amber-500" : "bg-muted"
-                                }`}
+                                className={`w-1.5 h-1.5 rounded-full transition-colors ${i === pulseIndex ? "bg-amber-500" : "bg-muted"
+                                  }`}
                               />
                             ))}
                           </div>
@@ -1203,15 +1190,14 @@ export function Dashboard({ initialTab }: DashboardProps) {
                               key={displayIndex}
                               onClick={() => submitQuizAnswer(displayIndex)}
                               disabled={hasAnswered || submittingAnswer}
-                              className={`w-full p-3 text-left text-sm rounded-lg border transition-all ${
-                                showCorrect
+                              className={`w-full p-3 text-left text-sm rounded-lg border transition-all ${showCorrect
                                   ? "bg-accent/20 border-accent"
                                   : showWrong
                                     ? "bg-destructive/20 border-destructive"
                                     : hasAnswered
                                       ? "bg-muted border-border"
                                       : "bg-muted/50 border-border hover:bg-muted"
-                              }`}
+                                }`}
                             >
                               <div className="flex items-center justify-between">
                                 <span>{option}</span>
@@ -1299,6 +1285,7 @@ export function Dashboard({ initialTab }: DashboardProps) {
                   )}
                 </div>
               </div>
+            </div>
             </div>
           )}
 
@@ -1541,6 +1528,20 @@ export function Dashboard({ initialTab }: DashboardProps) {
           )}
         </div>
       )}
+
+      {/* Status Bar */}
+      <footer className="fixed bottom-0 left-0 right-0 h-8 bg-muted/50 border-t border-border/40 z-40">
+        <div className="max-w-6xl mx-auto px-6 h-full flex items-center">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className={`w-1.5 h-1.5 rounded-full ${time ? "bg-accent" : "bg-muted-foreground"}`} />
+            <span>{time ? "Connected" : "Connecting..."}</span>
+            <span className="text-muted-foreground/50">·</span>
+            <span className="font-medium">
+              {time ? new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "--:--:--"}
+            </span>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
@@ -1576,11 +1577,10 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
   return (
     <div
-      className={`max-w-[80%] px-4 py-3 rounded-xl relative overflow-hidden ${
-        isUser
+      className={`max-w-[80%] px-4 py-3 rounded-xl relative overflow-hidden ${isUser
           ? "self-end bg-primary text-primary-foreground"
           : "self-start bg-muted"
-      }`}
+        }`}
     >
       {message.status === "typing" ? (
         <span className="flex gap-1 py-1">
