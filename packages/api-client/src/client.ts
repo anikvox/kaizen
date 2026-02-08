@@ -14,6 +14,7 @@ import {
   PomodoroEndpoints,
   JourneyEndpoint,
   AgentEndpoints,
+  CognitiveHealthEndpoint,
 } from "./endpoints/index.js";
 import type { ApiClientOptions } from "./types/index.js";
 
@@ -34,6 +35,7 @@ export class ApiClient {
   public pomodoro: PomodoroEndpoints;
   public journey: JourneyEndpoint;
   public agent: AgentEndpoints;
+  public cognitiveHealth: CognitiveHealthEndpoint;
 
   constructor(options: ApiClientOptions) {
     this.http = new HttpClient(options);
@@ -51,6 +53,7 @@ export class ApiClient {
     this.pomodoro = new PomodoroEndpoints(this.http);
     this.journey = new JourneyEndpoint(this.http);
     this.agent = new AgentEndpoints(this.http);
+    this.cognitiveHealth = new CognitiveHealthEndpoint(this.http);
   }
 }
 

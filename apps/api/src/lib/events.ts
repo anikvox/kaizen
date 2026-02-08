@@ -158,6 +158,21 @@ export interface AgentNudgeEvent {
   nudge: AgentNudgeData;
 }
 
+// Health Report Events
+export interface HealthReportProgressData {
+  step: string;
+  message: string;
+  toolName?: string;
+  toolResult?: unknown;
+  timestamp: Date;
+}
+
+export interface HealthReportProgressEvent {
+  userId: string;
+  reportId: string;
+  progress: HealthReportProgressData;
+}
+
 // Pomodoro Events
 export type PomodoroState = "idle" | "running" | "paused" | "cooldown";
 
@@ -381,6 +396,16 @@ class AppEvents extends EventEmitter {
   onAgentNudge(callback: (data: AgentNudgeEvent) => void) {
     this.on("agentNudge", callback);
     return () => this.off("agentNudge", callback);
+  }
+
+  // Health Report Events
+  emitHealthReportProgress(data: HealthReportProgressEvent) {
+    this.emit("healthReportProgress", data);
+  }
+
+  onHealthReportProgress(callback: (data: HealthReportProgressEvent) => void) {
+    this.on("healthReportProgress", callback);
+    return () => this.off("healthReportProgress", callback);
   }
 }
 

@@ -462,6 +462,29 @@ app.get("/", async (c) => {
       })
     );
 
+    // Health report progress
+    cleanups.push(
+      events.onHealthReportProgress(async (data) => {
+        if (data.userId === userId) {
+          await stream.writeSSE({
+            data: JSON.stringify({
+              type: "health-report-progress",
+              reportId: data.reportId,
+              progress: {
+                step: data.progress.step,
+                message: data.progress.message,
+                toolName: data.progress.toolName,
+                toolResult: data.progress.toolResult,
+                timestamp: data.progress.timestamp.toISOString(),
+              },
+            }),
+            event: "message",
+            id: String(id++),
+          });
+        }
+      })
+    );
+
     // Keep-alive ping and pomodoro ticks
     try {
       while (true) {
