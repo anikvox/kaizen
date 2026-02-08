@@ -681,12 +681,21 @@ export type UnifiedSSEEventType =
   | "device-list-changed"
   | "active-tab-changed"
   | "pulses-updated"
+  | "insight-created"
   | "ping";
 
 // Pulse types
 export interface Pulse {
   id: string;
   message: string;
+  createdAt: string;
+}
+
+// Attention Insight types
+export interface AttentionInsight {
+  id: string;
+  message: string;
+  sourceUrl: string | null;
   createdAt: string;
 }
 
@@ -701,6 +710,7 @@ export interface UnifiedSSEConnectedData {
   focuses: Focus[];
   pomodoro: PomodoroStatus;
   pulses: Pulse[];
+  insights: AttentionInsight[];
 }
 
 export interface UnifiedSSESettingsChangedData {
@@ -790,6 +800,11 @@ export interface UnifiedSSEPulsesUpdatedData {
   pulses: Pulse[];
 }
 
+export interface UnifiedSSEInsightCreatedData {
+  type: "insight-created";
+  insight: AttentionInsight;
+}
+
 export interface UnifiedSSEPingData {
   type: "ping";
   time: string;
@@ -811,5 +826,6 @@ export type UnifiedSSEData =
   | UnifiedSSEDeviceListChangedData
   | UnifiedSSEActiveTabChangedData
   | UnifiedSSEPulsesUpdatedData
+  | UnifiedSSEInsightCreatedData
   | UnifiedSSEPingData;
 

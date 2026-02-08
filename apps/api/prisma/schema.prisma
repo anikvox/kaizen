@@ -327,5 +327,17 @@ model Pulse {
   @@map("pulses")
 }
 
+model AttentionInsight {
+  id        String   @id @default(cuid())
+  userId    String
+  message   String   // Short 4-5 word summary like "You're reading about XYZ"
+  sourceUrl String?  // URL where the attention was captured
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@map("attention_insights")
+}
+
 // Note: Background jobs are now managed by pg-boss which creates its own tables in the pgboss schema
 

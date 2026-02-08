@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { db, events } from "../lib/index.js";
 import { deviceAuthMiddleware, type DeviceAuthVariables } from "../middleware/index.js";
 import { generateIndividualImageSummary } from "../lib/summarization.js";
+import { generateInsight } from "../lib/insight/index.js";
 
 const app = new Hono<{ Variables: DeviceAuthVariables }>();
 
@@ -24,6 +25,13 @@ app.post("/text", deviceAuthMiddleware, async (c) => {
       userId,
     },
   });
+
+  // Fire-and-forget insight generation (rate limited to 1 per 30s)
+  generateInsight(userId, {
+    type: "text",
+    url: body.url,
+    content: body.text,
+  }).catch((err) => console.error("[Insight] Text insight error:", err));
 
   return c.json(attention);
 });
@@ -81,6 +89,16 @@ app.post("/image", deviceAuthMiddleware, async (c) => {
       summarizedAt: summary ? new Date() : null,
     },
   });
+
+  // Fire-and-forget insight generation (rate limited to 1 per 30s)
+  const imageContent = summary || body.alt || body.title;
+  if (imageContent) {
+    generateInsight(userId, {
+      type: "image",
+      url: body.url,
+      content: imageContent,
+    }).catch((err) => console.error("[Insight] Image insight error:", err));
+  }
 
   return c.json({ ...attention, summary, kaizenId: body.kaizenId });
 });
@@ -143,6 +161,16 @@ app.post("/youtube", deviceAuthMiddleware, async (c) => {
       userId,
     },
   });
+
+  // Fire-and-forget insight generation for YouTube (rate limited to 1 per 30s)
+  const youtubeContent = body.title || body.caption;
+  if (youtubeContent) {
+    generateInsight(userId, {
+      type: "youtube",
+      url: body.url || `https://youtube.com/watch?v=${body.videoId}`,
+      content: youtubeContent,
+    }).catch((err) => console.error("[Insight] YouTube insight error:", err));
+  }
 
   return c.json(attention);
 });

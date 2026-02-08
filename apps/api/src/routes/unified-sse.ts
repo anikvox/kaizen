@@ -3,6 +3,7 @@ import { streamSSE } from "hono/streaming";
 import { db, events } from "../lib/index.js";
 import { getPomodoroStatus } from "../lib/pomodoro/index.js";
 import { getUserPulses } from "../lib/pulse/index.js";
+import { getUserInsights } from "../lib/insight/index.js";
 
 /**
  * Unified SSE endpoint that combines all real-time streams into a single connection.
@@ -100,7 +101,7 @@ app.get("/", async (c) => {
     let id = 0;
 
     // Gather initial state
-    const [settings, focuses, pomodoroStatus, pulses] = await Promise.all([
+    const [settings, focuses, pomodoroStatus, pulses, insights] = await Promise.all([
       db.userSettings.upsert({
         where: { userId },
         update: {},
@@ -116,6 +117,7 @@ app.get("/", async (c) => {
       }),
       getPomodoroStatus(userId),
       getUserPulses(userId),
+      getUserInsights(userId),
     ]);
 
     // Send initial connection with all state
@@ -160,6 +162,12 @@ app.get("/", async (c) => {
           id: p.id,
           message: p.message,
           createdAt: p.createdAt.toISOString(),
+        })),
+        insights: insights.map((i) => ({
+          id: i.id,
+          message: i.message,
+          sourceUrl: i.sourceUrl,
+          createdAt: i.createdAt.toISOString(),
         })),
       }),
       event: "message",
@@ -366,6 +374,27 @@ app.get("/", async (c) => {
                 message: p.message,
                 createdAt: p.createdAt.toISOString(),
               })),
+            }),
+            event: "message",
+            id: String(id++),
+          });
+        }
+      })
+    );
+
+    // Insight created
+    cleanups.push(
+      events.onInsightCreated(async (data) => {
+        if (data.userId === userId) {
+          await stream.writeSSE({
+            data: JSON.stringify({
+              type: "insight-created",
+              insight: {
+                id: data.insight.id,
+                message: data.insight.message,
+                sourceUrl: data.insight.sourceUrl,
+                createdAt: data.insight.createdAt.toISOString(),
+              },
             }),
             event: "message",
             id: String(id++),
