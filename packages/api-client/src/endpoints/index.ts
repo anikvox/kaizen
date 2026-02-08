@@ -12,3 +12,4 @@ export { QuizEndpoints } from "./quiz.js";
 export { PomodoroEndpoints } from "./pomodoro.js";
 export { JourneyEndpoint } from "./journey.js";
 export { AgentEndpoints } from "./agent.js";
+export { CognitiveHealthEndpoint } from "./cognitive-health.js";

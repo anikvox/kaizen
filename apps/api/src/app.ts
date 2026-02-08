@@ -16,6 +16,7 @@ import {
   unifiedSSERoutes,
   journeyRoutes,
   agentRoutes,
+  cognitiveHealthRoutes,
 } from "./routes/index.js";
 
 const app = new Hono();
@@ -52,5 +53,6 @@ app.route("/quiz", quizRoutes);
 app.route("/pomodoro", pomodoroRoutes);
 app.route("/journey", journeyRoutes);
 app.route("/agent", agentRoutes);
+app.route("/cognitive-health", cognitiveHealthRoutes);
 
 export default app;

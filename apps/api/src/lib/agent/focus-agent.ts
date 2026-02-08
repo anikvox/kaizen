@@ -10,6 +10,7 @@
 import { db } from "../db.js";
 import { createLLMService } from "../llm/service.js";
 import { events } from "../events.js";
+import { getPromptWithMetadata, PROMPT_NAMES } from "../llm/prompt-provider.js";
 
 const ANALYSIS_WINDOW_MS = 15 * 60 * 1000; // Look at last 15 minutes
 const MIN_ACTIVITY_FOR_ANALYSIS = 5; // Need at least 5 attention events to analyze
@@ -302,7 +303,11 @@ async function makeDecision(
   const llmService = createLLMService(settings);
   const provider = llmService.getProvider();
 
-  const prompt = `You are a focus guardian assistant. Analyze the user's recent activity and decide if they need a gentle nudge.
+  // Get centralized prompt
+  const promptData = await getPromptWithMetadata(PROMPT_NAMES.FOCUS_GUARDIAN);
+
+  // Build the context-specific prompt
+  const prompt = `${promptData.content}
 
 RECENT ACTIVITY (last 15 minutes):
 - Domains visited: ${context.recentDomains.join(", ")}
@@ -317,29 +322,7 @@ USER FEEDBACK HISTORY:
 - Total feedback received: ${feedback.totalFeedback}
 - False positive rate: ${(feedback.falsePositiveRate * 100).toFixed(0)}%
 - Acknowledged rate: ${(feedback.acknowledgedRate * 100).toFixed(0)}%
-- Sensitivity setting: ${sensitivity} (0=less nudges, 1=more nudges)
-
-DETECTION PATTERNS:
-1. Doomscrolling: High social media time, rapid switching, low reading time
-2. Distraction: Many domain switches, no focus, short dwell times
-3. Focus drift: Has focus but activity doesn't match focus topics
-4. Break needed: Long session with declining engagement
-
-IMPORTANT GUIDELINES:
-- Be CONSERVATIVE. Only nudge when clearly needed.
-- High false positive rate = be MORE conservative
-- If user is reading deeply, don't interrupt
-- If they have an active focus and seem on-topic, don't nudge
-- Prefer to NOT nudge unless behavior is clearly problematic
-
-Respond with ONLY valid JSON:
-{
-  "shouldNudge": boolean,
-  "nudgeType": "doomscroll" | "distraction" | "break" | "focus_drift" | "encouragement",
-  "message": "A short, friendly message (under 100 chars). Use 'you' not 'the user'",
-  "confidence": 0.0 to 1.0,
-  "reasoning": "Brief explanation of why"
-}`;
+- Sensitivity setting: ${sensitivity} (0=less nudges, 1=more nudges)`;
 
   try {
     const response = await provider.generate({

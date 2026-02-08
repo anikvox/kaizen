@@ -17,6 +17,8 @@ export const PROMPT_NAMES = {
   IMAGE_SUMMARIZATION: "kaizen-image-summarization",
   INDIVIDUAL_IMAGE: "kaizen-individual-image",
   QUIZ_GENERATION: "kaizen-quiz-generation",
+  FOCUS_GUARDIAN: "kaizen-focus-guardian",
+  MENTAL_HEALTH_AGENT: "kaizen-mental-health-agent",
 } as const;
 
 export type PromptName = (typeof PROMPT_NAMES)[keyof typeof PROMPT_NAMES];

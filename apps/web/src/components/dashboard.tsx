@@ -25,6 +25,7 @@ import {
   type JourneySite,
 } from "@kaizen/api-client";
 import { Button, Logo } from "@kaizen/ui";
+import { HealthTab } from "./health-tab";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import {
@@ -60,6 +61,7 @@ import {
   Download,
   Image as ImageIcon,
   RefreshCw,
+  Heart,
 } from "lucide-react";
 
 const PROVIDER_LABELS: Record<LLMProviderType, string> = {
@@ -71,7 +73,7 @@ const PROVIDER_LABELS: Record<LLMProviderType, string> = {
 const apiUrl =
   process.env.NEXT_PUBLIC_KAIZEN_API_URL || "http://localhost:60092";
 
-type TabType = "dashboard" | "focus" | "journey" | "settings" | "chat";
+type TabType = "dashboard" | "focus" | "health" | "journey" | "settings" | "chat";
 
 const ATTENTION_RANGE_LABELS: Record<ChatAttentionRange, string> = {
   "30m": "Last 30 min",
@@ -1028,6 +1030,7 @@ export function Dashboard({ initialTab }: DashboardProps) {
   const tabs = [
     { id: "dashboard" as TabType, label: "Dashboard", icon: LayoutDashboard },
     { id: "focus" as TabType, label: "Focus", icon: Target },
+    { id: "health" as TabType, label: "Health", icon: Heart },
     { id: "journey" as TabType, label: "Journey", icon: History },
     { id: "settings" as TabType, label: "Settings", icon: Settings },
     { id: "chat" as TabType, label: "Chat", icon: MessageSquare },
@@ -1807,6 +1810,10 @@ export function Dashboard({ initialTab }: DashboardProps) {
                 </div>
               )}
             </div>
+          )}
+
+          {activeTab === "health" && (
+            <HealthTab apiUrl={apiUrl} getToken={getToken} />
           )}
 
           {activeTab === "journey" && (

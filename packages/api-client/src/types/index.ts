@@ -719,6 +719,7 @@ export type UnifiedSSEEventType =
   | "pulses-updated"
   | "insight-created"
   | "agent-nudge"
+  | "health-report-progress"
   | "ping";
 
 // Pulse types
@@ -917,6 +918,7 @@ export type UnifiedSSEData =
   | UnifiedSSEPulsesUpdatedData
   | UnifiedSSEInsightCreatedData
   | UnifiedSSEAgentNudgeData
+  | UnifiedSSEHealthReportProgressData
   | UnifiedSSEPingData;
 
 // Journey Types
@@ -988,4 +990,208 @@ export interface JourneyDomainDetailResponse {
   pages: JourneyPage[];
   referrers: JourneySiteReferrer[];
   dailyActivity: JourneyDailyActivity[];
+}
+
+// Cognitive Health Types
+export type CognitiveHealthTimeRange = 7 | 14 | 30 | 90;
+
+export interface DailyActiveMinutes {
+  date: string;
+  activeMinutes: number;
+}
+
+export interface DailyActivityTimes {
+  date: string;
+  firstActivityTime: string | null;
+  lastActivityTime: string | null;
+  firstActivityHour: number | null;
+  lastActivityHour: number | null;
+}
+
+export interface DailyLateNightMinutes {
+  date: string;
+  lateNightMinutes: number;
+}
+
+export interface FragmentationRate {
+  totalVisits: number;
+  fragmentedVisits: number;
+  fragmentationPercentage: number;
+}
+
+export interface DailyFragmentation {
+  date: string;
+  fragmentationPercentage: number;
+}
+
+export interface DailyFocusMinutes {
+  date: string;
+  focusMinutes: number;
+  sessionsCount: number;
+}
+
+export interface LongestFocusBlock {
+  date: string;
+  longestBlockMinutes: number;
+  focusItem: string | null;
+}
+
+export interface NudgeFrequency {
+  date: string;
+  totalNudges: number;
+  doomscrollNudges: number;
+  distractionNudges: number;
+  breakNudges: number;
+  focusDriftNudges: number;
+  encouragementNudges: number;
+}
+
+export interface MediaDiet {
+  youtubeMinutes: number;
+  readingMinutes: number;
+  audioMinutes: number;
+  youtubePercentage: number;
+  readingPercentage: number;
+  audioPercentage: number;
+}
+
+export interface DailyMediaDiet {
+  date: string;
+  youtubeMinutes: number;
+  readingMinutes: number;
+  audioMinutes: number;
+}
+
+export interface AttentionEntropy {
+  entropy: number;
+  topDomains: Array<{ domain: string; percentage: number }>;
+  uniqueDomains: number;
+}
+
+export interface CognitiveHealthMetrics {
+  timeRange: CognitiveHealthTimeRange;
+  averageDailyActiveMinutes: number;
+  activeMinutesTrend: number;
+  dailyActiveMinutes: DailyActiveMinutes[];
+  averageFirstActivityHour: number | null;
+  averageLastActivityHour: number | null;
+  dailyActivityTimes: DailyActivityTimes[];
+  averageLateNightMinutes: number;
+  lateNightTrend: number;
+  dailyLateNightMinutes: DailyLateNightMinutes[];
+  averageFocusMinutes: number;
+  focusTrend: number;
+  dailyFocusMinutes: DailyFocusMinutes[];
+  longestFocusBlocks: LongestFocusBlock[];
+  overallFragmentationRate: FragmentationRate;
+  dailyFragmentation: DailyFragmentation[];
+  averageNudgesPerDay: number;
+  nudgeTrend: number;
+  dailyNudges: NudgeFrequency[];
+  mediaDiet: MediaDiet;
+  dailyMediaDiet: DailyMediaDiet[];
+  attentionEntropy: AttentionEntropy;
+}
+
+export interface CognitiveHealthSummary {
+  timeRange: number;
+  activity: {
+    averageActiveMinutes: number;
+    trend: number;
+    trendLabel: "up" | "down" | "stable";
+  };
+  sleepProxy: {
+    avgFirstActivityHour: number | null;
+    avgLastActivityHour: number | null;
+    lateNightMinutes: number;
+    lateNightTrend: number;
+  };
+  focus: {
+    averageFocusMinutes: number;
+    trend: number;
+    fragmentationRate: number;
+  };
+  nudges: {
+    averagePerDay: number;
+    trend: number;
+    breakdown: {
+      doomscroll: number;
+      distraction: number;
+      break: number;
+      focusDrift: number;
+    };
+  };
+  mediaDiet: {
+    youtube: number;
+    reading: number;
+    audio: number;
+    youtubePercentage: number;
+    readingPercentage: number;
+    audioPercentage: number;
+  };
+  attention: {
+    entropy: number;
+    uniqueDomains: number;
+    topDomains: Array<{ domain: string; percentage: number }>;
+  };
+  quizRetention: {
+    totalQuizzes: number;
+    totalQuestions: number;
+    correctAnswers: number;
+    accuracy: number;
+    trend: number;
+  };
+}
+
+export interface CognitiveHealthNudge {
+  id: string;
+  type: string;
+  message: string;
+  confidence: number;
+  reasoning: string | null;
+  response: string | null;
+  createdAt: string;
+}
+
+export interface ReportGenerationStep {
+  step: string;
+  message: string;
+  toolName?: string;
+  toolResult?: unknown;
+  timestamp: string;
+}
+
+export interface CognitiveHealthReport {
+  id: string;
+  timeRange: CognitiveHealthTimeRange;
+  content: string;
+  generationSteps: ReportGenerationStep[];
+  createdAt: string;
+}
+
+export interface CognitiveHealthMetricsResponse {
+  success: boolean;
+  metrics: CognitiveHealthMetrics;
+}
+
+export interface CognitiveHealthSummaryResponse {
+  success: boolean;
+  summary: CognitiveHealthSummary;
+}
+
+export interface CognitiveHealthNudgesResponse {
+  success: boolean;
+  nudges: CognitiveHealthNudge[];
+}
+
+export interface CognitiveHealthReportResponse {
+  success: boolean;
+  report: CognitiveHealthReport;
+}
+
+// Health Report Progress SSE Event
+export interface UnifiedSSEHealthReportProgressData {
+  type: "health-report-progress";
+  reportId: string;
+  progress: ReportGenerationStep;
 }
