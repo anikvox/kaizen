@@ -26,7 +26,7 @@ export class FocusEndpoints {
     const query = params.toString();
     const url = query ? `/focus?${query}` : "/focus";
 
-    const response = await this.http.get<FocusListResponse>(url);
+    const response = await this.http.get<FocusListResponse>(url, true);
     return response.focuses;
   }
 
@@ -34,7 +34,7 @@ export class FocusEndpoints {
    * Get all current active focuses
    */
   async getActive(): Promise<Focus[]> {
-    const response = await this.http.get<FocusListResponse>("/focus/active");
+    const response = await this.http.get<FocusListResponse>("/focus/active", true);
     return response.focuses;
   }
 
@@ -42,7 +42,7 @@ export class FocusEndpoints {
    * Get a specific focus by ID
    */
   async get(id: string): Promise<Focus | null> {
-    const response = await this.http.get<FocusResponse>(`/focus/${id}`);
+    const response = await this.http.get<FocusResponse>(`/focus/${id}`, true);
     return response.focus;
   }
 
@@ -50,7 +50,7 @@ export class FocusEndpoints {
    * Manually end the current active focus
    */
   async endActive(): Promise<Focus | null> {
-    const response = await this.http.post<FocusResponse>("/focus/end", {});
+    const response = await this.http.post<FocusResponse>("/focus/end", {}, true);
     return response.focus;
   }
 }

@@ -71,7 +71,7 @@ const PROVIDER_LABELS: Record<LLMProviderType, string> = {
 const apiUrl =
   process.env.NEXT_PUBLIC_KAIZEN_API_URL || "http://localhost:60092";
 
-type TabType = "dashboard" | "journey" | "settings" | "chat";
+type TabType = "dashboard" | "focus" | "journey" | "settings" | "chat";
 
 const ATTENTION_RANGE_LABELS: Record<ChatAttentionRange, string> = {
   "30m": "Last 30 min",
@@ -231,6 +231,10 @@ export function Dashboard({ initialTab }: DashboardProps) {
   const [journeyData, setJourneyData] = useState<JourneyResponse | null>(null);
   const [journeyLoading, setJourneyLoading] = useState(false);
   const [journeyDays, setJourneyDays] = useState(7);
+
+  // Focus history state
+  const [focusHistory, setFocusHistory] = useState<Focus[] | null>(null);
+  const [focusHistoryLoading, setFocusHistoryLoading] = useState(false);
 
   // Chat sidebar state
   const [chatSidebarCollapsed, setChatSidebarCollapsed] = useState(false);
@@ -752,6 +756,29 @@ export function Dashboard({ initialTab }: DashboardProps) {
     }
   }, [activeTab, journeyData, journeyLoading, journeyDays, fetchJourneyData]);
 
+  // Focus history data fetch
+  const fetchFocusHistory = useCallback(async () => {
+    setFocusHistoryLoading(true);
+    const api = createApiClient(apiUrl, getTokenFn);
+    try {
+      const focuses = await api.focus.list({ limit: 100, includeActive: true });
+      setFocusHistory(focuses);
+    } catch (err) {
+      console.error("Failed to fetch focus history:", err);
+      // Set empty array on error to prevent infinite retry
+      setFocusHistory([]);
+    } finally {
+      setFocusHistoryLoading(false);
+    }
+  }, [getTokenFn]);
+
+  // Fetch focus history when tab changes
+  useEffect(() => {
+    if (activeTab === "focus" && focusHistory === null && !focusHistoryLoading) {
+      fetchFocusHistory();
+    }
+  }, [activeTab, focusHistory, focusHistoryLoading, fetchFocusHistory]);
+
   // Quiz handlers
   const generateQuiz = async () => {
     setQuizLoading(true);
@@ -1000,6 +1027,7 @@ export function Dashboard({ initialTab }: DashboardProps) {
 
   const tabs = [
     { id: "dashboard" as TabType, label: "Dashboard", icon: LayoutDashboard },
+    { id: "focus" as TabType, label: "Focus", icon: Target },
     { id: "journey" as TabType, label: "Journey", icon: History },
     { id: "settings" as TabType, label: "Settings", icon: Settings },
     { id: "chat" as TabType, label: "Chat", icon: MessageSquare },
@@ -1695,6 +1723,89 @@ export function Dashboard({ initialTab }: DashboardProps) {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeTab === "focus" && (
+            <div className="space-y-6">
+              {/* Focus Header */}
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold">Focus History</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Your detected focus sessions and learning activities
+                  </p>
+                </div>
+                <Button
+                  onClick={fetchFocusHistory}
+                  variant="ghost"
+                  size="sm"
+                  disabled={focusHistoryLoading}
+                  className="w-9 h-9 p-0"
+                >
+                  {focusHistoryLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RotateCcw className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+
+              {/* Loading State */}
+              {focusHistoryLoading && (focusHistory === null || focusHistory.length === 0) && (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                </div>
+              )}
+
+              {/* Active Focus Sessions */}
+              {focusHistory && focusHistory.filter((f) => f.isActive).length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-focus animate-pulse" />
+                    Active Sessions
+                  </h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {focusHistory
+                      .filter((f) => f.isActive)
+                      .map((focus) => (
+                        <FocusCard key={focus.id} focus={focus} />
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Past Focus Sessions */}
+              {focusHistory && focusHistory.filter((f) => !f.isActive).length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium text-muted-foreground">
+                    Past Sessions
+                  </h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {focusHistory
+                      .filter((f) => !f.isActive)
+                      .map((focus) => (
+                        <FocusCard key={focus.id} focus={focus} />
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty State */}
+              {!focusHistoryLoading && focusHistory !== null && focusHistory.length === 0 && (
+                <div className="rounded-2xl border bg-card border-border p-12 text-center">
+                  <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                    <Target className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">
+                    No Focus Sessions Yet
+                  </h3>
+                  <p className="text-muted-foreground text-sm">
+                    Start browsing with the extension enabled to see your
+                    detected focus sessions here.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -2417,5 +2528,138 @@ function StatusIndicator({
     >
       {statusText}
     </span>
+  );
+}
+
+function FocusCard({ focus }: { focus: Focus }) {
+  const startedAt = new Date(focus.startedAt);
+  const endedAt = focus.endedAt ? new Date(focus.endedAt) : null;
+  const lastActivity = new Date(focus.lastActivityAt);
+
+  const duration = endedAt
+    ? endedAt.getTime() - startedAt.getTime()
+    : Date.now() - startedAt.getTime();
+
+  const formatFocusDuration = (ms: number): string => {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) {
+      return `${days}d ${hours % 24}h`;
+    }
+    if (hours > 0) {
+      return `${hours}h ${minutes % 60}m`;
+    }
+    if (minutes > 0) {
+      return `${minutes}m`;
+    }
+    return `${seconds}s`;
+  };
+
+  const formatTimeAgo = (date: Date): string => {
+    const now = Date.now();
+    const diff = now - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `${days}d ago`;
+    if (hours > 0) return `${hours}h ago`;
+    if (minutes > 0) return `${minutes}m ago`;
+    return "just now";
+  };
+
+  return (
+    <div
+      className={`rounded-2xl border p-4 transition-colors ${
+        focus.isActive
+          ? "bg-focus/5 border-focus/30"
+          : "bg-card border-border hover:border-border/80"
+      }`}
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-2">
+          {focus.isActive ? (
+            <div className="w-8 h-8 rounded-lg bg-focus/20 flex items-center justify-center">
+              <Target className="w-4 h-4 text-focus" />
+            </div>
+          ) : (
+            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
+              <Target className="w-4 h-4 text-muted-foreground" />
+            </div>
+          )}
+          <div>
+            {focus.isActive && (
+              <span className="text-[10px] font-medium uppercase tracking-wider text-focus">
+                Active
+              </span>
+            )}
+            <p className="font-semibold text-sm leading-tight">{focus.item}</p>
+          </div>
+        </div>
+        <span className="text-xs text-muted-foreground">
+          {formatFocusDuration(duration)}
+        </span>
+      </div>
+
+      {/* Keywords */}
+      {focus.keywords.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {focus.keywords.slice(0, 5).map((keyword) => (
+            <span
+              key={keyword}
+              className={`px-2 py-0.5 text-xs rounded-full ${
+                focus.isActive
+                  ? "bg-focus/20 text-focus"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {keyword}
+            </span>
+          ))}
+          {focus.keywords.length > 5 && (
+            <span className="px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">
+              +{focus.keywords.length - 5}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Timeline */}
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <div className="flex items-center gap-1">
+          <Clock className="w-3 h-3" />
+          <span>
+            Started{" "}
+            {startedAt.toLocaleDateString([], {
+              month: "short",
+              day: "numeric",
+            })}{" "}
+            at{" "}
+            {startedAt.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+        </div>
+        {focus.isActive ? (
+          <span className="flex items-center gap-1">
+            <Zap className="w-3 h-3 text-focus" />
+            Last active {formatTimeAgo(lastActivity)}
+          </span>
+        ) : (
+          <span>
+            Ended{" "}
+            {endedAt?.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
