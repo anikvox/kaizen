@@ -4,6 +4,8 @@ A privacy-first Chrome extension for personal growth and learning, designed for 
 Kaizen helps you stay focused and retain more of what you consume online — without blocking content or forcing rigid workflows.
 We use [Comet Opik](https://www.comet.com/site/products/opik/) for observability, enabling us to trace prompts, inspect model responses, and continuously improve output quality. Privacy is a core principle, with an option to run inference on a local LLM so your data stays on-device.
 
+We used Claude Code for code generation and all our prompts are available in [./prompts.md](./prompts.md) for transparency and reproducibility.
+
 ## Features
 
 - **Focus Tracking** — Monitor your attention across websites, articles, videos, and audio content
