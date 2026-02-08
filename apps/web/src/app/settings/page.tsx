@@ -4,6 +4,16 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth, SignInButton, useUser } from "@clerk/nextjs";
 import { createApiClient, type UserSettings, type LLMModels, type LLMProviderType, type ModelInfo, type UnifiedSSEData } from "@kaizen/api-client";
 import Link from "next/link";
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Input,
+  Logo,
+} from "@kaizen/ui";
+import { ArrowLeft, Loader2, Check, X, Key, Brain, Timer, HelpCircle, Settings2 } from "lucide-react";
 
 const apiUrl =
   process.env.NEXT_PUBLIC_KAIZEN_API_URL || "http://localhost:60092";
@@ -412,702 +422,545 @@ export default function Settings() {
 
   if (!isLoaded || loading) {
     return (
-      <main style={{ padding: "2rem" }}>
-        <h1>Settings</h1>
-        <p>Loading...</p>
+      <main className="min-h-screen bg-background p-8">
+        <div className="max-w-2xl mx-auto">
+          <Logo size="md" className="mb-6" />
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span>Loading settings...</span>
+          </div>
+        </div>
       </main>
     );
   }
 
   if (!isSignedIn) {
     return (
-      <main style={{ padding: "2rem" }}>
-        <h1>Settings</h1>
-        <p>Sign in to manage your settings.</p>
-        <div style={{ marginTop: "1rem" }}>
-          <SignInButton mode="modal" />
+      <main className="min-h-screen bg-background p-8">
+        <div className="max-w-2xl mx-auto">
+          <Logo size="md" className="mb-6" />
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings2 className="w-5 h-5" />
+                Settings
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground mb-4">Sign in to manage your settings.</p>
+              <SignInButton mode="modal">
+                <Button>Sign In</Button>
+              </SignInButton>
+            </CardContent>
+          </Card>
         </div>
       </main>
     );
   }
 
   return (
-    <main style={{ padding: "2rem", maxWidth: "600px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-        <h1 style={{ margin: 0 }}>Settings</h1>
-        <Link href="/" style={{ color: "#666" }}>Back to Home</Link>
-      </div>
+    <main className="min-h-screen bg-background p-8">
+      <div className="max-w-2xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <Logo size="md" />
+            <h1 className="text-2xl font-bold">Settings</h1>
+          </div>
+          <Link href="/" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft className="w-4 h-4" />
+            Back to Home
+          </Link>
+        </div>
 
-      {error && <p style={{ color: "red", marginBottom: "1rem" }}>{error}</p>}
+        {error && (
+          <div className="mb-6 p-4 rounded-lg bg-destructive/10 text-destructive flex items-center gap-2">
+            <X className="w-4 h-4" />
+            {error}
+          </div>
+        )}
 
-      <section style={{ marginBottom: "2rem" }}>
-        <h2 style={{ fontSize: "1.25rem", marginBottom: "1rem" }}>Cognitive Attention Tracking</h2>
-        <p style={{ color: "#666", fontSize: "0.9rem", marginBottom: "1rem" }}>
-          These settings control the attention tracking behavior in the browser extension.
-          Changes will sync to all linked extensions in real-time.
-        </p>
+        {/* Cognitive Attention Tracking Section */}
+        <section className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Brain className="w-5 h-5 text-secondary" />
+            <h2 className="text-lg font-semibold">Cognitive Attention Tracking</h2>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            These settings control the attention tracking behavior in the browser extension.
+            Changes will sync to all linked extensions in real-time.
+          </p>
 
-        {settings && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            <div
-              style={{
-                padding: "1rem",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <div>
-                <p style={{ margin: 0, fontWeight: "bold" }}>Debug Mode</p>
-                <p style={{ margin: "0.25rem 0 0", fontSize: "0.85rem", color: "#666" }}>
-                  Shows a debug overlay with real-time attention tracking data including
-                  reading progress, top candidates, and scroll velocity.
-                </p>
-              </div>
-              <button
-                onClick={() => handleToggle("cognitiveAttentionDebugMode")}
-                disabled={saving}
-                style={{
-                  background: settings.cognitiveAttentionDebugMode ? "#28a745" : "#6c757d",
-                  color: "white",
-                  border: "none",
-                  padding: "0.5rem 1rem",
-                  borderRadius: "4px",
-                  cursor: saving ? "not-allowed" : "pointer",
-                  opacity: saving ? 0.6 : 1,
-                  minWidth: "60px",
-                }}
-              >
-                {settings.cognitiveAttentionDebugMode ? "ON" : "OFF"}
-              </button>
-            </div>
-
-            <div
-              style={{
-                padding: "1rem",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <div>
-                <p style={{ margin: 0, fontWeight: "bold" }}>Show Overlay</p>
-                <p style={{ margin: "0.25rem 0 0", fontSize: "0.85rem", color: "#666" }}>
-                  Displays visual overlays around text, images, and audio elements
-                  being tracked to show reading progress and attention focus.
-                </p>
-              </div>
-              <button
-                onClick={() => handleToggle("cognitiveAttentionShowOverlay")}
-                disabled={saving}
-                style={{
-                  background: settings.cognitiveAttentionShowOverlay ? "#28a745" : "#6c757d",
-                  color: "white",
-                  border: "none",
-                  padding: "0.5rem 1rem",
-                  borderRadius: "4px",
-                  cursor: saving ? "not-allowed" : "pointer",
-                  opacity: saving ? 0.6 : 1,
-                  minWidth: "60px",
-                }}
-              >
-                {settings.cognitiveAttentionShowOverlay ? "ON" : "OFF"}
-              </button>
-            </div>
-
-            {/* Ignore List */}
-            <div
-              style={{
-                padding: "1rem",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-              }}
-            >
-              <p style={{ margin: 0, fontWeight: "bold" }}>Ignore List</p>
-              <p style={{ margin: "0.25rem 0 0.75rem", fontSize: "0.85rem", color: "#666" }}>
-                URLs to skip from attention tracking. Enter one pattern per line.
-                Supports plain text (substring match), glob patterns (*.example.com),
-                and regex (/pattern/).
-              </p>
-              <textarea
-                value={ignoreListValue}
-                onChange={(e) => {
-                  setIgnoreListValue(e.target.value);
-                  setIgnoreListDirty(true);
-                }}
-                placeholder={"Example patterns:\nexample.com\n*.internal.company.com\n/^https:\\/\\/mail\\.google\\.com/"}
-                disabled={saving}
-                style={{
-                  width: "100%",
-                  padding: "0.5rem",
-                  borderRadius: "4px",
-                  border: "1px solid #ccc",
-                  fontSize: "0.9rem",
-                  fontFamily: "monospace",
-                  resize: "vertical",
-                  minHeight: "100px",
-                  boxSizing: "border-box",
-                }}
-                rows={5}
-              />
-              {ignoreListDirty && (
-                <button
-                  onClick={handleSaveIgnoreList}
-                  disabled={saving}
-                  style={{
-                    marginTop: "0.5rem",
-                    background: "#007bff",
-                    color: "white",
-                    border: "none",
-                    padding: "0.5rem 1rem",
-                    borderRadius: "4px",
-                    cursor: saving ? "not-allowed" : "pointer",
-                    opacity: saving ? 0.6 : 1,
-                  }}
-                >
-                  {saving ? "Saving..." : "Save Ignore List"}
-                </button>
-              )}
-            </div>
-
-            {/* Summarization Settings */}
-            <div
-              style={{
-                padding: "1rem",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-              }}
-            >
-              <div style={{ marginBottom: "1rem" }}>
-                <p style={{ margin: 0, fontWeight: "bold" }}>Auto-Summarization</p>
-                <p style={{ margin: "0.25rem 0 0", fontSize: "0.85rem", color: "#666" }}>
-                  Automatically generate summaries of web pages based on the text you read.
-                  Summaries are generated using your configured AI provider.
-                </p>
-              </div>
-
-              <div>
-                <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: "500" }}>
-                  Summarization Interval
-                </label>
-                <select
-                  value={settings.attentionSummarizationIntervalMs ?? 60000}
-                  onChange={(e) => handleSummarizationIntervalChange(Number(e.target.value))}
-                  disabled={saving}
-                  style={{
-                    width: "100%",
-                    padding: "0.5rem",
-                    borderRadius: "4px",
-                    border: "1px solid #ccc",
-                    fontSize: "0.9rem",
-                    cursor: saving ? "not-allowed" : "pointer",
-                  }}
-                >
-                  <option value={30000}>30 seconds</option>
-                  <option value={60000}>1 minute</option>
-                  <option value={120000}>2 minutes</option>
-                  <option value={300000}>5 minutes</option>
-                  <option value={600000}>10 minutes</option>
-                </select>
-                <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
-                  How often to check for new content to summarize.
-                </p>
-              </div>
-            </div>
-
-            {/* Focus Calculation Settings */}
-            <div
-              style={{
-                padding: "1rem",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-              }}
-            >
-              <div style={{ marginBottom: "1rem" }}>
-                <p style={{ margin: 0, fontWeight: "bold" }}>Focus Detection</p>
-                <p style={{ margin: "0.25rem 0 0", fontSize: "0.85rem", color: "#666" }}>
-                  Automatically detect what you&apos;re focused on based on your browsing activity.
-                  Uses AI to analyze patterns and identify your current area of focus.
-                </p>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                  <div>
-                    <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: "500" }}>
-                      Calculation Interval
-                    </label>
-                    <select
-                      value={settings.focusCalculationIntervalMs ?? 30000}
-                      onChange={(e) => handleFocusIntervalChange(Number(e.target.value))}
+          {settings && (
+            <div className="space-y-4">
+              {/* Debug Mode Toggle */}
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="font-medium">Debug Mode</p>
+                      <p className="text-sm text-muted-foreground">
+                        Shows a debug overlay with real-time attention tracking data including
+                        reading progress, top candidates, and scroll velocity.
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => handleToggle("cognitiveAttentionDebugMode")}
                       disabled={saving}
-                      style={{
-                        width: "100%",
-                        padding: "0.5rem",
-                        borderRadius: "4px",
-                        border: "1px solid #ccc",
-                        fontSize: "0.9rem",
-                        cursor: saving ? "not-allowed" : "pointer",
-                      }}
+                      variant={settings.cognitiveAttentionDebugMode ? "default" : "outline"}
+                      size="sm"
+                      className="min-w-[60px]"
+                    >
+                      {settings.cognitiveAttentionDebugMode ? "ON" : "OFF"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Show Overlay Toggle */}
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="font-medium">Show Overlay</p>
+                      <p className="text-sm text-muted-foreground">
+                        Displays visual overlays around text, images, and audio elements
+                        being tracked to show reading progress and attention focus.
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => handleToggle("cognitiveAttentionShowOverlay")}
+                      disabled={saving}
+                      variant={settings.cognitiveAttentionShowOverlay ? "default" : "outline"}
+                      size="sm"
+                      className="min-w-[60px]"
+                    >
+                      {settings.cognitiveAttentionShowOverlay ? "ON" : "OFF"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Ignore List */}
+              <Card>
+                <CardContent className="pt-4">
+                  <p className="font-medium mb-1">Ignore List</p>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    URLs to skip from attention tracking. Enter one pattern per line.
+                    Supports plain text (substring match), glob patterns (*.example.com),
+                    and regex (/pattern/).
+                  </p>
+                  <textarea
+                    value={ignoreListValue}
+                    onChange={(e) => {
+                      setIgnoreListValue(e.target.value);
+                      setIgnoreListDirty(true);
+                    }}
+                    placeholder={"Example patterns:\nexample.com\n*.internal.company.com\n/^https:\\/\\/mail\\.google\\.com/"}
+                    disabled={saving}
+                    className="w-full p-3 rounded-md border border-input bg-background text-sm font-mono resize-y min-h-[100px] focus:outline-none focus:ring-2 focus:ring-ring"
+                    rows={5}
+                  />
+                  {ignoreListDirty && (
+                    <Button
+                      onClick={handleSaveIgnoreList}
+                      disabled={saving}
+                      className="mt-3"
+                    >
+                      {saving ? "Saving..." : "Save Ignore List"}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Summarization Settings */}
+              <Card>
+                <CardContent className="pt-4">
+                  <p className="font-medium mb-1">Auto-Summarization</p>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Automatically generate summaries of web pages based on the text you read.
+                    Summaries are generated using your configured AI provider.
+                  </p>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Summarization Interval</label>
+                    <select
+                      value={settings.attentionSummarizationIntervalMs ?? 60000}
+                      onChange={(e) => handleSummarizationIntervalChange(Number(e.target.value))}
+                      disabled={saving}
+                      className="w-full p-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     >
                       <option value={30000}>30 seconds</option>
-                      <option value={60000}>1 minute</option>
-                      <option value={120000}>2 minutes</option>
-                      <option value={300000}>5 minutes</option>
-                    </select>
-                    <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
-                      How often to analyze your activity and update focus.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: "500" }}>
-                      Inactivity Threshold
-                    </label>
-                    <select
-                      value={settings.focusInactivityThresholdMs ?? 60000}
-                      onChange={(e) => handleFocusInactivityChange(Number(e.target.value))}
-                      disabled={saving}
-                      style={{
-                        width: "100%",
-                        padding: "0.5rem",
-                        borderRadius: "4px",
-                        border: "1px solid #ccc",
-                        fontSize: "0.9rem",
-                        cursor: saving ? "not-allowed" : "pointer",
-                      }}
-                    >
                       <option value={60000}>1 minute</option>
                       <option value={120000}>2 minutes</option>
                       <option value={300000}>5 minutes</option>
                       <option value={600000}>10 minutes</option>
-                      <option value={900000}>15 minutes</option>
                     </select>
-                    <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
-                      End focus after this period of inactivity.
+                    <p className="text-xs text-muted-foreground mt-2">
+                      How often to check for new content to summarize.
                     </p>
                   </div>
+                </CardContent>
+              </Card>
 
-                  <div>
-                    <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: "500" }}>
-                      Minimum Focus Duration
-                    </label>
-                    <select
-                      value={settings.focusMinDurationMs ?? 30000}
-                      onChange={(e) => handleFocusMinDurationChange(Number(e.target.value))}
-                      disabled={saving}
-                      style={{
-                        width: "100%",
-                        padding: "0.5rem",
-                        borderRadius: "4px",
-                        border: "1px solid #ccc",
-                        fontSize: "0.9rem",
-                        cursor: saving ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      <option value={30000}>30 seconds</option>
-                      <option value={60000}>1 minute</option>
-                      <option value={120000}>2 minutes</option>
-                      <option value={300000}>5 minutes</option>
-                    </select>
-                    <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
-                      Minimum time before detecting a new focus area.
-                    </p>
-                  </div>
-                </div>
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* LLM Settings Section */}
-      <section style={{ marginBottom: "2rem" }}>
-        <h2 style={{ fontSize: "1.25rem", marginBottom: "1rem" }}>AI Chat Settings</h2>
-        <p style={{ color: "#666", fontSize: "0.9rem", marginBottom: "1rem" }}>
-          Configure which AI provider and model to use for chat. Add your API keys first,
-          then select a provider and model.
-        </p>
-
-        {settings && llmModels && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            {/* API Keys Section - First */}
-            <div
-              style={{
-                padding: "1rem",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-              }}
-            >
-              <p style={{ margin: "0 0 0.5rem", fontWeight: "bold" }}>API Keys</p>
-              <p style={{ margin: "0 0 1rem", fontSize: "0.85rem", color: "#666" }}>
-                Add your API keys to enable different providers. Keys are encrypted and stored securely.
-              </p>
-
-              {(Object.keys(PROVIDER_LABELS) as LLMProviderType[]).map((provider) => (
-                <div key={provider} style={{ marginBottom: "1rem" }}>
-                  <label style={{ display: "block", marginBottom: "0.25rem", fontWeight: "500", fontSize: "0.9rem" }}>
-                    {PROVIDER_LABELS[provider]}
-                    {hasApiKey(provider) && (
-                      <span style={{ color: "#28a745", marginLeft: "0.5rem", fontWeight: "normal" }}>
-                        (configured)
-                      </span>
-                    )}
-                  </label>
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
-                    <input
-                      type="password"
-                      placeholder={hasApiKey(provider) ? "••••••••••••••••" : `Enter ${PROVIDER_LABELS[provider]} API key`}
-                      value={apiKeyInputs[provider]}
-                      onChange={(e) => setApiKeyInputs((prev) => ({ ...prev, [provider]: e.target.value }))}
-                      disabled={saving}
-                      style={{
-                        flex: 1,
-                        padding: "0.5rem",
-                        borderRadius: "4px",
-                        border: "1px solid #ccc",
-                        fontSize: "0.9rem",
-                      }}
-                    />
-                    <button
-                      onClick={() => handleApiKeySave(provider)}
-                      disabled={saving || !apiKeyInputs[provider].trim()}
-                      style={{
-                        background: "#007bff",
-                        color: "white",
-                        border: "none",
-                        padding: "0.5rem 1rem",
-                        borderRadius: "4px",
-                        cursor: saving || !apiKeyInputs[provider].trim() ? "not-allowed" : "pointer",
-                        opacity: saving || !apiKeyInputs[provider].trim() ? 0.6 : 1,
-                      }}
-                    >
-                      Save
-                    </button>
-                    {hasApiKey(provider) && (
-                      <button
-                        onClick={() => handleApiKeyClear(provider)}
-                        disabled={saving}
-                        style={{
-                          background: "#dc3545",
-                          color: "white",
-                          border: "none",
-                          padding: "0.5rem 1rem",
-                          borderRadius: "4px",
-                          cursor: saving ? "not-allowed" : "pointer",
-                          opacity: saving ? 0.6 : 1,
-                        }}
-                      >
-                        Clear
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Provider Selection - Only show providers with API keys */}
-            <div
-              style={{
-                padding: "1rem",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-              }}
-            >
-              <p style={{ margin: "0 0 0.5rem", fontWeight: "bold" }}>Active Provider</p>
-              <p style={{ margin: "0 0 0.75rem", fontSize: "0.85rem", color: "#666" }}>
-                Select which provider to use for chat. Only providers with configured API keys are available.
-              </p>
-              <select
-                value={settings.llmProvider || ""}
-                onChange={(e) => handleProviderChange(e.target.value as LLMProviderType | "")}
-                disabled={saving}
-                style={{
-                  width: "100%",
-                  padding: "0.5rem",
-                  borderRadius: "4px",
-                  border: "1px solid #ccc",
-                  fontSize: "1rem",
-                  cursor: saving ? "not-allowed" : "pointer",
-                }}
-              >
-                <option value="">System Default (Gemini)</option>
-                {(Object.keys(PROVIDER_LABELS) as LLMProviderType[])
-                  .filter((provider) => hasApiKey(provider))
-                  .map((provider) => (
-                    <option key={provider} value={provider}>
-                      {PROVIDER_LABELS[provider]}
-                    </option>
-                  ))}
-              </select>
-              {!settings.llmProvider && (
-                <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
-                  Using system Gemini API. Add your own API key above to use a different provider.
-                </p>
-              )}
-            </div>
-
-            {/* Model Selection - Only show when a provider with API key is selected */}
-            {settings.llmProvider && hasApiKey(settings.llmProvider) && (() => {
-              const models = providerModels[settings.llmProvider] || llmModels?.[settings.llmProvider] || [];
-              const isLoadingProviderModels = loadingModels[settings.llmProvider];
-
-              return (
-                <div
-                  style={{
-                    padding: "1rem",
-                    border: "1px solid #ddd",
-                    borderRadius: "8px",
-                  }}
-                >
-                  <p style={{ margin: "0 0 0.5rem", fontWeight: "bold" }}>
-                    Model
-                    {isLoadingProviderModels && (
-                      <span style={{ fontWeight: "normal", color: "#888", marginLeft: "0.5rem" }}>
-                        (loading models...)
-                      </span>
-                    )}
+              {/* Focus Detection Settings */}
+              <Card>
+                <CardContent className="pt-4">
+                  <p className="font-medium mb-1">Focus Detection</p>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Automatically detect what you&apos;re focused on based on your browsing activity.
+                    Uses AI to analyze patterns and identify your current area of focus.
                   </p>
-                  <p style={{ margin: "0 0 0.75rem", fontSize: "0.85rem", color: "#666" }}>
-                    Select the model to use for {PROVIDER_LABELS[settings.llmProvider]}.
-                    {models.length > 0 && ` ${models.length} models available.`}
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Calculation Interval</label>
+                      <select
+                        value={settings.focusCalculationIntervalMs ?? 30000}
+                        onChange={(e) => handleFocusIntervalChange(Number(e.target.value))}
+                        disabled={saving}
+                        className="w-full p-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      >
+                        <option value={30000}>30 seconds</option>
+                        <option value={60000}>1 minute</option>
+                        <option value={120000}>2 minutes</option>
+                        <option value={300000}>5 minutes</option>
+                      </select>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        How often to analyze your activity and update focus.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Inactivity Threshold</label>
+                      <select
+                        value={settings.focusInactivityThresholdMs ?? 60000}
+                        onChange={(e) => handleFocusInactivityChange(Number(e.target.value))}
+                        disabled={saving}
+                        className="w-full p-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      >
+                        <option value={60000}>1 minute</option>
+                        <option value={120000}>2 minutes</option>
+                        <option value={300000}>5 minutes</option>
+                        <option value={600000}>10 minutes</option>
+                        <option value={900000}>15 minutes</option>
+                      </select>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        End focus after this period of inactivity.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Minimum Focus Duration</label>
+                      <select
+                        value={settings.focusMinDurationMs ?? 30000}
+                        onChange={(e) => handleFocusMinDurationChange(Number(e.target.value))}
+                        disabled={saving}
+                        className="w-full p-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      >
+                        <option value={30000}>30 seconds</option>
+                        <option value={60000}>1 minute</option>
+                        <option value={120000}>2 minutes</option>
+                        <option value={300000}>5 minutes</option>
+                      </select>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Minimum time before detecting a new focus area.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </section>
+
+        {/* LLM Settings Section */}
+        <section className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Key className="w-5 h-5 text-secondary" />
+            <h2 className="text-lg font-semibold">AI Chat Settings</h2>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            Configure which AI provider and model to use for chat. Add your API keys first,
+            then select a provider and model.
+          </p>
+
+          {settings && llmModels && (
+            <div className="space-y-4">
+              {/* API Keys Section */}
+              <Card>
+                <CardContent className="pt-4">
+                  <p className="font-medium mb-1">API Keys</p>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Add your API keys to enable different providers. Keys are encrypted and stored securely.
+                  </p>
+
+                  <div className="space-y-4">
+                    {(Object.keys(PROVIDER_LABELS) as LLMProviderType[]).map((provider) => (
+                      <div key={provider}>
+                        <label className="block text-sm font-medium mb-2">
+                          {PROVIDER_LABELS[provider]}
+                          {hasApiKey(provider) && (
+                            <span className="text-accent ml-2 font-normal flex items-center gap-1 inline-flex">
+                              <Check className="w-3 h-3" />
+                              configured
+                            </span>
+                          )}
+                        </label>
+                        <div className="flex gap-2">
+                          <Input
+                            type="password"
+                            placeholder={hasApiKey(provider) ? "••••••••••••••••" : `Enter ${PROVIDER_LABELS[provider]} API key`}
+                            value={apiKeyInputs[provider]}
+                            onChange={(e) => setApiKeyInputs((prev) => ({ ...prev, [provider]: e.target.value }))}
+                            disabled={saving}
+                            className="flex-1"
+                          />
+                          <Button
+                            onClick={() => handleApiKeySave(provider)}
+                            disabled={saving || !apiKeyInputs[provider].trim()}
+                          >
+                            Save
+                          </Button>
+                          {hasApiKey(provider) && (
+                            <Button
+                              onClick={() => handleApiKeyClear(provider)}
+                              disabled={saving}
+                              variant="destructive"
+                            >
+                              Clear
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Provider Selection */}
+              <Card>
+                <CardContent className="pt-4">
+                  <p className="font-medium mb-1">Active Provider</p>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Select which provider to use for chat. Only providers with configured API keys are available.
                   </p>
                   <select
-                    value={settings.llmModel || ""}
-                    onChange={(e) => handleModelChange(e.target.value)}
-                    disabled={saving || isLoadingProviderModels}
-                    style={{
-                      width: "100%",
-                      padding: "0.5rem",
-                      borderRadius: "4px",
-                      border: "1px solid #ccc",
-                      fontSize: "1rem",
-                      cursor: saving || isLoadingProviderModels ? "not-allowed" : "pointer",
-                    }}
+                    value={settings.llmProvider || ""}
+                    onChange={(e) => handleProviderChange(e.target.value as LLMProviderType | "")}
+                    disabled={saving}
+                    className="w-full p-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
-                    {models.map((model) => (
-                      <option key={model.id} value={model.id}>
-                        {model.name}
-                      </option>
-                    ))}
+                    <option value="">System Default (Gemini)</option>
+                    {(Object.keys(PROVIDER_LABELS) as LLMProviderType[])
+                      .filter((provider) => hasApiKey(provider))
+                      .map((provider) => (
+                        <option key={provider} value={provider}>
+                          {PROVIDER_LABELS[provider]}
+                        </option>
+                      ))}
                   </select>
-                  {settings.llmModel && models.length > 0 && (
-                    <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
-                      {models.find((m) => m.id === settings.llmModel)?.description}
+                  {!settings.llmProvider && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Using system Gemini API. Add your own API key above to use a different provider.
                     </p>
                   )}
-                </div>
-              );
-            })()}
+                </CardContent>
+              </Card>
+
+              {/* Model Selection */}
+              {settings.llmProvider && hasApiKey(settings.llmProvider) && (() => {
+                const models = providerModels[settings.llmProvider] || llmModels?.[settings.llmProvider] || [];
+                const isLoadingProviderModels = loadingModels[settings.llmProvider];
+
+                return (
+                  <Card>
+                    <CardContent className="pt-4">
+                      <p className="font-medium mb-1">
+                        Model
+                        {isLoadingProviderModels && (
+                          <span className="font-normal text-muted-foreground ml-2 text-sm">
+                            (loading models...)
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Select the model to use for {PROVIDER_LABELS[settings.llmProvider]}.
+                        {models.length > 0 && ` ${models.length} models available.`}
+                      </p>
+                      <select
+                        value={settings.llmModel || ""}
+                        onChange={(e) => handleModelChange(e.target.value)}
+                        disabled={saving || isLoadingProviderModels}
+                        className="w-full p-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      >
+                        {models.map((model) => (
+                          <option key={model.id} value={model.id}>
+                            {model.name}
+                          </option>
+                        ))}
+                      </select>
+                      {settings.llmModel && models.length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {models.find((m) => m.id === settings.llmModel)?.description}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+            </div>
+          )}
+        </section>
+
+        {/* Pomodoro Settings Section */}
+        <section className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Timer className="w-5 h-5 text-pomodoro" />
+            <h2 className="text-lg font-semibold">Pomodoro Timer</h2>
           </div>
-        )}
-      </section>
+          <p className="text-sm text-muted-foreground mb-4">
+            The Pomodoro timer automatically tracks your focused work time. It starts when focus is detected
+            and continues running even during brief breaks (cooldown period).
+          </p>
 
-      {/* Pomodoro Settings Section */}
-      <section style={{ marginBottom: "2rem" }}>
-        <h2 style={{ fontSize: "1.25rem", marginBottom: "1rem" }}>Pomodoro Timer</h2>
-        <p style={{ color: "#666", fontSize: "0.9rem", marginBottom: "1rem" }}>
-          The Pomodoro timer automatically tracks your focused work time. It starts when focus is detected
-          and continues running even during brief breaks (cooldown period).
-        </p>
+          {settings && (
+            <Card>
+              <CardContent className="pt-4">
+                <label className="block text-sm font-medium mb-2">Cooldown Period</label>
+                <select
+                  value={settings.pomodoroCooldownMs ?? 120000}
+                  onChange={async (e) => {
+                    setSaving(true);
+                    const api = createApiClient(apiUrl, getTokenFn);
+                    try {
+                      const result = await api.settings.update({
+                        pomodoroCooldownMs: Number(e.target.value),
+                      });
+                      setSettings(result);
+                      setError("");
+                    } catch (err) {
+                      console.error("Update pomodoro cooldown error:", err);
+                      setError("Failed to update pomodoro settings");
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  disabled={saving}
+                  className="w-full p-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value={30000}>30 seconds</option>
+                  <option value={60000}>1 minute</option>
+                  <option value={120000}>2 minutes</option>
+                  <option value={180000}>3 minutes</option>
+                  <option value={300000}>5 minutes</option>
+                  <option value={600000}>10 minutes</option>
+                </select>
+                <p className="text-xs text-muted-foreground mt-2">
+                  How long the timer continues running after all focus sessions end.
+                  If you resume work within this time, the timer continues. Otherwise, it resets.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </section>
 
-        {settings && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            <div
-              style={{
-                padding: "1rem",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-              }}
-            >
-              <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: "500" }}>
-                Cooldown Period
-              </label>
-              <select
-                value={settings.pomodoroCooldownMs ?? 120000}
-                onChange={async (e) => {
-                  setSaving(true);
-                  const api = createApiClient(apiUrl, getTokenFn);
-                  try {
-                    const result = await api.settings.update({
-                      pomodoroCooldownMs: Number(e.target.value),
-                    });
-                    setSettings(result);
-                    setError("");
-                  } catch (err) {
-                    console.error("Update pomodoro cooldown error:", err);
-                    setError("Failed to update pomodoro settings");
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-                disabled={saving}
-                style={{
-                  width: "100%",
-                  padding: "0.5rem",
-                  borderRadius: "4px",
-                  border: "1px solid #ccc",
-                  fontSize: "0.9rem",
-                  cursor: saving ? "not-allowed" : "pointer",
-                }}
-              >
-                <option value={30000}>30 seconds</option>
-                <option value={60000}>1 minute</option>
-                <option value={120000}>2 minutes</option>
-                <option value={180000}>3 minutes</option>
-                <option value={300000}>5 minutes</option>
-                <option value={600000}>10 minutes</option>
-              </select>
-              <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
-                How long the timer continues running after all focus sessions end.
-                If you resume work within this time, the timer continues. Otherwise, it resets.
-              </p>
-            </div>
+        {/* Quiz Settings Section */}
+        <section className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <HelpCircle className="w-5 h-5 text-pulse" />
+            <h2 className="text-lg font-semibold">Quiz Settings</h2>
           </div>
-        )}
-      </section>
+          <p className="text-sm text-muted-foreground mb-4">
+            Configure how the daily learning quiz is generated based on your browsing activity.
+          </p>
 
-      {/* Quiz Settings Section */}
-      <section style={{ marginBottom: "2rem" }}>
-        <h2 style={{ fontSize: "1.25rem", marginBottom: "1rem" }}>Quiz Settings</h2>
-        <p style={{ color: "#666", fontSize: "0.9rem", marginBottom: "1rem" }}>
-          Configure how the daily learning quiz is generated based on your browsing activity.
-        </p>
+          {settings && (
+            <div className="space-y-4">
+              <Card>
+                <CardContent className="pt-4">
+                  <label className="block text-sm font-medium mb-2">Answer Options per Question</label>
+                  <select
+                    value={settings.quizAnswerOptionsCount ?? 2}
+                    onChange={async (e) => {
+                      setSaving(true);
+                      const api = createApiClient(apiUrl, getTokenFn);
+                      try {
+                        const result = await api.settings.update({
+                          quizAnswerOptionsCount: Number(e.target.value),
+                        });
+                        setSettings(result);
+                        setError("");
+                      } catch (err) {
+                        console.error("Update quiz options error:", err);
+                        setError("Failed to update quiz settings");
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                    disabled={saving}
+                    className="w-full p-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value={2}>2 options</option>
+                    <option value={3}>3 options</option>
+                    <option value={4}>4 options</option>
+                  </select>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    More options make the quiz harder.
+                  </p>
+                </CardContent>
+              </Card>
 
-        {settings && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            <div
-              style={{
-                padding: "1rem",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-              }}
-            >
-              <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: "500" }}>
-                Answer Options per Question
-              </label>
-              <select
-                value={settings.quizAnswerOptionsCount ?? 2}
-                onChange={async (e) => {
-                  setSaving(true);
-                  const api = createApiClient(apiUrl, getTokenFn);
-                  try {
-                    const result = await api.settings.update({
-                      quizAnswerOptionsCount: Number(e.target.value),
-                    });
-                    setSettings(result);
-                    setError("");
-                  } catch (err) {
-                    console.error("Update quiz options error:", err);
-                    setError("Failed to update quiz settings");
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-                disabled={saving}
-                style={{
-                  width: "100%",
-                  padding: "0.5rem",
-                  borderRadius: "4px",
-                  border: "1px solid #ccc",
-                  fontSize: "0.9rem",
-                  cursor: saving ? "not-allowed" : "pointer",
-                }}
-              >
-                <option value={2}>2 options</option>
-                <option value={3}>3 options</option>
-                <option value={4}>4 options</option>
-              </select>
-              <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
-                More options make the quiz harder.
-              </p>
+              <Card>
+                <CardContent className="pt-4">
+                  <label className="block text-sm font-medium mb-2">Activity Lookback Period</label>
+                  <select
+                    value={settings.quizActivityDays ?? 3}
+                    onChange={async (e) => {
+                      setSaving(true);
+                      const api = createApiClient(apiUrl, getTokenFn);
+                      try {
+                        const result = await api.settings.update({
+                          quizActivityDays: Number(e.target.value),
+                        });
+                        setSettings(result);
+                        setError("");
+                      } catch (err) {
+                        console.error("Update quiz days error:", err);
+                        setError("Failed to update quiz settings");
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                    disabled={saving}
+                    className="w-full p-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value={1}>1 day</option>
+                    <option value={2}>2 days</option>
+                    <option value={3}>3 days</option>
+                    <option value={4}>4 days</option>
+                    <option value={5}>5 days</option>
+                    <option value={6}>6 days</option>
+                    <option value={7}>7 days</option>
+                  </select>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    How many days of browsing activity to use for generating quiz questions.
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Generate Quiz Button */}
+              <Card>
+                <CardContent className="pt-4 text-center">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Ready to test your knowledge? Generate a quiz based on your recent browsing activity.
+                  </p>
+                  <Link href="/quiz">
+                    <Button variant="secondary">Take Quiz</Button>
+                  </Link>
+                </CardContent>
+              </Card>
             </div>
-
-            <div
-              style={{
-                padding: "1rem",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-              }}
-            >
-              <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: "500" }}>
-                Activity Lookback Period
-              </label>
-              <select
-                value={settings.quizActivityDays ?? 3}
-                onChange={async (e) => {
-                  setSaving(true);
-                  const api = createApiClient(apiUrl, getTokenFn);
-                  try {
-                    const result = await api.settings.update({
-                      quizActivityDays: Number(e.target.value),
-                    });
-                    setSettings(result);
-                    setError("");
-                  } catch (err) {
-                    console.error("Update quiz days error:", err);
-                    setError("Failed to update quiz settings");
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-                disabled={saving}
-                style={{
-                  width: "100%",
-                  padding: "0.5rem",
-                  borderRadius: "4px",
-                  border: "1px solid #ccc",
-                  fontSize: "0.9rem",
-                  cursor: saving ? "not-allowed" : "pointer",
-                }}
-              >
-                <option value={1}>1 day</option>
-                <option value={2}>2 days</option>
-                <option value={3}>3 days</option>
-                <option value={4}>4 days</option>
-                <option value={5}>5 days</option>
-                <option value={6}>6 days</option>
-                <option value={7}>7 days</option>
-              </select>
-              <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
-                How many days of browsing activity to use for generating quiz questions.
-              </p>
-            </div>
-
-            {/* Generate Quiz Button */}
-            <div
-              style={{
-                padding: "1rem",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-                textAlign: "center",
-              }}
-            >
-              <p style={{ margin: "0 0 1rem", fontSize: "0.9rem", color: "#666" }}>
-                Ready to test your knowledge? Generate a quiz based on your recent browsing activity.
-              </p>
-              <Link
-                href="/quiz"
-                style={{
-                  display: "inline-block",
-                  padding: "0.75rem 1.5rem",
-                  background: "#007bff",
-                  color: "white",
-                  textDecoration: "none",
-                  borderRadius: "4px",
-                  fontSize: "1rem",
-                  fontWeight: "500",
-                }}
-              >
-                Take Quiz
-              </Link>
-            </div>
-          </div>
-        )}
-      </section>
-
+          )}
+        </section>
+      </div>
     </main>
   );
 }

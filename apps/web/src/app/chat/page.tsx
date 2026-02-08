@@ -15,6 +15,13 @@ import {
 } from "@kaizen/api-client";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
+import {
+  Button,
+  Card,
+  CardContent,
+  Logo,
+} from "@kaizen/ui";
+import { ArrowLeft, Loader2, Plus, Trash2, Send, MessageSquare } from "lucide-react";
 
 const apiUrl =
   process.env.NEXT_PUBLIC_KAIZEN_API_URL || "http://localhost:60092";
@@ -35,7 +42,7 @@ interface PendingToolCall {
 
 export default function ChatPage() {
   return (
-    <Suspense fallback={<main style={{ padding: "2rem", maxWidth: "800px", margin: "0 auto" }}><p>Loading...</p></main>}>
+    <Suspense fallback={<main className="p-8 max-w-3xl mx-auto"><Loader2 className="w-6 h-6 animate-spin" /></main>}>
       <ChatPageContent />
     </Suspense>
   );
@@ -353,63 +360,77 @@ function ChatPageContent() {
 
   if (!isLoaded || loading) {
     return (
-      <main style={styles.container}>
-        <p>Loading...</p>
+      <main className="min-h-screen bg-background p-8 max-w-3xl mx-auto">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span>Loading...</span>
+        </div>
       </main>
     );
   }
 
   if (!isSignedIn) {
     return (
-      <main style={styles.container}>
-        <h1>Chat</h1>
-        <p>Sign in to start chatting.</p>
-        <div style={{ marginTop: "1rem" }}>
-          <SignInButton mode="modal" />
-        </div>
+      <main className="min-h-screen bg-background p-8 max-w-3xl mx-auto">
+        <Logo size="md" className="mb-6" />
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <MessageSquare className="w-5 h-5 text-secondary" />
+              <h1 className="text-xl font-semibold">Chat</h1>
+            </div>
+            <p className="text-muted-foreground mb-4">Sign in to start chatting.</p>
+            <SignInButton mode="modal">
+              <Button>Sign In</Button>
+            </SignInButton>
+          </CardContent>
+        </Card>
       </main>
     );
   }
 
   return (
-    <div style={styles.wrapper}>
+    <div className="flex h-screen bg-background">
       {/* Sidebar */}
-      <aside style={styles.sidebar}>
-        <div style={styles.sidebarHeader}>
-          <h2 style={styles.sidebarTitle}>Chats</h2>
-          <Link href="/" style={styles.backLink}>Home</Link>
+      <aside className="w-72 border-r border-border flex flex-col bg-muted/30">
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Chats</h2>
+          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+            <ArrowLeft className="w-3 h-3" />
+            Home
+          </Link>
         </div>
 
-        <button onClick={handleNewChat} style={styles.newChatButton}>
-          + New Chat
-        </button>
+        <Button onClick={handleNewChat} className="m-4 gap-2">
+          <Plus className="w-4 h-4" />
+          New Chat
+        </Button>
 
-        <div style={styles.sessionList}>
+        <div className="flex-1 overflow-auto">
           {sessions.length === 0 ? (
-            <p style={styles.noSessions}>No chats yet</p>
+            <p className="p-4 text-sm text-muted-foreground text-center">No chats yet</p>
           ) : (
             sessions.map((session) => (
               <div
                 key={session.id}
                 onClick={() => setActiveSessionId(session.id)}
-                style={{
-                  ...styles.sessionItem,
-                  background: activeSessionId === session.id ? "#e3f2fd" : "transparent",
-                }}
+                className={`p-3 cursor-pointer flex items-center justify-between border-b border-border/50 hover:bg-muted/50 transition-colors ${
+                  activeSessionId === session.id ? "bg-secondary/10" : ""
+                }`}
               >
-                <div style={styles.sessionInfo}>
-                  <p style={styles.sessionTitle}>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">
                     {session.title || "New Chat"}
                   </p>
-                  <p style={styles.sessionMeta}>
+                  <p className="text-xs text-muted-foreground">
                     {session.messageCount} messages · {ATTENTION_RANGE_LABELS[session.attentionRange as ChatAttentionRange] || session.attentionRange}
                   </p>
                 </div>
                 <button
                   onClick={(e) => handleDeleteSession(session.id, e)}
-                  style={styles.deleteButton}
+                  className="p-1 text-muted-foreground hover:text-destructive transition-colors"
                 >
-                  ×
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             ))
@@ -418,44 +439,44 @@ function ChatPageContent() {
       </aside>
 
       {/* Main Chat Area */}
-      <main style={styles.main}>
+      <main className="flex-1 flex flex-col min-w-0">
         {/* Chat Header - shows context info for active session */}
         {activeSessionId && (
-          <div style={styles.chatHeader}>
-            <span style={styles.chatHeaderText}>
+          <div className="p-2 px-4 border-b border-border bg-muted/30">
+            <span className="text-xs text-muted-foreground">
               Context: {ATTENTION_RANGE_LABELS[getCurrentAttentionRange()]}
             </span>
           </div>
         )}
 
         {error && (
-          <div style={styles.error}>{error}</div>
+          <div className="p-3 px-4 bg-destructive/10 text-destructive text-sm">
+            {error}
+          </div>
         )}
 
         {/* Messages */}
-        <div style={styles.messagesContainer}>
+        <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
           {messages.length === 0 ? (
-            <div style={styles.emptyState}>
-              <p style={styles.emptyTitle}>Start a conversation</p>
-              <p style={styles.emptySubtitle}>
+            <div className="flex-1 flex flex-col items-center justify-center text-center">
+              <MessageSquare className="w-12 h-12 text-muted-foreground/50 mb-4" />
+              <p className="text-lg font-medium">Start a conversation</p>
+              <p className="text-sm text-muted-foreground mb-6">
                 Select the time range of activity context for your chat
               </p>
-              <div style={styles.rangeSelector}>
+              <div className="flex gap-2 flex-wrap justify-center">
                 {(["30m", "2h", "1d", "all"] as ChatAttentionRange[]).map((range) => (
-                  <button
+                  <Button
                     key={range}
                     onClick={() => setSelectedAttentionRange(range)}
-                    style={{
-                      ...styles.rangeButton,
-                      background: selectedAttentionRange === range ? "#007bff" : "#f0f0f0",
-                      color: selectedAttentionRange === range ? "#fff" : "#333",
-                    }}
+                    variant={selectedAttentionRange === range ? "default" : "outline"}
+                    size="sm"
                   >
                     {ATTENTION_RANGE_LABELS[range]}
-                  </button>
+                  </Button>
                 ))}
               </div>
-              <p style={styles.rangeHint}>
+              <p className="text-xs text-muted-foreground mt-4">
                 The AI will have context about your recent browsing activity
               </p>
             </div>
@@ -473,26 +494,24 @@ function ChatPageContent() {
         </div>
 
         {/* Input */}
-        <div style={styles.inputContainer}>
+        <div className="p-4 border-t border-border flex gap-2 bg-background">
           <textarea
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             disabled={sending}
-            style={styles.input}
+            className="flex-1 p-3 rounded-lg border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
             rows={1}
           />
-          <button
+          <Button
             onClick={handleSend}
             disabled={!inputValue.trim() || sending}
-            style={{
-              ...styles.sendButton,
-              opacity: !inputValue.trim() || sending ? 0.5 : 1,
-            }}
+            className="gap-2"
           >
-            {sending ? "..." : "Send"}
-          </button>
+            {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            Send
+          </Button>
         </div>
       </main>
     </div>
@@ -505,12 +524,10 @@ function ChatPageContent() {
 function PendingToolLine({ toolName }: { toolName: string }) {
   const { loadingText } = getToolDisplayInfo(toolName);
   return (
-    <div style={styles.agentLine}>
-      <span style={styles.agentIcon}>○</span>
-      <span style={{ ...styles.agentText, opacity: 0.7 }}>
-        {loadingText}...
-      </span>
-      <span style={styles.agentSpinner} className="agent-spinner" />
+    <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground self-start">
+      <span className="text-[8px]">○</span>
+      <span className="opacity-70">{loadingText}...</span>
+      <Loader2 className="w-3 h-3 animate-spin" />
     </div>
   );
 }
@@ -526,31 +543,30 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   if (isTool) {
     const text = formatToolResultMessage(message.toolName, message.content);
     return (
-      <div style={styles.agentLine}>
-        <span style={styles.agentIcon}>●</span>
-        <span style={styles.agentText}>{text}</span>
+      <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground self-start">
+        <span className="text-[8px]">●</span>
+        <span>{text}</span>
       </div>
     );
   }
 
   return (
     <div
-      style={{
-        ...styles.messageBubble,
-        alignSelf: isUser ? "flex-end" : "flex-start",
-        background: isUser ? "#007bff" : "#f0f0f0",
-        color: isUser ? "#fff" : "#333",
-      }}
+      className={`max-w-[80%] px-4 py-3 rounded-xl relative overflow-hidden ${
+        isUser
+          ? "self-end bg-primary text-primary-foreground"
+          : "self-start bg-muted"
+      }`}
     >
       {message.status === "typing" ? (
-        <span className="typing-indicator" style={styles.typingIndicator}>
-          <span>●</span>
-          <span>●</span>
-          <span>●</span>
+        <span className="flex gap-1 py-1">
+          <span className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+          <span className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+          <span className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
         </span>
       ) : (
         <>
-          <div style={styles.messageContent}>
+          <div className="text-sm leading-relaxed break-words">
             {isAssistant ? (
               <ReactMarkdown
                 urlTransform={(url) => {
@@ -571,26 +587,12 @@ function MessageBubble({ message }: { message: ChatMessage }) {
                     <img
                       src={src}
                       alt={alt || "Generated image"}
-                      style={{
-                        maxWidth: "100%",
-                        borderRadius: "8px",
-                        marginTop: "0.5rem",
-                      }}
+                      className="max-w-full rounded-lg mt-2"
                     />
                   ),
                   // Custom rendering for code blocks
                   pre: ({ children }) => (
-                    <pre
-                      style={{
-                        background: "#1e1e1e",
-                        color: "#d4d4d4",
-                        padding: "1rem",
-                        borderRadius: "8px",
-                        overflow: "auto",
-                        fontSize: "0.85rem",
-                        margin: "0.5rem 0",
-                      }}
-                    >
+                    <pre className="bg-slate-900 text-slate-200 p-4 rounded-lg overflow-auto text-xs my-2">
                       {children}
                     </pre>
                   ),
@@ -598,18 +600,10 @@ function MessageBubble({ message }: { message: ChatMessage }) {
                   code: ({ children, className }) => {
                     const isBlock = className?.includes("language-");
                     if (isBlock) {
-                      return <code style={{ fontFamily: "monospace" }}>{children}</code>;
+                      return <code className="font-mono">{children}</code>;
                     }
                     return (
-                      <code
-                        style={{
-                          background: "rgba(0,0,0,0.1)",
-                          padding: "0.15rem 0.4rem",
-                          borderRadius: "4px",
-                          fontSize: "0.9em",
-                          fontFamily: "monospace",
-                        }}
-                      >
+                      <code className="bg-black/10 px-1.5 py-0.5 rounded text-[0.9em] font-mono">
                         {children}
                       </code>
                     );
@@ -620,32 +614,25 @@ function MessageBubble({ message }: { message: ChatMessage }) {
                       href={href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ color: "#007bff", textDecoration: "underline" }}
+                      className="text-secondary underline hover:no-underline"
                     >
                       {children}
                     </a>
                   ),
                   // Paragraphs
                   p: ({ children }) => (
-                    <p style={{ margin: "0.5rem 0" }}>{children}</p>
+                    <p className="my-2 first:mt-0 last:mb-0">{children}</p>
                   ),
                   // Lists
                   ul: ({ children }) => (
-                    <ul style={{ margin: "0.5rem 0", paddingLeft: "1.5rem" }}>{children}</ul>
+                    <ul className="my-2 pl-6 list-disc">{children}</ul>
                   ),
                   ol: ({ children }) => (
-                    <ol style={{ margin: "0.5rem 0", paddingLeft: "1.5rem" }}>{children}</ol>
+                    <ol className="my-2 pl-6 list-decimal">{children}</ol>
                   ),
                   // Blockquotes
                   blockquote: ({ children }) => (
-                    <blockquote
-                      style={{
-                        borderLeft: "3px solid #ccc",
-                        margin: "0.5rem 0",
-                        paddingLeft: "1rem",
-                        color: "#666",
-                      }}
-                    >
+                    <blockquote className="border-l-3 border-border my-2 pl-4 text-muted-foreground">
                       {children}
                     </blockquote>
                   ),
@@ -654,14 +641,14 @@ function MessageBubble({ message }: { message: ChatMessage }) {
                 {message.content}
               </ReactMarkdown>
             ) : (
-              <p style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+              <p className="whitespace-pre-wrap break-words">
                 {message.content}
               </p>
             )}
-            {isStreaming && <span style={styles.cursor}>▊</span>}
+            {isStreaming && <span className="animate-pulse ml-0.5">▊</span>}
           </div>
           {isError && message.errorMessage && (
-            <p style={styles.errorMessage}>
+            <p className="mt-2 text-xs text-destructive">
               Error: {message.errorMessage}
             </p>
           )}
@@ -688,258 +675,11 @@ function StatusIndicator({ status, isAssistant }: { status: ChatMessageStatus; i
 
   return (
     <span
-      style={{
-        ...styles.statusIndicator,
-        color: status === "error" ? "#dc3545" : "#666",
-      }}
+      className={`block mt-1 text-[10px] ${
+        status === "error" ? "text-destructive" : "text-muted-foreground"
+      }`}
     >
       {statusText}
     </span>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  wrapper: {
-    display: "flex",
-    height: "100vh",
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-  },
-  container: {
-    padding: "2rem",
-    maxWidth: "800px",
-    margin: "0 auto",
-  },
-  sidebar: {
-    width: "280px",
-    borderRight: "1px solid #e0e0e0",
-    display: "flex",
-    flexDirection: "column",
-    background: "#fafafa",
-  },
-  sidebarHeader: {
-    padding: "1rem",
-    borderBottom: "1px solid #e0e0e0",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  sidebarTitle: {
-    margin: 0,
-    fontSize: "1.25rem",
-    fontWeight: 600,
-  },
-  backLink: {
-    fontSize: "0.85rem",
-    color: "#666",
-    textDecoration: "none",
-  },
-  newChatButton: {
-    margin: "1rem",
-    padding: "0.75rem",
-    background: "#007bff",
-    color: "#fff",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontSize: "0.9rem",
-    fontWeight: 500,
-  },
-  sessionList: {
-    flex: 1,
-    overflow: "auto",
-  },
-  noSessions: {
-    padding: "1rem",
-    color: "#666",
-    fontSize: "0.9rem",
-    textAlign: "center",
-  },
-  sessionItem: {
-    padding: "0.75rem 1rem",
-    cursor: "pointer",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderBottom: "1px solid #eee",
-  },
-  sessionInfo: {
-    flex: 1,
-    minWidth: 0,
-  },
-  sessionTitle: {
-    margin: 0,
-    fontSize: "0.9rem",
-    fontWeight: 500,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
-  sessionMeta: {
-    margin: "0.25rem 0 0",
-    fontSize: "0.75rem",
-    color: "#666",
-  },
-  deleteButton: {
-    background: "transparent",
-    border: "none",
-    fontSize: "1.25rem",
-    color: "#999",
-    cursor: "pointer",
-    padding: "0.25rem 0.5rem",
-    lineHeight: 1,
-  },
-  main: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    minWidth: 0,
-  },
-  chatHeader: {
-    padding: "0.5rem 1rem",
-    borderBottom: "1px solid #e0e0e0",
-    background: "#f8f9fa",
-  },
-  chatHeaderText: {
-    fontSize: "0.8rem",
-    color: "#666",
-  },
-  error: {
-    padding: "0.75rem 1rem",
-    background: "#fee",
-    color: "#c00",
-    fontSize: "0.9rem",
-  },
-  messagesContainer: {
-    flex: 1,
-    overflow: "auto",
-    padding: "1rem",
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
-  },
-  emptyState: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    color: "#666",
-  },
-  emptyTitle: {
-    margin: 0,
-    fontSize: "1.25rem",
-    fontWeight: 500,
-  },
-  emptySubtitle: {
-    margin: "0.5rem 0 0",
-    fontSize: "0.9rem",
-  },
-  rangeSelector: {
-    display: "flex",
-    gap: "0.5rem",
-    marginTop: "1.5rem",
-    flexWrap: "wrap",
-    justifyContent: "center",
-  },
-  rangeButton: {
-    padding: "0.5rem 1rem",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontSize: "0.85rem",
-    fontWeight: 500,
-    transition: "all 0.2s",
-  },
-  rangeHint: {
-    marginTop: "1rem",
-    fontSize: "0.8rem",
-    color: "#888",
-  },
-  messageBubble: {
-    maxWidth: "80%",
-    padding: "0.75rem 1rem",
-    borderRadius: "12px",
-    position: "relative",
-    overflow: "hidden",
-  },
-  messageContent: {
-    margin: 0,
-    wordBreak: "break-word",
-    lineHeight: 1.5,
-    fontSize: "0.95rem",
-  },
-  cursor: {
-    animation: "blink 1s infinite",
-    marginLeft: "2px",
-  },
-  typingIndicator: {
-    display: "flex",
-    gap: "4px",
-    padding: "0.25rem 0",
-  },
-  errorMessage: {
-    margin: "0.5rem 0 0",
-    fontSize: "0.8rem",
-    color: "#dc3545",
-  },
-  statusIndicator: {
-    display: "block",
-    marginTop: "0.25rem",
-    fontSize: "0.7rem",
-  },
-  agentLine: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    padding: "0.25rem 0.5rem",
-    margin: "0.125rem 0",
-    fontSize: "0.8rem",
-    color: "#666",
-    alignSelf: "flex-start",
-  } as React.CSSProperties,
-  agentIcon: {
-    fontSize: "0.5rem",
-    color: "#999",
-    lineHeight: 1,
-  } as React.CSSProperties,
-  agentText: {
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-    fontSize: "0.8rem",
-    color: "#666",
-  } as React.CSSProperties,
-  agentSpinner: {
-    width: "10px",
-    height: "10px",
-    border: "1.5px solid #ccc",
-    borderTopColor: "#666",
-    borderRadius: "50%",
-    animation: "spin 0.8s linear infinite",
-  } as React.CSSProperties,
-  inputContainer: {
-    padding: "1rem",
-    borderTop: "1px solid #e0e0e0",
-    display: "flex",
-    gap: "0.5rem",
-    background: "#fff",
-  },
-  input: {
-    flex: 1,
-    padding: "0.75rem",
-    border: "1px solid #ddd",
-    borderRadius: "8px",
-    fontSize: "0.95rem",
-    resize: "none",
-    outline: "none",
-    fontFamily: "inherit",
-  },
-  sendButton: {
-    padding: "0.75rem 1.5rem",
-    background: "#007bff",
-    color: "#fff",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontSize: "0.9rem",
-    fontWeight: 500,
-  },
-};

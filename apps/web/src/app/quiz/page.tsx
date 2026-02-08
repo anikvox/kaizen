@@ -4,6 +4,16 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useAuth, SignInButton, useUser } from "@clerk/nextjs";
 import { createApiClient, type QuizWithAnswers } from "@kaizen/api-client";
 import Link from "next/link";
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Logo,
+  Badge,
+} from "@kaizen/ui";
+import { ArrowLeft, Loader2, HelpCircle, Check, X, RotateCcw, Trophy } from "lucide-react";
 
 const apiUrl =
   process.env.NEXT_PUBLIC_KAIZEN_API_URL || "http://localhost:60092";
@@ -216,18 +226,33 @@ export default function QuizPage() {
 
   if (!isLoaded) {
     return (
-      <main style={{ padding: "2rem", maxWidth: "600px", margin: "0 auto" }}>
-        <p>Loading...</p>
+      <main className="min-h-screen bg-background p-8 max-w-xl mx-auto">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span>Loading...</span>
+        </div>
       </main>
     );
   }
 
   if (!isSignedIn) {
     return (
-      <main style={{ padding: "2rem", maxWidth: "600px", margin: "0 auto" }}>
-        <h1>Daily Quiz</h1>
-        <p>Sign in to take your quiz.</p>
-        <SignInButton mode="modal" />
+      <main className="min-h-screen bg-background p-8 max-w-xl mx-auto">
+        <Logo size="md" className="mb-6" />
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <HelpCircle className="w-5 h-5 text-pulse" />
+              Daily Quiz
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-4">Sign in to take your quiz.</p>
+            <SignInButton mode="modal">
+              <Button>Sign In</Button>
+            </SignInButton>
+          </CardContent>
+        </Card>
       </main>
     );
   }
@@ -235,121 +260,198 @@ export default function QuizPage() {
   const currentQuestion = quiz?.questions[currentIndex];
 
   return (
-    <main style={{ padding: "2rem", maxWidth: "600px", margin: "0 auto" }}>
-      <div style={{ marginBottom: "1rem" }}>
-        <Link href="/">← Home</Link>
+    <main className="min-h-screen bg-background p-8 max-w-xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <Logo size="md" />
+        </div>
+        <Link href="/" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft className="w-4 h-4" />
+          Home
+        </Link>
       </div>
 
       {error && (
-        <div style={{ padding: "1rem", background: "#fee", color: "#c00", marginBottom: "1rem", borderRadius: "4px" }}>
-          {error}
+        <div className="mb-6 p-4 rounded-lg bg-destructive/10 text-destructive flex items-center gap-2">
+          <X className="w-4 h-4 flex-shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
-      {quizState === "loading" && <p>Loading quiz...</p>}
+      {quizState === "loading" && (
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span>Loading quiz...</span>
+        </div>
+      )}
 
       {quizState === "idle" && (
-        <div>
-          <h1>Daily Quiz</h1>
-          <p>Test your knowledge based on your recent browsing.</p>
-          <button onClick={generateQuiz} style={{ padding: "0.5rem 1rem", cursor: "pointer" }}>
-            Generate Quiz
-          </button>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <HelpCircle className="w-5 h-5 text-pulse" />
+              Daily Quiz
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-6">
+              Test your knowledge based on your recent browsing activity.
+            </p>
+            <Button onClick={generateQuiz} className="gap-2">
+              <HelpCircle className="w-4 h-4" />
+              Generate Quiz
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       {quizState === "generating" && (
-        <div>
-          <h1>Daily Quiz</h1>
-          <p>Generating your quiz...</p>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <HelpCircle className="w-5 h-5 text-pulse" />
+              Daily Quiz
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-center py-8">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-secondary" />
+            <p className="text-muted-foreground">Generating your quiz...</p>
+          </CardContent>
+        </Card>
       )}
 
       {quizState === "error" && (
-        <div>
-          <h1>Daily Quiz</h1>
-          <button onClick={generateQuiz} style={{ padding: "0.5rem 1rem", cursor: "pointer" }}>
-            Try Again
-          </button>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <HelpCircle className="w-5 h-5 text-pulse" />
+              Daily Quiz
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-center py-8">
+            <Button onClick={generateQuiz} variant="outline" className="gap-2">
+              <RotateCcw className="w-4 h-4" />
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       {quizState === "active" && quiz && currentQuestion && shuffledOptions && (
-        <div>
-          <div style={{ marginBottom: "1rem", color: "#666" }}>
-            Question {currentIndex + 1} of {quiz.questions.length} ({quiz.answers.length} answered)
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Badge variant="secondary">
+              Question {currentIndex + 1} of {quiz.questions.length}
+            </Badge>
+            <span className="text-sm text-muted-foreground">
+              {quiz.answers.length} answered
+            </span>
           </div>
 
-          <div style={{ padding: "1rem", border: "1px solid #ddd", borderRadius: "4px", marginBottom: "1rem" }}>
-            <h2 style={{ margin: "0 0 1rem", fontSize: "1.1rem" }}>{currentQuestion.question}</h2>
+          <Card>
+            <CardContent className="pt-6">
+              <h2 className="text-lg font-medium mb-6">{currentQuestion.question}</h2>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              {shuffledOptions.shuffled.map((option, displayIndex) => {
-                const originalIndex = shuffledOptions.indexMap[displayIndex];
-                const hasAnswered = currentAnswer != null;
-                const isSelected = hasAnswered && currentAnswer!.selectedIndex === originalIndex;
-                const isCorrect = originalIndex === currentQuestion.correctIndex;
-                const showCorrect = hasAnswered && isCorrect;
-                const showWrong = hasAnswered && isSelected && !isCorrect;
+              <div className="space-y-3">
+                {shuffledOptions.shuffled.map((option, displayIndex) => {
+                  const originalIndex = shuffledOptions.indexMap[displayIndex];
+                  const hasAnswered = currentAnswer != null;
+                  const isSelected = hasAnswered && currentAnswer!.selectedIndex === originalIndex;
+                  const isCorrect = originalIndex === currentQuestion.correctIndex;
+                  const showCorrect = hasAnswered && isCorrect;
+                  const showWrong = hasAnswered && isSelected && !isCorrect;
 
-                let bg = "#f5f5f5";
-                if (showCorrect) bg = "#dfd";
-                else if (showWrong) bg = "#fdd";
-
-                return (
-                  <button
-                    key={displayIndex}
-                    onClick={() => submitAnswer(displayIndex)}
-                    disabled={hasAnswered || submitting}
-                    style={{
-                      padding: "0.75rem",
-                      textAlign: "left",
-                      background: bg,
-                      border: "1px solid #ddd",
-                      borderRadius: "4px",
-                      cursor: hasAnswered ? "default" : "pointer",
-                    }}
-                  >
-                    {String.fromCharCode(65 + displayIndex)}. {option}
-                    {showCorrect && " ✓"}
-                    {showWrong && " ✗"}
-                  </button>
-                );
-              })}
-            </div>
-
-            {lastAnswerCorrect !== null && (
-              <div style={{ marginTop: "1rem", fontWeight: "bold", color: lastAnswerCorrect ? "green" : "red" }}>
-                {lastAnswerCorrect ? "Correct!" : "Incorrect"}
+                  return (
+                    <button
+                      key={displayIndex}
+                      onClick={() => submitAnswer(displayIndex)}
+                      disabled={hasAnswered || submitting}
+                      className={`w-full p-4 text-left rounded-lg border transition-colors ${
+                        showCorrect
+                          ? "bg-accent/20 border-accent text-accent-foreground"
+                          : showWrong
+                            ? "bg-destructive/20 border-destructive text-destructive-foreground"
+                            : hasAnswered
+                              ? "bg-muted border-border cursor-default"
+                              : "bg-muted/50 border-border hover:bg-muted hover:border-primary cursor-pointer"
+                      } ${submitting ? "opacity-50" : ""}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span>
+                          <span className="font-medium mr-2">{String.fromCharCode(65 + displayIndex)}.</span>
+                          {option}
+                        </span>
+                        {showCorrect && <Check className="w-5 h-5 text-accent" />}
+                        {showWrong && <X className="w-5 h-5 text-destructive" />}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
-            )}
-          </div>
+
+              {lastAnswerCorrect !== null && (
+                <div className={`mt-6 p-4 rounded-lg text-center font-semibold ${
+                  lastAnswerCorrect
+                    ? "bg-accent/20 text-accent"
+                    : "bg-destructive/20 text-destructive"
+                }`}>
+                  {lastAnswerCorrect ? "Correct!" : "Incorrect"}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {quizState === "completed" && quiz && (
-        <div>
-          <h1>Quiz Complete</h1>
-          <p style={{ fontSize: "1.5rem", fontWeight: "bold" }}>
-            Score: {score}/{quiz.questions.length}
-          </p>
+        <div className="space-y-6">
+          <Card>
+            <CardContent className="pt-6 text-center">
+              <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center mx-auto mb-4">
+                <Trophy className="w-8 h-8 text-accent" />
+              </div>
+              <h2 className="text-2xl font-bold mb-2">Quiz Complete!</h2>
+              <p className="text-3xl font-bold text-secondary mb-4">
+                {score}/{quiz.questions.length}
+              </p>
+              <p className="text-muted-foreground">
+                {score === quiz.questions.length
+                  ? "Perfect score! You're a knowledge master."
+                  : score >= quiz.questions.length / 2
+                    ? "Great job! Keep up the learning."
+                    : "Keep practicing, you'll improve!"}
+              </p>
+            </CardContent>
+          </Card>
 
-          <div style={{ margin: "1rem 0", padding: "1rem", background: "#f5f5f5", borderRadius: "4px" }}>
-            <h3 style={{ margin: "0 0 0.5rem" }}>Summary</h3>
-            {quiz.questions.map((q, idx) => {
-              const answer = quiz.answers.find(a => a.questionIndex === idx);
-              const isCorrect = answer?.isCorrect ?? false;
-              return (
-                <div key={q.id} style={{ padding: "0.25rem 0", borderBottom: "1px solid #ddd" }}>
-                  {isCorrect ? "✓" : "✗"} {q.question}
-                </div>
-              );
-            })}
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {quiz.questions.map((q, idx) => {
+                  const answer = quiz.answers.find(a => a.questionIndex === idx);
+                  const isCorrect = answer?.isCorrect ?? false;
+                  return (
+                    <div key={q.id} className="flex items-start gap-2 py-2 border-b border-border last:border-0">
+                      {isCorrect ? (
+                        <Check className="w-4 h-4 text-accent flex-shrink-0 mt-0.5" />
+                      ) : (
+                        <X className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
+                      )}
+                      <span className="text-sm">{q.question}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
 
-          <button onClick={generateQuiz} style={{ padding: "0.5rem 1rem", cursor: "pointer" }}>
+          <Button onClick={generateQuiz} className="w-full gap-2">
+            <RotateCcw className="w-4 h-4" />
             Take Another Quiz
-          </button>
+          </Button>
         </div>
       )}
     </main>
