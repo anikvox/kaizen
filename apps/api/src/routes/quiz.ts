@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { db } from "../lib/index.js";
-import { startQuizGeneration, getQuizTaskStatus, getQueueStatus } from "../lib/quiz/index.js";
-import { getTask, TASK_STATUS } from "../lib/task-queue/index.js";
+import { startQuizGeneration, getQuizJobStatus, getQueueStatus } from "../lib/quiz/index.js";
+import { getJob } from "../lib/jobs/index.js";
 
 // Combined variables type for routes that support both auth methods
 type CombinedAuthVariables = {
@@ -71,8 +71,8 @@ async function dualAuthMiddleware(c: any, next: () => Promise<void>) {
 
 /**
  * POST /quiz/generate
- * Start quiz generation via task queue.
- * Client should poll GET /quiz/job/:taskId for status.
+ * Start quiz generation via job queue.
+ * Client should poll GET /quiz/job/:jobId for status.
  */
 app.post("/generate", dualAuthMiddleware, async (c) => {
   const userId = await getUserIdFromContext(c);
@@ -84,8 +84,7 @@ app.post("/generate", dualAuthMiddleware, async (c) => {
   try {
     const result = await startQuizGeneration(userId);
     return c.json({
-      jobId: result.taskId, // Keep 'jobId' for backward compatibility
-      taskId: result.taskId,
+      jobId: result.jobId,
       status: result.status,
     });
   } catch (error) {
@@ -96,7 +95,7 @@ app.post("/generate", dualAuthMiddleware, async (c) => {
 
 /**
  * GET /quiz/job/:jobId
- * Get the status of a quiz generation task.
+ * Get the status of a quiz generation job.
  * Returns the quiz when completed.
  */
 app.get("/job/:jobId", dualAuthMiddleware, async (c) => {
@@ -106,40 +105,47 @@ app.get("/job/:jobId", dualAuthMiddleware, async (c) => {
     return c.json({ error: "User not found" }, 404);
   }
 
-  const taskId = c.req.param("jobId");
+  const jobId = c.req.param("jobId");
 
   try {
-    // Get task from the task queue
-    const task = await getTask(taskId);
+    // Get job from pg-boss
+    const job = await getJob(jobId);
 
-    if (!task || task.userId !== userId) {
+    if (!job) {
       return c.json({ error: "Job not found" }, 404);
     }
 
-    // Return full result if completed, otherwise just status
-    if (task.status === TASK_STATUS.COMPLETED && task.result) {
+    // Check that job belongs to user
+    const data = job.data as { userId?: string };
+    if (data.userId !== userId) {
+      return c.json({ error: "Job not found" }, 404);
+    }
+
+    // Return full result if completed
+    if (job.state === "completed" && job.output) {
       return c.json({
         status: "completed",
-        quiz: task.result,
+        quiz: job.output,
       });
     }
 
-    if (task.status === TASK_STATUS.FAILED) {
+    if (job.state === "failed") {
       return c.json({
         status: "failed",
-        error: task.error || "Quiz generation failed",
-        code: task.error?.includes("Not enough activity") ? "INSUFFICIENT_DATA" : "INTERNAL_ERROR",
+        error: "Quiz generation failed",
+        code: "INTERNAL_ERROR",
       });
     }
 
-    // Map task status to legacy job status
+    // Map job state to API status
     const statusMap: Record<string, string> = {
-      [TASK_STATUS.PENDING]: "pending",
-      [TASK_STATUS.PROCESSING]: "processing",
+      created: "pending",
+      retry: "pending",
+      active: "processing",
     };
 
     return c.json({
-      status: statusMap[task.status] || task.status,
+      status: statusMap[job.state] || job.state,
     });
   } catch (error) {
     console.error("[Quiz] Error getting job status:", error);

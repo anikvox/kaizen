@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useAuth, SignInButton, useUser } from "@clerk/nextjs";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -33,6 +33,14 @@ interface PendingToolCall {
 }
 
 export default function ChatPage() {
+  return (
+    <Suspense fallback={<main style={{ padding: "2rem", maxWidth: "800px", margin: "0 auto" }}><p>Loading...</p></main>}>
+      <ChatPageContent />
+    </Suspense>
+  );
+}
+
+function ChatPageContent() {
   const { isSignedIn, isLoaded, getToken } = useAuth();
   const { user: clerkUser } = useUser();
   const searchParams = useSearchParams();
@@ -126,25 +134,14 @@ export default function ChatPage() {
     if (isNewChat && promptParam) {
       hasHandledUrlParams.current = true;
 
-      // Create new session
-      const createNewSessionWithPrompt = async () => {
-        const api = createApiClient(apiUrl, getTokenFn);
-        try {
-          const newSession = await api.chats.createSession({ attentionRange: selectedAttentionRange });
-          setSessions((prev) => sortSessionsByDate([newSession, ...prev]));
-          setActiveSessionId(newSession.id);
-          setInputValue(promptParam);
+      // Set up for new chat with the prompt - session will be created when message is sent
+      setActiveSessionId(null);
+      setInputValue(promptParam);
 
-          // Clear URL parameters
-          router.replace("/chat");
-        } catch (err) {
-          console.error("Failed to create session from URL:", err);
-        }
-      };
-
-      createNewSessionWithPrompt();
+      // Clear URL parameters
+      router.replace("/chat");
     }
-  }, [isSignedIn, sessions, searchParams, getTokenFn, selectedAttentionRange, router]);
+  }, [isSignedIn, sessions, searchParams, router]);
 
   // Load messages when active session changes
   useEffect(() => {

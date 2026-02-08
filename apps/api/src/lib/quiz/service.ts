@@ -16,12 +16,11 @@ import { DEFAULT_QUIZ_SETTINGS } from "./types.js";
 import { createQuizPrompt, parseQuizResponse } from "./prompts.js";
 import { LLM_CONFIG, getPrompt, PROMPT_NAMES } from "../llm/index.js";
 import {
-  pushQuizGeneration,
-  getTask,
-  getUserQueueStatus,
-  TASK_TYPES,
-  type TaskQueueItem,
-} from "../task-queue/index.js";
+  sendQuizGeneration,
+  getJob,
+  getUserJobsStatus,
+} from "../jobs/index.js";
+import { JOB_NAMES } from "../jobs/types.js";
 
 const QUESTION_COUNT = 10;
 
@@ -36,57 +35,59 @@ export function extractQuizSettings(settings: UserSettings | null): QuizSettings
 }
 
 /**
- * Start quiz generation via task queue.
- * Returns the task immediately, client should poll for status.
+ * Start quiz generation via job queue.
+ * Returns the job ID immediately, client should poll for status.
  */
 export async function startQuizGeneration(userId: string): Promise<{
-  taskId: string;
+  jobId: string | null;
   status: string;
 }> {
-  const task = await pushQuizGeneration(userId);
+  const jobId = await sendQuizGeneration(userId);
 
-  console.log(`[Quiz] Created task ${task.id} for user ${userId}`);
+  console.log(`[Quiz] Created job ${jobId} for user ${userId}`);
 
   return {
-    taskId: task.id,
-    status: task.status,
+    jobId,
+    status: "created",
   };
 }
 
 /**
- * Get quiz task status and result.
- * Bridges the old job API to the new task queue.
+ * Get quiz job status and result.
  */
-export async function getQuizTaskStatus(taskId: string, userId: string): Promise<{
+export async function getQuizJobStatus(jobId: string, userId: string): Promise<{
   status: string;
   quiz?: GeneratedQuiz;
   error?: string;
 } | null> {
-  const task = await getTask(taskId);
+  const job = await getJob(jobId);
 
-  if (!task || task.userId !== userId) {
+  if (!job) {
     return null;
   }
 
-  if (task.status === "completed" && task.result) {
-    // The task result contains quiz generation metadata
-    // For full quiz, we need to re-generate or store in payload
-    // For now, return the metadata
+  // Check that job belongs to user
+  const data = job.data as { userId?: string };
+  if (data.userId !== userId) {
+    return null;
+  }
+
+  if (job.state === "completed" && job.output) {
     return {
-      status: task.status,
-      quiz: task.result as unknown as GeneratedQuiz,
+      status: job.state,
+      quiz: job.output as unknown as GeneratedQuiz,
     };
   }
 
-  if (task.status === "failed") {
+  if (job.state === "failed") {
     return {
-      status: task.status,
-      error: task.error || "Quiz generation failed",
+      status: job.state,
+      error: "Quiz generation failed",
     };
   }
 
   return {
-    status: task.status,
+    status: job.state,
   };
 }
 
@@ -199,18 +200,18 @@ export async function gatherQuizContext(
 }
 
 /**
- * Get queue status for debugging (using task queue)
+ * Get queue status for debugging (using job queue)
  */
 export async function getQueueStatus(userId?: string) {
   if (userId) {
-    const status = await getUserQueueStatus(userId);
-    const quizTasks = status.pendingTasks.filter(t => t.type === TASK_TYPES.QUIZ_GENERATION);
-    const processingQuiz = status.processingTasks.filter(t => t.type === TASK_TYPES.QUIZ_GENERATION);
+    const status = await getUserJobsStatus(userId);
+    const quizPending = status.pending.filter(j => j.name === JOB_NAMES.QUIZ_GENERATION);
+    const quizActive = status.active.filter(j => j.name === JOB_NAMES.QUIZ_GENERATION);
 
     return {
-      pending: quizTasks.length,
-      processing: processingQuiz.length,
-      total: quizTasks.length + processingQuiz.length,
+      pending: quizPending.length,
+      processing: quizActive.length,
+      total: quizPending.length + quizActive.length,
     };
   }
 

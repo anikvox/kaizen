@@ -118,15 +118,25 @@ export interface ActiveTabChangedEvent {
   timestamp: number;
 }
 
-// Task queue events
-export interface TaskQueueChangedEvent {
+// Job events (pg-boss)
+export interface JobCompletedEvent {
   userId: string;
-  taskId: string;
-  type: string;
-  status: string;
-  changeType: "created" | "started" | "completed" | "failed" | "cancelled";
-  result?: unknown;
-  error?: string;
+  jobId: string;
+  name: string;
+  result: unknown;
+}
+
+export interface JobFailedEvent {
+  userId: string;
+  jobId: string;
+  name: string;
+  error: string;
+}
+
+export interface JobCreatedEvent {
+  userId: string;
+  jobId: string;
+  name: string;
 }
 
 class AppEvents extends EventEmitter {
@@ -234,14 +244,32 @@ class AppEvents extends EventEmitter {
     return () => this.off("activeTabChanged", callback);
   }
 
-  // Task Queue Events
-  emitTaskQueueChanged(data: TaskQueueChangedEvent) {
-    this.emit("taskQueueChanged", data);
+  // Job Events (pg-boss)
+  emitJobCreated(data: JobCreatedEvent) {
+    this.emit("jobCreated", data);
   }
 
-  onTaskQueueChanged(callback: (data: TaskQueueChangedEvent) => void) {
-    this.on("taskQueueChanged", callback);
-    return () => this.off("taskQueueChanged", callback);
+  onJobCreated(callback: (data: JobCreatedEvent) => void) {
+    this.on("jobCreated", callback);
+    return () => this.off("jobCreated", callback);
+  }
+
+  emitJobCompleted(data: JobCompletedEvent) {
+    this.emit("jobCompleted", data);
+  }
+
+  onJobCompleted(callback: (data: JobCompletedEvent) => void) {
+    this.on("jobCompleted", callback);
+    return () => this.off("jobCompleted", callback);
+  }
+
+  emitJobFailed(data: JobFailedEvent) {
+    this.emit("jobFailed", data);
+  }
+
+  onJobFailed(callback: (data: JobFailedEvent) => void) {
+    this.on("jobFailed", callback);
+    return () => this.off("jobFailed", callback);
   }
 }
 

@@ -12,6 +12,8 @@ services:
       - ../.env.production
     environment:
       - DATABASE_URL=postgresql://kaizen:kaizen_password@postgres:5432/kaizen
+      - CORS_ORIGINS=http://localhost:60091
+      - NEXT_PUBLIC_KAIZEN_API_URL=http://localhost:60092
     ports:
       - "60091:60091"
       - "60092:60092"

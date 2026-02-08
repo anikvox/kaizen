@@ -13,7 +13,7 @@ export { DEFAULT_QUIZ_SETTINGS } from "./types.js";
 // Service
 export {
   startQuizGeneration,
-  getQuizTaskStatus,
+  getQuizJobStatus,
   generateQuiz,
   gatherQuizContext,
   getQueueStatus,

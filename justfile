@@ -8,6 +8,7 @@ dev-up:
     @sleep 2
     pnpm --filter @kaizen/api db:generate
     pnpm --filter @kaizen/api db:push
+    PGBOSS_DATABASE_URL=$DATABASE_URL pnpm --filter @kaizen/api jobs:migrate
     pnpm --filter @kaizen/api-client build
     overmind start
 
@@ -17,9 +18,13 @@ dev-down:
 
 clean:
     -overmind stop
+    rm ./.overmind.sock || true
     docker compose down -v
+    docker volume rm server_postgres_data || true
+    docker volume rm kaizen_kaizen_postgres_data || true
     rm -rf apps/*/dist apps/*/.next apps/*/.plasmo packages/*/dist .turbo
     rm -rf node_modules apps/*/node_modules packages/*/node_modules
+    rm -rf apps/extension/build
     pnpm install
 
 db-migrate name:
