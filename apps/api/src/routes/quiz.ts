@@ -110,6 +110,17 @@ app.post("/generate", dualAuthMiddleware, async (c) => {
 
   try {
     const result = await startQuizGeneration(userId);
+
+    // If pre-check failed (no activity data), return error immediately
+    if (result.status === "failed") {
+      return c.json({
+        jobId: null,
+        status: "failed",
+        error: result.error,
+        code: result.code,
+      });
+    }
+
     return c.json({
       jobId: result.jobId,
       status: result.status,
@@ -164,10 +175,15 @@ app.get("/job/:jobId", dualAuthMiddleware, async (c) => {
     }
 
     if (job.state === "failed") {
+      // Check if the failure reason was no activity data
+      const output = job.output as { message?: string } | null;
+      const errorMessage = output?.message || "";
+      const isNoActivityError = errorMessage.includes("NO_ACTIVITY_DATA");
+
       return c.json({
         status: "failed",
-        error: "Quiz generation failed",
-        code: "INTERNAL_ERROR",
+        error: isNoActivityError ? "Not enough activity data to generate quiz" : "Quiz generation failed",
+        code: isNoActivityError ? "NO_ACTIVITY_DATA" : "INTERNAL_ERROR",
       });
     }
 

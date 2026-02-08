@@ -172,6 +172,7 @@ export function Dashboard({ initialTab }: DashboardProps) {
   const [quizLoading, setQuizLoading] = useState(false);
   const [quizCurrentIndex, setQuizCurrentIndex] = useState(0);
   const [submittingAnswer, setSubmittingAnswer] = useState(false);
+  const [quizError, setQuizError] = useState<string | null>(null);
 
   // Pulses carousel
   const [pulseIndex, setPulseIndex] = useState(0);
@@ -667,9 +668,29 @@ export function Dashboard({ initialTab }: DashboardProps) {
   // Quiz handlers
   const generateQuiz = async () => {
     setQuizLoading(true);
+    setQuizError(null);
     const api = createApiClient(apiUrl, getTokenFn);
     try {
-      const { jobId } = await api.quiz.generate();
+      const generateResult = await api.quiz.generate();
+
+      // Check if generation failed immediately (e.g., no activity data)
+      if (generateResult.status === "failed") {
+        setQuizLoading(false);
+        if ((generateResult as any).code === "NO_ACTIVITY_DATA") {
+          setQuizError("Not enough browsing activity to generate a quiz. Keep exploring!");
+        } else {
+          setQuizError((generateResult as any).error || "Failed to generate quiz. Please try again.");
+        }
+        return;
+      }
+
+      const { jobId } = generateResult;
+      if (!jobId) {
+        setQuizLoading(false);
+        setQuizError("Failed to start quiz generation.");
+        return;
+      }
+
       const pollStatus = async () => {
         const result = await api.quiz.getJobStatus(jobId);
         if (result.status === "completed" && result.quiz) {
@@ -678,6 +699,11 @@ export function Dashboard({ initialTab }: DashboardProps) {
           setQuizLoading(false);
         } else if (result.status === "failed") {
           setQuizLoading(false);
+          if (result.code === "NO_ACTIVITY_DATA") {
+            setQuizError("Not enough browsing activity to generate a quiz. Keep exploring!");
+          } else {
+            setQuizError("Failed to generate quiz. Please try again.");
+          }
         } else {
           setTimeout(pollStatus, 1000);
         }
@@ -686,6 +712,7 @@ export function Dashboard({ initialTab }: DashboardProps) {
     } catch (err) {
       console.error("Failed to generate quiz:", err);
       setQuizLoading(false);
+      setQuizError("Failed to generate quiz. Please try again.");
     }
   };
 
@@ -1217,11 +1244,20 @@ export function Dashboard({ initialTab }: DashboardProps) {
                       </div>
                       <h3 className="font-semibold mb-1">No Quiz Available</h3>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Generate a quiz based on your browsing
+                        {quizError || "Generate a quiz based on your browsing"}
                       </p>
-                      <Button onClick={generateQuiz} size="sm" className="gap-2">
-                        <Brain className="w-3 h-3" />
-                        Generate Quiz
+                      <Button
+                        onClick={generateQuiz}
+                        size="sm"
+                        className="gap-2"
+                        disabled={quizLoading}
+                      >
+                        {quizLoading ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Brain className="w-3 h-3" />
+                        )}
+                        {quizLoading ? "Generating..." : "Generate Quiz"}
                       </Button>
                     </div>
                   )}

@@ -188,7 +188,9 @@ async function handleQuizGeneration(
   const quiz = await generateQuiz(userId, { answerOptionsCount, activityDays });
 
   if (!quiz) {
-    throw new Error("Not enough activity data to generate quiz");
+    const error = new Error("NO_ACTIVITY_DATA");
+    (error as any).code = "NO_ACTIVITY_DATA";
+    throw error;
   }
 
   return {

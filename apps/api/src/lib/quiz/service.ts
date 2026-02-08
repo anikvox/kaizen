@@ -155,11 +155,34 @@ export async function submitAnswer(
 /**
  * Start quiz generation via job queue.
  * Returns the job ID immediately, client should poll for status.
+ * Pre-checks for activity data and returns error immediately if none.
  */
 export async function startQuizGeneration(userId: string): Promise<{
   jobId: string | null;
   status: string;
+  error?: string;
+  code?: string;
 }> {
+  // Get user settings for activity days
+  const settings = await db.userSettings.findUnique({
+    where: { userId },
+  });
+
+  const activityDays = settings?.quizActivityDays ?? DEFAULT_QUIZ_SETTINGS.activityDays;
+
+  // Pre-check for activity data before creating job
+  const context = await gatherQuizContext(userId, activityDays);
+
+  if (!context) {
+    console.log(`[Quiz] No activity data for user ${userId}, skipping job creation`);
+    return {
+      jobId: null,
+      status: "failed",
+      error: "Not enough activity data to generate quiz",
+      code: "NO_ACTIVITY_DATA",
+    };
+  }
+
   const jobId = await sendQuizGeneration(userId);
 
   console.log(`[Quiz] Created job ${jobId} for user ${userId}`);

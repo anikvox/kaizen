@@ -945,18 +945,6 @@ export default function Settings() {
                   </p>
                 </CardContent>
               </Card>
-
-              {/* Generate Quiz Button */}
-              <Card>
-                <CardContent className="pt-4 text-center">
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Ready to test your knowledge? Generate a quiz based on your recent browsing activity.
-                  </p>
-                  <Link href="/quiz">
-                    <Button variant="secondary">Take Quiz</Button>
-                  </Link>
-                </CardContent>
-              </Card>
             </div>
           )}
         </section>
