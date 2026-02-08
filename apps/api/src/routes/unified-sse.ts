@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { db, events } from "../lib/index.js";
 import { getPomodoroStatus } from "../lib/pomodoro/index.js";
+import { getUserPulses } from "../lib/pulse/index.js";
 
 /**
  * Unified SSE endpoint that combines all real-time streams into a single connection.
@@ -22,6 +23,7 @@ import { getPomodoroStatus } from "../lib/pomodoro/index.js";
  * - chat-message-updated: Message updated (streaming, status change)
  * - device-token-revoked: Device token was revoked
  * - active-tab-changed: Active browser tab changed
+ * - pulses-updated: User's pulses were regenerated
  */
 
 const app = new Hono();
@@ -98,7 +100,7 @@ app.get("/", async (c) => {
     let id = 0;
 
     // Gather initial state
-    const [settings, focuses, pomodoroStatus] = await Promise.all([
+    const [settings, focuses, pomodoroStatus, pulses] = await Promise.all([
       db.userSettings.upsert({
         where: { userId },
         update: {},
@@ -113,6 +115,7 @@ app.get("/", async (c) => {
         orderBy: { startedAt: "desc" },
       }),
       getPomodoroStatus(userId),
+      getUserPulses(userId),
     ]);
 
     // Send initial connection with all state
@@ -153,6 +156,11 @@ app.get("/", async (c) => {
           lastActivityAt: f.lastActivityAt.toISOString(),
         })),
         pomodoro: pomodoroStatus,
+        pulses: pulses.map((p) => ({
+          id: p.id,
+          message: p.message,
+          createdAt: p.createdAt.toISOString(),
+        })),
       }),
       event: "message",
       id: String(id++),
@@ -338,6 +346,26 @@ app.get("/", async (c) => {
               type: "device-list-changed",
               action: data.action,
               deviceId: data.deviceId,
+            }),
+            event: "message",
+            id: String(id++),
+          });
+        }
+      })
+    );
+
+    // Pulses updated
+    cleanups.push(
+      events.onPulsesUpdated(async (data) => {
+        if (data.userId === userId) {
+          await stream.writeSSE({
+            data: JSON.stringify({
+              type: "pulses-updated",
+              pulses: data.pulses.map((p) => ({
+                id: p.id,
+                message: p.message,
+                createdAt: p.createdAt.toISOString(),
+              })),
             }),
             event: "message",
             id: String(id++),

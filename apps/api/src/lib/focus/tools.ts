@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { db } from "../db.js";
 import { emitFocusChange } from "./utils.js";
+import { sendPulseGeneration } from "../jobs/service.js";
 
 /**
  * Create focus management tools for the agent.
@@ -113,6 +114,12 @@ export function createFocusTools(userId: string, inactivityThresholdMs: number, 
         });
 
         emitFocusChange(userId, newFocus, "created");
+
+        // Trigger immediate pulse generation if no pulses exist (first focus scenario)
+        const existingPulses = await db.pulse.count({ where: { userId } });
+        if (existingPulses === 0) {
+          await sendPulseGeneration(userId);
+        }
 
         return {
           success: true,

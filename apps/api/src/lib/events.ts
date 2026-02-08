@@ -118,6 +118,19 @@ export interface ActiveTabChangedEvent {
   timestamp: number;
 }
 
+// Pulse Events
+export interface PulseData {
+  id: string;
+  userId: string;
+  message: string;
+  createdAt: Date;
+}
+
+export interface PulsesUpdatedEvent {
+  userId: string;
+  pulses: PulseData[];
+}
+
 // Pomodoro Events
 export type PomodoroState = "idle" | "running" | "paused" | "cooldown";
 
@@ -309,6 +322,16 @@ class AppEvents extends EventEmitter {
   onPomodoroTick(callback: (data: PomodoroTickEvent) => void) {
     this.on("pomodoroTick", callback);
     return () => this.off("pomodoroTick", callback);
+  }
+
+  // Pulse Events
+  emitPulsesUpdated(data: PulsesUpdatedEvent) {
+    this.emit("pulsesUpdated", data);
+  }
+
+  onPulsesUpdated(callback: (data: PulsesUpdatedEvent) => void) {
+    this.on("pulsesUpdated", callback);
+    return () => this.off("pulsesUpdated", callback);
   }
 }
 
