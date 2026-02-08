@@ -605,10 +605,27 @@ export function createChatTools(userId: string) {
             "7d": 10080,
           };
 
-          const lookbackMinutes =
-            minutes ?? (preset ? presetMinutes[preset] : 120);
+          // Calculate lookbackMinutes with fallback validation
+          let lookbackMinutes: number;
+          if (typeof minutes === "number" && !isNaN(minutes) && minutes > 0) {
+            lookbackMinutes = minutes;
+          } else if (preset && presetMinutes[preset]) {
+            lookbackMinutes = presetMinutes[preset];
+          } else {
+            // Default to 2 hours if invalid input
+            lookbackMinutes = 120;
+          }
+
           const now = new Date();
           const from = new Date(now.getTime() - lookbackMinutes * 60 * 1000);
+
+          // Validate the resulting date
+          if (isNaN(from.getTime())) {
+            return {
+              found: false,
+              error: "Failed to calculate time range. Please try again.",
+            };
+          }
 
           const attentionData = await getAttentionData(userId, {
             from,

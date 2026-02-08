@@ -426,8 +426,17 @@ async function generateAgentResponse(
   attentionRange?: string, // User's selected time range for activity context
 ) {
   // Build context about the user's selected attention range
+  // Map the UI-friendly range to tool-compatible preset
+  const rangeToPreset: Record<string, string> = {
+    "30m": "30m",
+    "2h": "2h",
+    "1d": "1d",
+    "all": "7d", // Map "all" to 7 days (maximum supported by the tool)
+  };
+  const toolPreset = attentionRange ? rangeToPreset[attentionRange] || "2h" : "2h";
+
   const attentionRangeContext = attentionRange
-    ? `\n\n## Attention Range Context\nThe user has selected "${attentionRange}" as their attention range for this conversation. When querying browsing activity or attention data, use this time range:\n- "30m" = last 30 minutes\n- "2h" = last 2 hours\n- "1d" = last 24 hours\n- "all" = all available data\n\nUse the appropriate preset or minutes value when calling get_attention_data or similar tools.`
+    ? `\n\n## Attention Range Context\nThe user has selected "${attentionRange}" as their attention range for this conversation. When querying browsing activity or attention data, use the preset "${toolPreset}" when calling get_attention_data or similar tools. Valid presets are: 5m, 15m, 30m, 1h, 2h, 6h, 12h, 1d, 3d, 7d.`
     : "";
 
   try {
