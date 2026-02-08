@@ -9,6 +9,7 @@ export interface PomodoroStatus {
 interface PomodoroTimerProps extends React.HTMLAttributes<HTMLDivElement> {
   status: PomodoroStatus | null;
   onToggle?: () => void;
+  compact?: boolean;
 }
 
 function formatTime(seconds: number): string {
@@ -23,11 +24,60 @@ function formatTime(seconds: number): string {
 }
 
 const PomodoroTimer = React.forwardRef<HTMLDivElement, PomodoroTimerProps>(
-  ({ className, status, onToggle, ...props }, ref) => {
+  ({ className, status, onToggle, compact = false, ...props }, ref) => {
     const isRunning = status?.state === "running";
     const isPaused = status?.state === "paused";
     const isCooldown = status?.state === "cooldown";
     const isActive = isRunning || isPaused || isCooldown;
+
+    if (compact) {
+      return (
+        <div
+          ref={ref}
+          className={cn(
+            "flex items-center gap-2 rounded-lg px-3 py-1.5 border",
+            isRunning
+              ? "bg-pomodoro/10 border-pomodoro/30"
+              : "bg-muted/50 border-border",
+            className,
+          )}
+          {...props}
+        >
+          <span
+            className={cn(
+              "w-2 h-2 rounded-full shrink-0",
+              isRunning && "bg-pomodoro",
+              isPaused && "bg-yellow-500",
+              isCooldown && "bg-cyan-500",
+              !isActive && "bg-muted-foreground",
+            )}
+          />
+          <span
+            className={cn(
+              "text-sm font-bold font-mono",
+              isRunning && "text-pomodoro",
+              isPaused && "text-yellow-500",
+              !isActive && "text-foreground",
+            )}
+          >
+            {status ? formatTime(status.elapsedSeconds) : "0:00"}
+          </span>
+          {(isRunning || isPaused) && onToggle && (
+            <button
+              onClick={onToggle}
+              className={cn(
+                "px-2 py-0.5 text-[10px] font-medium rounded text-white transition-colors",
+                isPaused
+                  ? "bg-focus hover:bg-focus/90"
+                  : "bg-muted-foreground hover:bg-muted-foreground/90",
+              )}
+            >
+              {isPaused ? "Resume" : "Pause"}
+            </button>
+          )}
+        </div>
+      );
+    }
 
     return (
       <div
