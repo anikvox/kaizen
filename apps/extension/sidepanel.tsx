@@ -8,7 +8,8 @@ import {
   type ChatSessionListItem,
   type ChatMessage,
   type ChatMessageStatus,
-  type Focus
+  type Focus,
+  type PomodoroStatus
 } from "@kaizen/api-client"
 import {
   COGNITIVE_ATTENTION_DEBUG_MODE,
@@ -40,6 +41,9 @@ function SidePanel() {
   // Focus state (multiple active focuses)
   const [focuses, setFocuses] = useState<Focus[]>([])
 
+  // Pomodoro state
+  const [pomodoroStatus, setPomodoroStatus] = useState<PomodoroStatus | null>(null)
+
   // Settings state
   const [settings, setSettings] = useState<UserSettings | null>(null)
   const [savingSettings, setSavingSettings] = useState(false)
@@ -66,6 +70,7 @@ function SidePanel() {
   const settingsEventSourceRef = useRef<EventSource | null>(null)
   const chatEventSourceRef = useRef<EventSource | null>(null)
   const focusEventSourceRef = useRef<EventSource | null>(null)
+  const pomodoroEventSourceRef = useRef<EventSource | null>(null)
   const messagesEndRef = useRef<EventSource | null>(null)
 
   // Scroll to bottom when messages change
@@ -134,6 +139,30 @@ function SidePanel() {
     })
   }, [])
 
+  // Format seconds to HH:MM:SS or MM:SS
+  const formatTime = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600)
+    const mins = Math.floor((seconds % 3600) / 60)
+    const secs = seconds % 60
+
+    if (hours > 0) {
+      return `${hours}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
+    }
+    return `${mins}:${secs.toString().padStart(2, "0")}`
+  }
+
+  // Handle Pomodoro pause/resume
+  const handlePomodoroToggle = async () => {
+    const api = createApiClient(apiUrl, getTokenFn)
+    if (pomodoroStatus?.state === "paused") {
+      const result = await api.pomodoro.resume()
+      setPomodoroStatus(result.status)
+    } else if (pomodoroStatus?.state === "running") {
+      const result = await api.pomodoro.pause()
+      setPomodoroStatus(result.status)
+    }
+  }
+
   const handleUnlink = async () => {
     const token = await storage.get<string>("deviceToken")
     if (token) {
@@ -159,13 +188,23 @@ function SidePanel() {
     const newValue = !settings[key]
 
     try {
-      await sendToBackground({
-        name: "update-settings",
-        body: { [key]: newValue }
-      })
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Request timeout")), 5000)
+      )
+
+      await Promise.race([
+        sendToBackground({
+          name: "update-settings",
+          body: { [key]: newValue }
+        }),
+        timeoutPromise
+      ])
       setSettings({ ...settings, [key]: newValue })
     } catch (error) {
       console.error("Failed to update setting:", error)
+      // Still update local state on error so UI isn't stuck
+      setSettings({ ...settings, [key]: newValue })
     } finally {
       setSavingSettings(false)
     }
@@ -177,13 +216,23 @@ function SidePanel() {
     setSavingSettings(true)
 
     try {
-      await sendToBackground({
-        name: "update-settings",
-        body: { attentionTrackingIgnoreList: value }
-      })
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Request timeout")), 5000)
+      )
+
+      await Promise.race([
+        sendToBackground({
+          name: "update-settings",
+          body: { attentionTrackingIgnoreList: value }
+        }),
+        timeoutPromise
+      ])
       setSettings({ ...settings, attentionTrackingIgnoreList: value })
     } catch (error) {
       console.error("Failed to update ignore list:", error)
+      // Still update local state on error
+      setSettings({ ...settings, attentionTrackingIgnoreList: value })
     } finally {
       setSavingSettings(false)
     }
@@ -474,6 +523,59 @@ function SidePanel() {
     }
   }, [user])
 
+  // Setup Pomodoro SSE
+  useEffect(() => {
+    let cancelled = false
+
+    const setupPomodoroSSE = async () => {
+      if (pomodoroEventSourceRef.current) {
+        pomodoroEventSourceRef.current.close()
+        pomodoroEventSourceRef.current = null
+      }
+
+      const token = await storage.get<string>("deviceToken")
+      if (!token || !user) {
+        setPomodoroStatus(null)
+        return
+      }
+
+      const api = createApiClient(apiUrl)
+      const eventSource = api.pomodoro.subscribePomodoro(
+        (data) => {
+          if (!cancelled) {
+            setPomodoroStatus(data.status)
+          }
+        },
+        (data) => {
+          if (!cancelled) {
+            setPomodoroStatus(data.status)
+          }
+        },
+        (data) => {
+          if (!cancelled) {
+            setPomodoroStatus(data.status)
+          }
+        },
+        () => {
+          console.error("Pomodoro SSE error")
+        },
+        token
+      )
+
+      pomodoroEventSourceRef.current = eventSource
+    }
+
+    setupPomodoroSSE()
+
+    return () => {
+      cancelled = true
+      if (pomodoroEventSourceRef.current) {
+        pomodoroEventSourceRef.current.close()
+        pomodoroEventSourceRef.current = null
+      }
+    }
+  }, [user])
+
 
   // Setup chat SSE
   useEffect(() => {
@@ -714,6 +816,49 @@ function SidePanel() {
         ) : (
           <span style={styles.focusEmpty}>No active focus</span>
         )}
+      </div>
+
+      {/* Pomodoro Timer */}
+      <div style={styles.pomodoroContainer}>
+        <div style={styles.pomodoroHeader}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{
+              ...styles.focusIndicator,
+              background: pomodoroStatus?.state === "running" ? "#fd7e14" :
+                         pomodoroStatus?.state === "paused" ? "#ffc107" :
+                         pomodoroStatus?.state === "cooldown" ? "#17a2b8" : "#6c757d"
+            }} />
+            <span style={styles.focusLabel}>Pomodoro</span>
+            {pomodoroStatus && pomodoroStatus.state !== "idle" && (
+              <span style={{ fontSize: "10px", color: "#888", textTransform: "capitalize" }}>
+                ({pomodoroStatus.state})
+              </span>
+            )}
+          </div>
+          {pomodoroStatus && (pomodoroStatus.state === "running" || pomodoroStatus.state === "paused") && (
+            <button
+              onClick={handlePomodoroToggle}
+              style={{
+                padding: "2px 8px",
+                fontSize: "10px",
+                cursor: "pointer",
+                background: pomodoroStatus.state === "paused" ? "#28a745" : "#6c757d",
+                color: "white",
+                border: "none",
+                borderRadius: "3px"
+              }}
+            >
+              {pomodoroStatus.state === "paused" ? "Resume" : "Pause"}
+            </button>
+          )}
+        </div>
+        <span style={{
+          ...styles.pomodoroTime,
+          color: pomodoroStatus?.state === "running" ? "#fd7e14" :
+                 pomodoroStatus?.state === "paused" ? "#ffc107" : "#333"
+        }}>
+          {pomodoroStatus ? formatTime(pomodoroStatus.elapsedSeconds) : "0:00"}
+        </span>
       </div>
 
       {/* Tabs */}
@@ -1379,6 +1524,23 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
     color: "#999",
     fontStyle: "italic" as const
+  },
+  // Pomodoro styles
+  pomodoroContainer: {
+    padding: "10px 16px",
+    background: "#fff8f0",
+    borderBottom: "1px solid #eee"
+  },
+  pomodoroHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4
+  },
+  pomodoroTime: {
+    fontSize: 24,
+    fontWeight: 700,
+    fontFamily: "monospace"
   },
 }
 

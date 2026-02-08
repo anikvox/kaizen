@@ -118,6 +118,26 @@ export interface ActiveTabChangedEvent {
   timestamp: number;
 }
 
+// Pomodoro Events
+export type PomodoroState = "idle" | "running" | "paused" | "cooldown";
+
+export interface PomodoroStatusData {
+  state: PomodoroState;
+  elapsedSeconds: number;
+  isPaused: boolean;
+  lastActivityAt: string;
+}
+
+export interface PomodoroStatusChangedEvent {
+  userId: string;
+  status: PomodoroStatusData;
+}
+
+export interface PomodoroTickEvent {
+  userId: string;
+  status: PomodoroStatusData;
+}
+
 // Job events (pg-boss)
 export interface JobCompletedEvent {
   userId: string;
@@ -270,6 +290,25 @@ class AppEvents extends EventEmitter {
   onJobFailed(callback: (data: JobFailedEvent) => void) {
     this.on("jobFailed", callback);
     return () => this.off("jobFailed", callback);
+  }
+
+  // Pomodoro Events
+  emitPomodoroStatusChanged(data: PomodoroStatusChangedEvent) {
+    this.emit("pomodoroStatusChanged", data);
+  }
+
+  onPomodoroStatusChanged(callback: (data: PomodoroStatusChangedEvent) => void) {
+    this.on("pomodoroStatusChanged", callback);
+    return () => this.off("pomodoroStatusChanged", callback);
+  }
+
+  emitPomodoroTick(data: PomodoroTickEvent) {
+    this.emit("pomodoroTick", data);
+  }
+
+  onPomodoroTick(callback: (data: PomodoroTickEvent) => void) {
+    this.on("pomodoroTick", callback);
+    return () => this.off("pomodoroTick", callback);
   }
 }
 

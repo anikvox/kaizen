@@ -179,10 +179,32 @@ model UserSettings {
   // Quiz Settings
   quizAnswerOptionsCount        Int      @default(2)    // 2, 3, or 4 answer options per question
   quizActivityDays              Int      @default(3)    // 1-7 days of activity to use for quiz
+  // Pomodoro Settings
+  pomodoroCooldownMs            Int      @default(120000) // Default 2 minutes - inactivity before timer resets
   createdAt                     DateTime @default(now())
   updatedAt                     DateTime @updatedAt
 
+  pomodoro                      PomodoroSession?
+
   @@map("user_settings")
+}
+
+model PomodoroSession {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  settings           UserSettings @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  state              String   @default("idle") // "idle" | "running" | "paused" | "cooldown"
+  accumulatedSeconds Int      @default(0)      // Time accumulated before pause/cooldown
+  startedAt          DateTime?                 // When current running period started
+  pausedAt           DateTime?                 // When manually paused
+  cooldownStartedAt  DateTime?                 // When cooldown period started
+  lastActivityAt     DateTime @default(now())  // Last focus activity timestamp
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("pomodoro_sessions")
 }
 
 model ChatSession {

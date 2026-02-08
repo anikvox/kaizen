@@ -1,5 +1,5 @@
 import { HttpClient } from "./http.js";
-import { HealthEndpoint, UsersEndpoint, SSEEndpoint, DeviceTokensEndpoint, WebsiteVisitsEndpoint, AttentionEndpoint, ExportEndpoint, SettingsEndpoint, ChatsEndpoint, FocusEndpoints, QuizEndpoints } from "./endpoints/index.js";
+import { HealthEndpoint, UsersEndpoint, SSEEndpoint, DeviceTokensEndpoint, WebsiteVisitsEndpoint, AttentionEndpoint, ExportEndpoint, SettingsEndpoint, ChatsEndpoint, FocusEndpoints, QuizEndpoints, PomodoroEndpoints } from "./endpoints/index.js";
 import type { ApiClientOptions } from "./types/index.js";
 
 export class ApiClient {
@@ -16,6 +16,7 @@ export class ApiClient {
   public chats: ChatsEndpoint;
   public focus: FocusEndpoints;
   public quiz: QuizEndpoints;
+  public pomodoro: PomodoroEndpoints;
 
   constructor(options: ApiClientOptions) {
     this.http = new HttpClient(options);
@@ -30,6 +31,7 @@ export class ApiClient {
     this.chats = new ChatsEndpoint(this.http);
     this.focus = new FocusEndpoints(this.http);
     this.quiz = new QuizEndpoints(this.http);
+    this.pomodoro = new PomodoroEndpoints(this.http);
   }
 }
 

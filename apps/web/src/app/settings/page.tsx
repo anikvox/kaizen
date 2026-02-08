@@ -902,6 +902,70 @@ export default function Settings() {
         )}
       </section>
 
+      {/* Pomodoro Settings Section */}
+      <section style={{ marginBottom: "2rem" }}>
+        <h2 style={{ fontSize: "1.25rem", marginBottom: "1rem" }}>Pomodoro Timer</h2>
+        <p style={{ color: "#666", fontSize: "0.9rem", marginBottom: "1rem" }}>
+          The Pomodoro timer automatically tracks your focused work time. It starts when focus is detected
+          and continues running even during brief breaks (cooldown period).
+        </p>
+
+        {settings && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div
+              style={{
+                padding: "1rem",
+                border: "1px solid #ddd",
+                borderRadius: "8px",
+              }}
+            >
+              <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: "500" }}>
+                Cooldown Period
+              </label>
+              <select
+                value={settings.pomodoroCooldownMs ?? 120000}
+                onChange={async (e) => {
+                  setSaving(true);
+                  const api = createApiClient(apiUrl, getTokenFn);
+                  try {
+                    const result = await api.settings.update({
+                      pomodoroCooldownMs: Number(e.target.value),
+                    });
+                    setSettings(result);
+                    setError("");
+                  } catch (err) {
+                    console.error("Update pomodoro cooldown error:", err);
+                    setError("Failed to update pomodoro settings");
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                disabled={saving}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem",
+                  borderRadius: "4px",
+                  border: "1px solid #ccc",
+                  fontSize: "0.9rem",
+                  cursor: saving ? "not-allowed" : "pointer",
+                }}
+              >
+                <option value={30000}>30 seconds</option>
+                <option value={60000}>1 minute</option>
+                <option value={120000}>2 minutes</option>
+                <option value={180000}>3 minutes</option>
+                <option value={300000}>5 minutes</option>
+                <option value={600000}>10 minutes</option>
+              </select>
+              <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#888" }}>
+                How long the timer continues running after all focus sessions end.
+                If you resume work within this time, the timer continues. Otherwise, it resets.
+              </p>
+            </div>
+          </div>
+        )}
+      </section>
+
       {/* Quiz Settings Section */}
       <section style={{ marginBottom: "2rem" }}>
         <h2 style={{ fontSize: "1.25rem", marginBottom: "1rem" }}>Quiz Settings</h2>
