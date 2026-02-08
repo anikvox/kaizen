@@ -1,5 +1,5 @@
 import type { HttpClient } from "../http.js";
-import type { Focus, FocusListResponse, FocusResponse, SSEFocusConnectedData, SSEFocusChangedData } from "../types/index.js";
+import type { Focus, FocusListResponse, FocusResponse } from "../types/index.js";
 
 export class FocusEndpoints {
   constructor(private http: HttpClient) {}
@@ -45,38 +45,5 @@ export class FocusEndpoints {
   async endActive(): Promise<Focus | null> {
     const response = await this.http.post<FocusResponse>("/focus/end", {});
     return response.focus;
-  }
-
-  /**
-   * Subscribe to focus changes via SSE
-   */
-  subscribeFocus(
-    onConnected: (data: SSEFocusConnectedData) => void,
-    onFocusChanged: (data: SSEFocusChangedData) => void,
-    onError?: (error: Event) => void,
-    token?: string
-  ): EventSource {
-    const url = new URL(`${this.http.getBaseUrl()}/sse/focus`);
-    if (token) {
-      url.searchParams.set("token", token);
-    }
-
-    const eventSource = new EventSource(url.toString());
-
-    eventSource.addEventListener("connected", (e) => {
-      const data = JSON.parse((e as MessageEvent).data);
-      onConnected(data);
-    });
-
-    eventSource.addEventListener("focus-changed", (e) => {
-      const data = JSON.parse((e as MessageEvent).data);
-      onFocusChanged(data);
-    });
-
-    if (onError) {
-      eventSource.onerror = onError;
-    }
-
-    return eventSource;
   }
 }

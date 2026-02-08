@@ -11,6 +11,7 @@ import {
   type ChatMessage,
   type ChatMessageStatus,
   type ChatAttentionRange,
+  type UnifiedSSEData,
 } from "@kaizen/api-client";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
@@ -58,6 +59,12 @@ function ChatPageContent() {
   const eventSourceRef = useRef<EventSource | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const hasHandledUrlParams = useRef(false);
+  const activeSessionIdRef = useRef<string | null>(null);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    activeSessionIdRef.current = activeSessionId;
+  }, [activeSessionId]);
 
   // Helper to sort sessions by updatedAt descending
   const sortSessionsByDate = (sessions: ChatSessionListItem[]) =>
@@ -153,7 +160,7 @@ function ChatPageContent() {
     }
   }, [activeSessionId, fetchMessages]);
 
-  // Setup SSE for real-time updates
+  // Setup unified SSE for real-time updates
   useEffect(() => {
     if (!isSignedIn || !clerkUser) return;
 
@@ -168,94 +175,102 @@ function ChatPageContent() {
         eventSourceRef.current.close();
       }
 
-      const api = createApiClient(apiUrl, getTokenFn);
-      eventSourceRef.current = api.chats.subscribeToAllChats(
-        {
-          onConnected: () => {
-            console.log("Chat SSE connected");
-          },
-          onSessionCreated: (data) => {
-            setSessions((prev) =>
-              sortSessionsByDate([
-                {
-                  id: data.session.id,
-                  title: data.session.title,
-                  attentionRange: data.session.attentionRange as ChatAttentionRange,
-                  messageCount: 0,
-                  createdAt: data.session.createdAt,
-                  updatedAt: data.session.updatedAt,
-                },
-                ...prev,
-              ])
-            );
-          },
-          onSessionUpdated: (data) => {
-            setSessions((prev) =>
-              sortSessionsByDate(
-                prev.map((s) =>
-                  s.id === data.sessionId
-                    ? { ...s, ...data.updates }
-                    : s
-                )
-              )
-            );
-          },
-          onSessionDeleted: (data) => {
-            setSessions((prev) => prev.filter((s) => s.id !== data.sessionId));
-            if (activeSessionId === data.sessionId) {
-              setActiveSessionId(null);
-              setMessages([]);
-            }
-          },
-          onMessageCreated: (data) => {
-            if (data.sessionId === activeSessionId) {
-              setMessages((prev) => sortMessagesByDate([...prev, data.message]));
-              // If this is a tool result, remove from pending tool calls
-              if (data.message.role === "tool" && data.message.toolCallId) {
-                setPendingToolCalls((prev) =>
-                  prev.filter((t) => t.toolCallId !== data.message.toolCallId)
-                );
-              }
-            }
-            // Update message count in session list and re-sort
-            setSessions((prev) =>
-              sortSessionsByDate(
-                prev.map((s) =>
-                  s.id === data.sessionId
-                    ? { ...s, messageCount: s.messageCount + 1, updatedAt: new Date().toISOString() }
-                    : s
-                )
-              )
-            );
-          },
-          onMessageUpdated: (data) => {
-            if (data.sessionId === activeSessionId) {
-              setMessages((prev) =>
-                sortMessagesByDate(
-                  prev.map((m) =>
-                    m.id === data.messageId
-                      ? { ...m, ...data.updates, updatedAt: new Date().toISOString() }
-                      : m
+      const api = createApiClient(apiUrl);
+      eventSourceRef.current = api.sse.subscribeUnified(
+        (data: UnifiedSSEData) => {
+          switch (data.type) {
+            case "connected":
+              console.log("Chat SSE connected");
+              break;
+
+            case "chat-session-created":
+              setSessions((prev) =>
+                sortSessionsByDate([
+                  {
+                    id: data.session.id,
+                    title: data.session.title,
+                    attentionRange: data.session.attentionRange as ChatAttentionRange,
+                    messageCount: 0,
+                    createdAt: data.session.createdAt,
+                    updatedAt: data.session.updatedAt,
+                  },
+                  ...prev,
+                ])
+              );
+              break;
+
+            case "chat-session-updated":
+              setSessions((prev) =>
+                sortSessionsByDate(
+                  prev.map((s) =>
+                    s.id === data.sessionId
+                      ? { ...s, ...data.updates }
+                      : s
                   )
                 )
               );
-            }
-          },
-          onToolCallStarted: (data) => {
-            if (data.sessionId === activeSessionId) {
-              setPendingToolCalls((prev) => [
-                ...prev,
-                {
-                  toolCallId: data.toolCallId,
-                  toolName: data.toolName,
-                  sessionId: data.sessionId,
-                },
-              ]);
-            }
-          },
-          onError: () => {
-            console.error("Chat SSE error");
-          },
+              break;
+
+            case "chat-session-deleted":
+              setSessions((prev) => prev.filter((s) => s.id !== data.sessionId));
+              if (activeSessionIdRef.current === data.sessionId) {
+                setActiveSessionId(null);
+                setMessages([]);
+              }
+              break;
+
+            case "chat-message-created":
+              if (data.sessionId === activeSessionIdRef.current) {
+                setMessages((prev) => sortMessagesByDate([...prev, data.message]));
+                // If this is a tool result, remove from pending tool calls
+                if (data.message.role === "tool" && data.message.toolCallId) {
+                  setPendingToolCalls((prev) =>
+                    prev.filter((t) => t.toolCallId !== data.message.toolCallId)
+                  );
+                }
+              }
+              // Update message count in session list and re-sort
+              setSessions((prev) =>
+                sortSessionsByDate(
+                  prev.map((s) =>
+                    s.id === data.sessionId
+                      ? { ...s, messageCount: s.messageCount + 1, updatedAt: new Date().toISOString() }
+                      : s
+                  )
+                )
+              );
+              break;
+
+            case "chat-message-updated":
+              if (data.sessionId === activeSessionIdRef.current) {
+                setMessages((prev) =>
+                  sortMessagesByDate(
+                    prev.map((m) =>
+                      m.id === data.messageId
+                        ? { ...m, ...data.updates, updatedAt: new Date().toISOString() }
+                        : m
+                    )
+                  )
+                );
+              }
+              break;
+
+            case "tool-call-started":
+              if (data.sessionId === activeSessionIdRef.current) {
+                setPendingToolCalls((prev) => [
+                  ...prev,
+                  {
+                    toolCallId: data.toolCallId,
+                    toolName: data.toolName,
+                    sessionId: data.sessionId,
+                  },
+                ]);
+              }
+              break;
+          }
+        },
+        () => {
+          console.error("Chat SSE error");
         },
         token
       );
@@ -270,7 +285,7 @@ function ChatPageContent() {
         eventSourceRef.current = null;
       }
     };
-  }, [isSignedIn, clerkUser, getToken, getTokenFn, activeSessionId]);
+  }, [isSignedIn, clerkUser, getToken]);
 
   // Get the current session's attention range (or selected range for new chats)
   const getCurrentAttentionRange = (): ChatAttentionRange => {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth, SignInButton, useUser } from "@clerk/nextjs";
-import { createApiClient, type UserSettings, type LLMModels, type LLMProviderType, type ModelInfo } from "@kaizen/api-client";
+import { createApiClient, type UserSettings, type LLMModels, type LLMProviderType, type ModelInfo, type UnifiedSSEData } from "@kaizen/api-client";
 import Link from "next/link";
 
 const apiUrl =
@@ -126,7 +126,7 @@ export default function Settings() {
     fetchSettings();
   }, [isLoaded, isSignedIn, fetchSettings]);
 
-  // Subscribe to settings changes via SSE (for real-time sync from extensions)
+  // Subscribe to settings changes via unified SSE (for real-time sync from extensions)
   useEffect(() => {
     if (!isSignedIn || !clerkUser) return;
 
@@ -134,21 +134,24 @@ export default function Settings() {
       const token = await getToken();
       if (!token) return;
 
-      const api = createApiClient(apiUrl, getTokenFn);
-      eventSourceRef.current = api.settings.subscribeSettings(
-        (data) => {
-          // Initial connection with settings
-          if (data.settings) {
-            setSettings(data.settings);
-            setIgnoreListValue(data.settings.attentionTrackingIgnoreList || "");
-            setIgnoreListDirty(false);
-          }
-        },
-        (newSettings) => {
-          // Settings changed from another source (e.g., extension)
-          setSettings(newSettings);
-          if (!ignoreListDirty) {
-            setIgnoreListValue(newSettings.attentionTrackingIgnoreList || "");
+      const api = createApiClient(apiUrl);
+      eventSourceRef.current = api.sse.subscribeUnified(
+        (data: UnifiedSSEData) => {
+          switch (data.type) {
+            case "connected":
+              // Initial connection with settings
+              setSettings(data.settings);
+              setIgnoreListValue(data.settings.attentionTrackingIgnoreList || "");
+              setIgnoreListDirty(false);
+              break;
+
+            case "settings-changed":
+              // Settings changed from another source (e.g., extension)
+              setSettings((prev) => prev ? { ...prev, ...data.settings } : null);
+              if (!ignoreListDirty && data.settings.attentionTrackingIgnoreList !== undefined) {
+                setIgnoreListValue(data.settings.attentionTrackingIgnoreList || "");
+              }
+              break;
           }
         },
         (error) => {
@@ -164,7 +167,7 @@ export default function Settings() {
       eventSourceRef.current?.close();
       eventSourceRef.current = null;
     };
-  }, [isSignedIn, clerkUser, getToken, getTokenFn]);
+  }, [isSignedIn, clerkUser, getToken, ignoreListDirty]);
 
 
   const handleToggle = async (key: keyof UserSettings) => {

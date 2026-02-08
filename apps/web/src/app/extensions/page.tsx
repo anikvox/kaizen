@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth, SignInButton, useUser } from "@clerk/nextjs";
-import { createApiClient, type DeviceToken } from "@kaizen/api-client";
+import { createApiClient, type DeviceToken, type UnifiedSSEData } from "@kaizen/api-client";
 import Link from "next/link";
 
 const apiUrl =
@@ -54,27 +54,33 @@ export default function Extensions() {
     fetchTokens();
   }, [isLoaded, isSignedIn, fetchTokens]);
 
-  // Subscribe to device list changes via SSE
+  // Subscribe to device token changes via unified SSE
   useEffect(() => {
     if (!isSignedIn || !clerkUser) return;
 
     let eventSource: EventSource | null = null;
 
     const setupSSE = async () => {
-      const api = createApiClient(apiUrl, getTokenFn);
-      eventSource = await api.sse.subscribeDeviceListChanged(
-        (data) => {
-          if (data.action === "created") {
-            // Refetch to get the new device
-            fetchTokens();
-          } else if (data.action === "deleted") {
-            // Remove the device locally
-            setTokens((prev) => prev.filter((t) => t.id !== data.deviceId));
+      const token = await getToken();
+      if (!token) return;
+
+      const api = createApiClient(apiUrl);
+      eventSource = api.sse.subscribeUnified(
+        (data: UnifiedSSEData) => {
+          if (data.type === "device-list-changed") {
+            if (data.action === "created") {
+              // Refetch to get the new device
+              fetchTokens();
+            } else if (data.action === "deleted") {
+              // Remove the device locally
+              setTokens((prev) => prev.filter((t) => t.id !== data.deviceId));
+            }
           }
         },
         (error) => {
           console.error("SSE error:", error);
-        }
+        },
+        token
       );
     };
 
@@ -83,7 +89,7 @@ export default function Extensions() {
     return () => {
       eventSource?.close();
     };
-  }, [isSignedIn, clerkUser, getTokenFn, fetchTokens]);
+  }, [isSignedIn, clerkUser, getToken, fetchTokens]);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to unlink this extension? It will no longer be able to access your account.")) {
