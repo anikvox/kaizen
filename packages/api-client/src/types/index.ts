@@ -567,7 +567,7 @@ export interface SSEActiveTabChangedData {
   timestamp: number;
 }
 
-// Quiz Types (stateless - progress tracked on client)
+// Quiz Types
 export interface QuizQuestion {
   id: string;
   questionIndex: number;
@@ -576,11 +576,25 @@ export interface QuizQuestion {
   correctIndex: number;
 }
 
+export interface QuizAnswerData {
+  questionIndex: number;
+  selectedIndex: number;
+  isCorrect: boolean;
+  answeredAt: string;
+}
+
 export interface GeneratedQuiz {
+  id: string;
   questions: QuizQuestion[];
   generatedAt: string;
   activityDays: number;
   optionsCount: number;
+}
+
+export interface QuizWithAnswers extends GeneratedQuiz {
+  answers: QuizAnswerData[];
+  completedAt: string | null;
+  score: number | null;
 }
 
 export type QuizJobStatus = "pending" | "processing" | "completed" | "failed";
@@ -588,9 +602,19 @@ export type QuizJobStatus = "pending" | "processing" | "completed" | "failed";
 export interface QuizJobResponse {
   jobId?: string;
   status: QuizJobStatus;
-  quiz?: GeneratedQuiz;
+  quiz?: QuizWithAnswers;
   error?: string;
   code?: string;
+}
+
+export interface QuizCurrentResponse {
+  quiz: QuizWithAnswers | null;
+}
+
+export interface QuizAnswerResponse {
+  success: boolean;
+  isCorrect: boolean;
+  quiz: QuizWithAnswers;
 }
 
 export interface QuizResultItem {

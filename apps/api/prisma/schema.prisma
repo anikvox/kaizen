@@ -23,6 +23,7 @@ model User {
   settings        UserSettings?
   chatSessions    ChatSession[]
   focuses         Focus[]
+  quizzes         Quiz[]
   quizResults     QuizResult[]
 
   @@map("users")
@@ -239,10 +240,49 @@ model Focus {
   @@map("focuses")
 }
 
+model Quiz {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  questions      Json     // Array of QuizQuestion objects
+  activityDays   Int
+  optionsCount   Int
+
+  // Track what content was used to generate this quiz (for deduplication)
+  contentHash    String?  // Hash of attention data used
+
+  generatedAt    DateTime @default(now())
+  completedAt    DateTime?
+
+  answers        QuizAnswer[]
+  result         QuizResult?
+
+  @@index([userId])
+  @@index([userId, generatedAt])
+  @@map("quizzes")
+}
+
+model QuizAnswer {
+  id             String   @id @default(cuid())
+  quizId         String
+  quiz           Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  questionIndex  Int
+  selectedIndex  Int
+  isCorrect      Boolean
+  answeredAt     DateTime @default(now())
+
+  @@unique([quizId, questionIndex])
+  @@map("quiz_answers")
+}
+
 model QuizResult {
   id             String   @id @default(cuid())
   userId         String
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizId         String?  @unique
+  quiz           Quiz?    @relation(fields: [quizId], references: [id], onDelete: SetNull)
 
   totalQuestions Int
   correctAnswers Int

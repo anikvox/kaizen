@@ -189,6 +189,7 @@ async function handleQuizGeneration(
   }
 
   return {
+    quizId: quiz.id,
     questionCount: quiz.questions.length,
     generatedAt: quiz.generatedAt,
   };

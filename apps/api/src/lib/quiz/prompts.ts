@@ -34,6 +34,20 @@ export function createQuizPrompt(
   ];
   const selectedStyle = questionStyles[Math.floor(Math.random() * questionStyles.length)];
 
+  // Build previous questions section for deduplication
+  let previousQuestionsSection = "";
+  if (context.previousQuestions.length > 0) {
+    previousQuestionsSection = `
+## IMPORTANT: Previous Questions to Avoid
+
+The following questions have already been asked in recent quizzes. DO NOT repeat these or create very similar questions:
+
+${context.previousQuestions.map((q, i) => `${i + 1}. ${q}`).join("\n")}
+
+Generate COMPLETELY DIFFERENT questions that test different aspects of the content.
+`;
+  }
+
   return `Generate ${questionCount} UNIQUE quiz questions to test understanding of the user's recent learning activity.
 
 ## Learning Data
@@ -45,7 +59,7 @@ Total Words Read: ${context.totalWordsRead}
 ### Key Content
 
 ${context.serializedAttention}
-
+${previousQuestionsSection}
 ## Instructions
 
 Create ${questionCount} quiz questions that:
@@ -56,6 +70,7 @@ Create ${questionCount} quiz questions that:
 5. Have one correct answer and ${optionsCount - 1} plausible distractor(s)
 6. For this quiz, ${selectedStyle}
 7. Generate DIFFERENT questions than previous quizzes - vary the topics and angles
+8. Cover different topics/sections from the content - don't cluster questions on one topic
 
 ## Rules
 
@@ -64,6 +79,7 @@ Create ${questionCount} quiz questions that:
 - Make questions specific to the content
 - correct_index is 0-based (0 for first option, 1 for second, etc.)
 - Variation seed: ${seed} (use this to ensure uniqueness)
+- NEVER repeat a question from the "Previous Questions to Avoid" section
 
 ## Response Format
 
@@ -76,4 +92,3 @@ Return ONLY a valid JSON array with no additional text:
   }
 ]`;
 }
-

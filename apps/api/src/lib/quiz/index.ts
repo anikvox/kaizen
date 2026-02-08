@@ -3,6 +3,8 @@ export type {
   QuizSettings,
   QuizQuestion,
   GeneratedQuiz,
+  QuizWithAnswers,
+  QuizAnswerData,
   QuizJob,
   QuizJobStatus,
   QuizGenerationContext,
@@ -17,6 +19,8 @@ export {
   generateQuiz,
   gatherQuizContext,
   getQueueStatus,
+  getCurrentQuiz,
+  submitAnswer,
   getJobStatus, // deprecated
   extractQuizSettings,
 } from "./service.js";

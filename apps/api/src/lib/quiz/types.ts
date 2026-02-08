@@ -1,5 +1,5 @@
 /**
- * Quiz types - Stateless quiz generation with background queue
+ * Quiz types - Quiz generation with persistent storage
  */
 
 export interface QuizSettings {
@@ -21,10 +21,24 @@ export interface QuizQuestion {
 }
 
 export interface GeneratedQuiz {
+  id: string;
   questions: QuizQuestion[];
   generatedAt: string;
   activityDays: number;
   optionsCount: number;
+}
+
+export interface QuizWithAnswers extends GeneratedQuiz {
+  answers: QuizAnswerData[];
+  completedAt: string | null;
+  score: number | null;
+}
+
+export interface QuizAnswerData {
+  questionIndex: number;
+  selectedIndex: number;
+  isCorrect: boolean;
+  answeredAt: string;
 }
 
 export type QuizJobStatus = "pending" | "processing" | "completed" | "failed";
@@ -43,4 +57,5 @@ export interface QuizGenerationContext {
   websiteCount: number;
   totalWordsRead: number;
   serializedAttention: string;
+  previousQuestions: string[]; // For deduplication
 }

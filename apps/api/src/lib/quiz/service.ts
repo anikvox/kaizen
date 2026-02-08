@@ -1,17 +1,15 @@
 /**
- * Quiz service - Generates quiz questions on-demand via task queue
- *
- * This service has been refactored to use the persistent task queue
- * instead of the in-memory p-queue.
+ * Quiz service - Generates quiz questions and stores them in database
  */
 
+import { createHash } from "crypto";
 import { db } from "../db.js";
 import { getAttentionData } from "../attention.js";
 import { serializeAttentionCompact } from "../llm/prompts.js";
 import { createLLMService } from "../llm/service.js";
 import { getUserFocusHistory } from "../focus/index.js";
 import type { UserSettings } from "@prisma/client";
-import type { QuizSettings, GeneratedQuiz, QuizGenerationContext } from "./types.js";
+import type { QuizSettings, GeneratedQuiz, QuizGenerationContext, QuizQuestion, QuizWithAnswers } from "./types.js";
 import { DEFAULT_QUIZ_SETTINGS } from "./types.js";
 import { createQuizPrompt, parseQuizResponse } from "./prompts.js";
 import { LLM_CONFIG, getPrompt, PROMPT_NAMES } from "../llm/index.js";
@@ -23,6 +21,7 @@ import {
 import { JOB_NAMES } from "../jobs/types.js";
 
 const QUESTION_COUNT = 10;
+const QUIZ_VALIDITY_HOURS = 24; // Quiz is valid for 24 hours
 
 /**
  * Extract quiz settings from user settings
@@ -32,6 +31,125 @@ export function extractQuizSettings(settings: UserSettings | null): QuizSettings
     answerOptionsCount: settings?.quizAnswerOptionsCount ?? DEFAULT_QUIZ_SETTINGS.answerOptionsCount,
     activityDays: settings?.quizActivityDays ?? DEFAULT_QUIZ_SETTINGS.activityDays,
   };
+}
+
+/**
+ * Get the current quiz for a user (or null if none exists or expired)
+ */
+export async function getCurrentQuiz(userId: string): Promise<QuizWithAnswers | null> {
+  const cutoffTime = new Date(Date.now() - QUIZ_VALIDITY_HOURS * 60 * 60 * 1000);
+
+  const quiz = await db.quiz.findFirst({
+    where: {
+      userId,
+      generatedAt: { gte: cutoffTime },
+    },
+    orderBy: { generatedAt: "desc" },
+    include: {
+      answers: {
+        orderBy: { questionIndex: "asc" },
+      },
+      result: true,
+    },
+  });
+
+  if (!quiz) return null;
+
+  const questions = quiz.questions as QuizQuestion[];
+  const correctCount = quiz.answers.filter(a => a.isCorrect).length;
+
+  return {
+    id: quiz.id,
+    questions,
+    generatedAt: quiz.generatedAt.toISOString(),
+    activityDays: quiz.activityDays,
+    optionsCount: quiz.optionsCount,
+    answers: quiz.answers.map(a => ({
+      questionIndex: a.questionIndex,
+      selectedIndex: a.selectedIndex,
+      isCorrect: a.isCorrect,
+      answeredAt: a.answeredAt.toISOString(),
+    })),
+    completedAt: quiz.completedAt?.toISOString() || null,
+    score: quiz.completedAt ? correctCount : null,
+  };
+}
+
+/**
+ * Submit an answer for a quiz question
+ */
+export async function submitAnswer(
+  userId: string,
+  quizId: string,
+  questionIndex: number,
+  selectedIndex: number
+): Promise<{ success: boolean; isCorrect: boolean; error?: string }> {
+  // Verify quiz belongs to user
+  const quiz = await db.quiz.findUnique({
+    where: { id: quizId },
+    select: { userId: true, questions: true, completedAt: true },
+  });
+
+  if (!quiz || quiz.userId !== userId) {
+    return { success: false, isCorrect: false, error: "Quiz not found" };
+  }
+
+  if (quiz.completedAt) {
+    return { success: false, isCorrect: false, error: "Quiz already completed" };
+  }
+
+  const questions = quiz.questions as QuizQuestion[];
+  const question = questions[questionIndex];
+
+  if (!question) {
+    return { success: false, isCorrect: false, error: "Question not found" };
+  }
+
+  const isCorrect = selectedIndex === question.correctIndex;
+
+  // Upsert the answer (in case they change their answer)
+  await db.quizAnswer.upsert({
+    where: {
+      quizId_questionIndex: { quizId, questionIndex },
+    },
+    create: {
+      quizId,
+      questionIndex,
+      selectedIndex,
+      isCorrect,
+    },
+    update: {
+      selectedIndex,
+      isCorrect,
+      answeredAt: new Date(),
+    },
+  });
+
+  // Check if all questions are answered
+  const answerCount = await db.quizAnswer.count({ where: { quizId } });
+
+  if (answerCount === questions.length) {
+    // Mark quiz as completed and create result
+    const answers = await db.quizAnswer.findMany({ where: { quizId } });
+    const correctAnswers = answers.filter(a => a.isCorrect).length;
+
+    await db.$transaction([
+      db.quiz.update({
+        where: { id: quizId },
+        data: { completedAt: new Date() },
+      }),
+      db.quizResult.create({
+        data: {
+          userId,
+          quizId,
+          totalQuestions: questions.length,
+          correctAnswers,
+        },
+      }),
+    ]);
+  }
+
+  return { success: true, isCorrect };
 }
 
 /**
@@ -73,10 +191,15 @@ export async function getQuizJobStatus(jobId: string, userId: string): Promise<{
   }
 
   if (job.state === "completed" && job.output) {
-    return {
-      status: job.state,
-      quiz: job.output as unknown as GeneratedQuiz,
-    };
+    // The job output now contains the quiz ID
+    const quizData = job.output as { quizId: string };
+    const quiz = await getCurrentQuiz(userId);
+    if (quiz) {
+      return {
+        status: job.state,
+        quiz,
+      };
+    }
   }
 
   if (job.state === "failed") {
@@ -93,7 +216,7 @@ export async function getQuizJobStatus(jobId: string, userId: string): Promise<{
 
 /**
  * Generate quiz directly (used by task handler)
- * This is the core generation logic without queue management.
+ * This is the core generation logic that saves to database.
  */
 export async function generateQuiz(
   userId: string,
@@ -152,15 +275,36 @@ export async function generateQuiz(
 
   console.log(`[Quiz] Successfully generated ${parsed.questions.length} questions`);
 
+  // Create content hash for deduplication tracking
+  const contentHash = createHash("md5")
+    .update(context.serializedAttention)
+    .digest("hex");
+
+  // Save quiz to database
+  const questions: QuizQuestion[] = parsed.questions.map((q, index) => ({
+    id: `q-${index}`,
+    questionIndex: index,
+    question: q.question,
+    options: q.options,
+    correctIndex: q.correct_index,
+  }));
+
+  const savedQuiz = await db.quiz.create({
+    data: {
+      userId,
+      questions: questions as any,
+      activityDays,
+      optionsCount: answerOptionsCount,
+      contentHash,
+    },
+  });
+
+  console.log(`[Quiz] Saved quiz ${savedQuiz.id} to database`);
+
   return {
-    questions: parsed.questions.map((q, index) => ({
-      id: `q-${index}`,
-      questionIndex: index,
-      question: q.question,
-      options: q.options,
-      correctIndex: q.correct_index,
-    })),
-    generatedAt: new Date().toISOString(),
+    id: savedQuiz.id,
+    questions,
+    generatedAt: savedQuiz.generatedAt.toISOString(),
     activityDays,
     optionsCount: answerOptionsCount,
   };
@@ -191,11 +335,28 @@ export async function gatherQuizContext(
   // Serialize attention data
   const serializedAttention = serializeAttentionCompact(attentionData);
 
+  // Get previous quiz questions (last 3 quizzes) for deduplication
+  const recentQuizzes = await db.quiz.findMany({
+    where: { userId },
+    orderBy: { generatedAt: "desc" },
+    take: 3,
+    select: { questions: true },
+  });
+
+  const previousQuestions: string[] = [];
+  for (const quiz of recentQuizzes) {
+    const questions = quiz.questions as QuizQuestion[];
+    for (const q of questions) {
+      previousQuestions.push(q.question);
+    }
+  }
+
   return {
     focusTopics,
     websiteCount: attentionData.summary.totalPages,
     totalWordsRead: attentionData.summary.totalWordsRead,
     serializedAttention,
+    previousQuestions,
   };
 }
 

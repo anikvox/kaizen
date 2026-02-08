@@ -46,6 +46,7 @@ export interface FocusCalculationResult {
 }
 
 export interface QuizGenerationResult {
+  quizId: string;
   questionCount: number;
   generatedAt: string;
 }

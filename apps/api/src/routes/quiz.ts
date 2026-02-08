@@ -1,6 +1,12 @@
 import { Hono } from "hono";
 import { db } from "../lib/index.js";
-import { startQuizGeneration, getQuizJobStatus, getQueueStatus } from "../lib/quiz/index.js";
+import {
+  startQuizGeneration,
+  getQuizJobStatus,
+  getQueueStatus,
+  getCurrentQuiz,
+  submitAnswer,
+} from "../lib/quiz/index.js";
 import { getJob } from "../lib/jobs/index.js";
 
 // Combined variables type for routes that support both auth methods
@@ -70,6 +76,27 @@ async function dualAuthMiddleware(c: any, next: () => Promise<void>) {
 }
 
 /**
+ * GET /quiz/current
+ * Get the current quiz for the user.
+ * Returns null if no quiz exists or it's expired.
+ */
+app.get("/current", dualAuthMiddleware, async (c) => {
+  const userId = await getUserIdFromContext(c);
+
+  if (!userId) {
+    return c.json({ error: "User not found" }, 404);
+  }
+
+  try {
+    const quiz = await getCurrentQuiz(userId);
+    return c.json({ quiz });
+  } catch (error) {
+    console.error("[Quiz] Error getting current quiz:", error);
+    return c.json({ error: "Failed to get current quiz" }, 500);
+  }
+});
+
+/**
  * POST /quiz/generate
  * Start quiz generation via job queue.
  * Client should poll GET /quiz/job/:jobId for status.
@@ -112,7 +139,13 @@ app.get("/job/:jobId", dualAuthMiddleware, async (c) => {
     const job = await getJob(jobId);
 
     if (!job) {
-      return c.json({ error: "Job not found" }, 404);
+      // Job not found in pg-boss - check if quiz was already generated
+      const quiz = await getCurrentQuiz(userId);
+      if (quiz) {
+        return c.json({ status: "completed", quiz });
+      }
+      // Job might still be pending - return pending status
+      return c.json({ status: "pending" });
     }
 
     // Check that job belongs to user
@@ -123,9 +156,10 @@ app.get("/job/:jobId", dualAuthMiddleware, async (c) => {
 
     // Return full result if completed
     if (job.state === "completed" && job.output) {
+      const quiz = await getCurrentQuiz(userId);
       return c.json({
         status: "completed",
-        quiz: job.output,
+        quiz,
       });
     }
 
@@ -148,14 +182,59 @@ app.get("/job/:jobId", dualAuthMiddleware, async (c) => {
       status: statusMap[job.state] || job.state,
     });
   } catch (error) {
-    console.error("[Quiz] Error getting job status:", error);
-    return c.json({ error: "Failed to get job status" }, 500);
+    // pg-boss throws "Queue X does not exist" when job is very new
+    // Check if quiz was already generated, otherwise return pending
+    const quiz = await getCurrentQuiz(userId);
+    if (quiz) {
+      return c.json({ status: "completed", quiz });
+    }
+    return c.json({ status: "pending" });
+  }
+});
+
+/**
+ * POST /quiz/:quizId/answer
+ * Submit an answer for a quiz question.
+ */
+app.post("/:quizId/answer", dualAuthMiddleware, async (c) => {
+  const userId = await getUserIdFromContext(c);
+
+  if (!userId) {
+    return c.json({ error: "User not found" }, 404);
+  }
+
+  const quizId = c.req.param("quizId");
+
+  try {
+    const body = await c.req.json<{ questionIndex: number; selectedIndex: number }>();
+
+    if (typeof body.questionIndex !== "number" || typeof body.selectedIndex !== "number") {
+      return c.json({ error: "questionIndex and selectedIndex are required" }, 400);
+    }
+
+    const result = await submitAnswer(userId, quizId, body.questionIndex, body.selectedIndex);
+
+    if (!result.success) {
+      return c.json({ error: result.error }, 400);
+    }
+
+    // Get updated quiz state
+    const quiz = await getCurrentQuiz(userId);
+
+    return c.json({
+      success: true,
+      isCorrect: result.isCorrect,
+      quiz,
+    });
+  } catch (error) {
+    console.error("[Quiz] Error submitting answer:", error);
+    return c.json({ error: "Failed to submit answer" }, 500);
   }
 });
 
 /**
  * POST /quiz/result
- * Save a quiz result.
+ * Save a quiz result (legacy endpoint for backward compatibility).
  */
 app.post("/result", dualAuthMiddleware, async (c) => {
   const userId = await getUserIdFromContext(c);
