@@ -21,6 +21,7 @@ clean:
     docker compose down -v
     rm -rf apps/*/dist apps/*/.next apps/*/.plasmo packages/*/dist .turbo
     rm -rf node_modules apps/*/node_modules packages/*/node_modules
+    rm -rf apps/extension/build
     pnpm install
 
 db-migrate name:

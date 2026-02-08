@@ -16,7 +16,7 @@ import {
   type UserJobsStatus,
   type FocusCalculationPayload,
   type QuizGenerationPayload,
-  type SummarizationPayload,
+  type VisitSummarizationPayload,
 } from "./types.js";
 
 /**
@@ -52,18 +52,18 @@ export async function sendQuizGeneration(
 }
 
 /**
- * Send a summarization job
+ * Send a visit summarization job
  */
-export async function sendSummarization(
+export async function sendVisitSummarization(
   userId: string,
   visitIds?: string[]
 ): Promise<string | null> {
   const boss = await getBoss();
   return boss.send(
-    JOB_NAMES.SUMMARIZATION,
-    { userId, visitIds } as SummarizationPayload,
+    JOB_NAMES.VISIT_SUMMARIZATION,
+    { userId, visitIds } as VisitSummarizationPayload,
     {
-      singletonKey: visitIds ? undefined : `summarize-${userId}`,
+      singletonKey: visitIds ? undefined : `visit-summarize-${userId}`,
       singletonSeconds: visitIds ? undefined : 30,
     }
   );
@@ -131,7 +131,7 @@ function toJobStatus(job: Job): JobStatus {
  *
  * Note: pg-boss doesn't have built-in methods to list jobs by user.
  * Job visibility is provided via SSE events (jobCreated, jobCompleted, jobFailed).
- * This returns minimal stats using pg-boss's getQueueSize().
+ * This returns minimal stats using pg-boss's getQueueStats().
  */
 export async function getUserJobsStatus(userId: string): Promise<UserJobsStatus> {
   if (!isBossRunning()) {
@@ -150,12 +150,21 @@ export async function getUserJobsStatus(userId: string): Promise<UserJobsStatus>
 
   const boss = await getBoss();
 
-  // Get queue sizes for each job type
-  const [focusSize, quizSize, summarizeSize] = await Promise.all([
-    boss.getQueueSize(JOB_NAMES.FOCUS_CALCULATION),
-    boss.getQueueSize(JOB_NAMES.QUIZ_GENERATION),
-    boss.getQueueSize(JOB_NAMES.SUMMARIZATION),
+  // Get queue stats for each job type (v11+ API)
+  const [focusStats, quizStats, summarizeStats] = await Promise.all([
+    boss.getQueueStats(JOB_NAMES.FOCUS_CALCULATION),
+    boss.getQueueStats(JOB_NAMES.QUIZ_GENERATION),
+    boss.getQueueStats(JOB_NAMES.VISIT_SUMMARIZATION),
   ]);
+
+  const pendingCount =
+    (focusStats?.queuedCount ?? 0) +
+    (quizStats?.queuedCount ?? 0) +
+    (summarizeStats?.queuedCount ?? 0);
+  const activeCount =
+    (focusStats?.activeCount ?? 0) +
+    (quizStats?.activeCount ?? 0) +
+    (summarizeStats?.activeCount ?? 0);
 
   // pg-boss doesn't expose per-user job lists via its API
   // Clients should track job IDs from SSE events or job creation responses
@@ -164,8 +173,8 @@ export async function getUserJobsStatus(userId: string): Promise<UserJobsStatus>
     active: [],
     recent: [],
     stats: {
-      pendingCount: focusSize + quizSize + summarizeSize,
-      activeCount: 0, // Would need raw query to get this
+      pendingCount,
+      activeCount,
       completedToday: 0,
       failedToday: 0,
     },
@@ -196,19 +205,30 @@ export async function getQueueStats(): Promise<{
 
   const boss = await getBoss();
 
-  // Get queue sizes for each job type
-  const [focusSize, quizSize, summarizeSize] = await Promise.all([
-    boss.getQueueSize(JOB_NAMES.FOCUS_CALCULATION),
-    boss.getQueueSize(JOB_NAMES.QUIZ_GENERATION),
-    boss.getQueueSize(JOB_NAMES.SUMMARIZATION),
+  // Get queue stats for each job type (v11+ API)
+  const [focusStats, quizStats, summarizeStats] = await Promise.all([
+    boss.getQueueStats(JOB_NAMES.FOCUS_CALCULATION),
+    boss.getQueueStats(JOB_NAMES.QUIZ_GENERATION),
+    boss.getQueueStats(JOB_NAMES.VISIT_SUMMARIZATION),
   ]);
 
-  const total = focusSize + quizSize + summarizeSize;
+  const created =
+    (focusStats?.queuedCount ?? 0) +
+    (quizStats?.queuedCount ?? 0) +
+    (summarizeStats?.queuedCount ?? 0);
+  const active =
+    (focusStats?.activeCount ?? 0) +
+    (quizStats?.activeCount ?? 0) +
+    (summarizeStats?.activeCount ?? 0);
+  const total =
+    (focusStats?.totalCount ?? 0) +
+    (quizStats?.totalCount ?? 0) +
+    (summarizeStats?.totalCount ?? 0);
 
   return {
-    created: total,
+    created,
     retry: 0,
-    active: 0,
+    active,
     completed: 0,
     failed: 0,
     all: total,

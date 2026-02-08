@@ -20,9 +20,7 @@ export { startScheduler, stopScheduler } from "./scheduler.js";
 export {
   sendFocusCalculation,
   sendQuizGeneration,
-  sendSummarization,
-  cancelJob,
+  sendVisitSummarization,
   getJob,
   getUserJobsStatus,
-  getQueueStats,
 } from "./service.js";

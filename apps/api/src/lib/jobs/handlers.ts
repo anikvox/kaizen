@@ -4,8 +4,7 @@
  * Individual handlers for each job type.
  */
 
-import type PgBoss from "pg-boss";
-import type { Job } from "pg-boss";
+import type { PgBoss, Job } from "pg-boss";
 import { db } from "../db.js";
 import { fetchRawAttentionData } from "../attention.js";
 import { runFocusAgent, checkAndEndInactiveFocuses } from "../focus/agent.js";
@@ -20,15 +19,14 @@ import {
 import { MAX_ATTENTION_WINDOW_MS, NO_FOCUS_ATTENTION_WINDOW_MS } from "../focus/types.js";
 import { processUserSummarization } from "../summarization.js";
 import { generateQuiz } from "../quiz/service.js";
-import { events } from "../events.js";
 import {
   JOB_NAMES,
   type FocusCalculationPayload,
   type FocusCalculationResult,
   type QuizGenerationPayload,
   type QuizGenerationResult,
-  type SummarizationPayload,
-  type SummarizationResult,
+  type VisitSummarizationPayload,
+  type VisitSummarizationResult,
 } from "./types.js";
 
 // Cache processed attention hashes to avoid reprocessing
@@ -179,11 +177,11 @@ async function handleQuizGeneration(
 }
 
 /**
- * Handle summarization job
+ * Handle visit summarization job
  */
-async function handleSummarization(
-  job: Job<SummarizationPayload>
-): Promise<SummarizationResult> {
+async function handleVisitSummarization(
+  job: Job<VisitSummarizationPayload>
+): Promise<VisitSummarizationResult> {
   const { userId } = job.data;
 
   const settings = await db.userSettings.findUnique({
@@ -208,91 +206,30 @@ async function handleSummarization(
  * Register all job handlers with pg-boss
  */
 export async function registerHandlers(boss: PgBoss): Promise<void> {
-  // Focus calculation - process one at a time per user
+  // Focus calculation
   await boss.work<FocusCalculationPayload, FocusCalculationResult>(
     JOB_NAMES.FOCUS_CALCULATION,
-    { teamConcurrency: 1, teamSize: 5 },
-    async (job) => {
+    async ([job]) => {
       console.log(`[Jobs] Processing focus calculation for user ${job.data.userId}`);
-      try {
-        const result = await handleFocusCalculation(job);
-
-        // Emit event for SSE
-        events.emitJobCompleted({
-          userId: job.data.userId,
-          jobId: job.id,
-          name: JOB_NAMES.FOCUS_CALCULATION,
-          result,
-        });
-
-        return result;
-      } catch (error) {
-        events.emitJobFailed({
-          userId: job.data.userId,
-          jobId: job.id,
-          name: JOB_NAMES.FOCUS_CALCULATION,
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
-        throw error;
-      }
+      return handleFocusCalculation(job);
     }
   );
 
-  // Quiz generation - one at a time globally (expensive LLM calls)
+  // Quiz generation
   await boss.work<QuizGenerationPayload, QuizGenerationResult>(
     JOB_NAMES.QUIZ_GENERATION,
-    { teamConcurrency: 1, teamSize: 2 },
-    async (job) => {
+    async ([job]) => {
       console.log(`[Jobs] Processing quiz generation for user ${job.data.userId}`);
-      try {
-        const result = await handleQuizGeneration(job);
-
-        events.emitJobCompleted({
-          userId: job.data.userId,
-          jobId: job.id,
-          name: JOB_NAMES.QUIZ_GENERATION,
-          result,
-        });
-
-        return result;
-      } catch (error) {
-        events.emitJobFailed({
-          userId: job.data.userId,
-          jobId: job.id,
-          name: JOB_NAMES.QUIZ_GENERATION,
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
-        throw error;
-      }
+      return handleQuizGeneration(job);
     }
   );
 
-  // Summarization
-  await boss.work<SummarizationPayload, SummarizationResult>(
-    JOB_NAMES.SUMMARIZATION,
-    { teamConcurrency: 1, teamSize: 5 },
-    async (job) => {
-      console.log(`[Jobs] Processing summarization for user ${job.data.userId}`);
-      try {
-        const result = await handleSummarization(job);
-
-        events.emitJobCompleted({
-          userId: job.data.userId,
-          jobId: job.id,
-          name: JOB_NAMES.SUMMARIZATION,
-          result,
-        });
-
-        return result;
-      } catch (error) {
-        events.emitJobFailed({
-          userId: job.data.userId,
-          jobId: job.id,
-          name: JOB_NAMES.SUMMARIZATION,
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
-        throw error;
-      }
+  // Visit summarization
+  await boss.work<VisitSummarizationPayload, VisitSummarizationResult>(
+    JOB_NAMES.VISIT_SUMMARIZATION,
+    async ([job]) => {
+      console.log(`[Jobs] Processing visit summarization for user ${job.data.userId}`);
+      return handleVisitSummarization(job);
     }
   );
 

@@ -5,7 +5,7 @@
  */
 
 import { Cron } from "croner";
-import type PgBoss from "pg-boss";
+import type { PgBoss } from "pg-boss";
 import { db } from "../db.js";
 import { JOB_NAMES } from "./types.js";
 
@@ -43,9 +43,9 @@ async function scheduleFocusCalculations(boss: PgBoss): Promise<void> {
 }
 
 /**
- * Schedule summarization jobs for all users with it enabled
+ * Schedule visit summarization jobs for all users with it enabled
  */
-async function scheduleSummarizations(boss: PgBoss): Promise<void> {
+async function scheduleVisitSummarizations(boss: PgBoss): Promise<void> {
   const users = await db.userSettings.findMany({
     where: { attentionSummarizationEnabled: true },
     select: {
@@ -62,10 +62,10 @@ async function scheduleSummarizations(boss: PgBoss): Promise<void> {
     const lastCalc = user.lastSummarizationCalculatedAt?.getTime() || 0;
 
     if (now - lastCalc >= interval) {
-      await boss.send(JOB_NAMES.SUMMARIZATION, {
+      await boss.send(JOB_NAMES.VISIT_SUMMARIZATION, {
         userId: user.userId,
       }, {
-        singletonKey: `summarize-${user.userId}`,
+        singletonKey: `visit-summarize-${user.userId}`,
         singletonSeconds: Math.floor(interval / 1000),
       });
     }
@@ -86,12 +86,12 @@ export function startScheduler(boss: PgBoss): void {
   });
   scheduledJobs.push(focusCron);
 
-  // Run summarizations every 30 seconds
+  // Run visit summarizations every 30 seconds
   const summarizeCron = new Cron("*/30 * * * * *", async () => {
     try {
-      await scheduleSummarizations(boss);
+      await scheduleVisitSummarizations(boss);
     } catch (error) {
-      console.error("[Scheduler] Error scheduling summarizations:", error);
+      console.error("[Scheduler] Error scheduling visit summarizations:", error);
     }
   });
   scheduledJobs.push(summarizeCron);

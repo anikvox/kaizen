@@ -9,4 +9,3 @@ export { SettingsEndpoint } from "./settings.js";
 export { ChatsEndpoint } from "./chats.js";
 export { FocusEndpoints } from "./focus.js";
 export { QuizEndpoints } from "./quiz.js";
-export { TasksEndpoint } from "./tasks.js";

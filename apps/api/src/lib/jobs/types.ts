@@ -8,7 +8,7 @@
 export const JOB_NAMES = {
   FOCUS_CALCULATION: "focus-calculation",
   QUIZ_GENERATION: "quiz-generation",
-  SUMMARIZATION: "summarization",
+  VISIT_SUMMARIZATION: "visit-summarization",
 } as const;
 
 export type JobName = typeof JOB_NAMES[keyof typeof JOB_NAMES];
@@ -25,7 +25,7 @@ export interface QuizGenerationPayload {
   activityDays?: number;
 }
 
-export interface SummarizationPayload {
+export interface VisitSummarizationPayload {
   userId: string;
   visitIds?: string[];
 }
@@ -33,7 +33,7 @@ export interface SummarizationPayload {
 export type JobPayload =
   | FocusCalculationPayload
   | QuizGenerationPayload
-  | SummarizationPayload;
+  | VisitSummarizationPayload;
 
 // Job results
 export interface FocusCalculationResult {
@@ -50,14 +50,14 @@ export interface QuizGenerationResult {
   generatedAt: string;
 }
 
-export interface SummarizationResult {
+export interface VisitSummarizationResult {
   visitsSummarized: number;
 }
 
 export type JobResult =
   | FocusCalculationResult
   | QuizGenerationResult
-  | SummarizationResult;
+  | VisitSummarizationResult;
 
 // Job status for API
 export interface JobStatus {

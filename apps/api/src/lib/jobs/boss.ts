@@ -4,7 +4,7 @@
  * Centralized job queue using pg-boss for reliable background job processing.
  */
 
-import PgBoss from "pg-boss";
+import { PgBoss } from "pg-boss";
 import { env } from "../env.js";
 import { JOB_NAMES } from "./types.js";
 
@@ -51,7 +51,7 @@ export async function startBoss(): Promise<PgBoss> {
   await Promise.all([
     instance.createQueue(JOB_NAMES.FOCUS_CALCULATION),
     instance.createQueue(JOB_NAMES.QUIZ_GENERATION),
-    instance.createQueue(JOB_NAMES.SUMMARIZATION),
+    instance.createQueue(JOB_NAMES.VISIT_SUMMARIZATION),
   ]);
   console.log("[pg-boss] Queues ready");
 
@@ -78,4 +78,4 @@ export function isBossRunning(): boolean {
   return started;
 }
 
-export { PgBoss };
+export type { PgBoss };

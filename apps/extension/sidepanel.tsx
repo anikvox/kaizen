@@ -8,10 +8,7 @@ import {
   type ChatSessionListItem,
   type ChatMessage,
   type ChatMessageStatus,
-  type Focus,
-  type UserTaskQueueStatus,
-  type TaskQueueItem,
-  type SSETaskQueueChangedData
+  type Focus
 } from "@kaizen/api-client"
 import {
   COGNITIVE_ATTENTION_DEBUG_MODE,
@@ -63,17 +60,13 @@ function SidePanel() {
   const sortMessagesByDate = (messages: ChatMessage[]) =>
     [...messages].sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime())
 
-  // Task queue state
-  const [taskQueueStatus, setTaskQueueStatus] = useState<UserTaskQueueStatus | null>(null)
-  const [taskSSEConnected, setTaskSSEConnected] = useState(false)
 
   // Refs
   const eventSourceRef = useRef<EventSource | null>(null)
   const settingsEventSourceRef = useRef<EventSource | null>(null)
   const chatEventSourceRef = useRef<EventSource | null>(null)
   const focusEventSourceRef = useRef<EventSource | null>(null)
-  const taskEventSourceRef = useRef<EventSource | null>(null)
-  const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const messagesEndRef = useRef<EventSource | null>(null)
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -157,8 +150,6 @@ function SidePanel() {
     setFocuses([])
     setSessions([])
     setMessages([])
-    setTaskQueueStatus(null)
-    setTaskSSEConnected(false)
   }
 
   const handleToggleSetting = async (key: keyof UserSettings) => {
@@ -483,116 +474,6 @@ function SidePanel() {
     }
   }, [user])
 
-  // Setup task queue SSE
-  useEffect(() => {
-    let cancelled = false
-
-    const setupTaskSSE = async () => {
-      if (taskEventSourceRef.current) {
-        taskEventSourceRef.current.close()
-        taskEventSourceRef.current = null
-      }
-
-      const token = await storage.get<string>("deviceToken")
-      if (!token || !user) {
-        setTaskQueueStatus(null)
-        setTaskSSEConnected(false)
-        return
-      }
-
-      const api = createApiClient(apiUrl)
-      taskEventSourceRef.current = api.tasks.subscribeTasks(
-        (data) => {
-          if (!cancelled) {
-            setTaskQueueStatus((prev) => ({
-              pending: data.pending,
-              processing: data.processing,
-              history: prev?.history || [],
-              stats: data.stats,
-            }))
-            setTaskSSEConnected(true)
-          }
-        },
-        (event) => {
-          if (!cancelled) {
-            setTaskQueueStatus((prev) => {
-              if (!prev) return prev
-
-              const { taskId, type, status, changeType } = event
-              let { pending, processing, stats } = prev
-
-              const newTask: TaskQueueItem = {
-                id: taskId,
-                type: type as any,
-                status: status as any,
-                priority: 0,
-                payload: {},
-                attempts: 0,
-                maxAttempts: 3,
-                createdAt: new Date().toISOString(),
-              }
-
-              switch (changeType) {
-                case "created":
-                  pending = [newTask, ...pending]
-                  stats = { ...stats, pendingCount: stats.pendingCount + 1 }
-                  break
-                case "started":
-                  pending = pending.filter((t) => t.id !== taskId)
-                  processing = [{ ...newTask, status: "processing" as any }, ...processing]
-                  stats = {
-                    ...stats,
-                    pendingCount: Math.max(0, stats.pendingCount - 1),
-                    processingCount: stats.processingCount + 1,
-                  }
-                  break
-                case "completed":
-                  processing = processing.filter((t) => t.id !== taskId)
-                  stats = {
-                    ...stats,
-                    processingCount: Math.max(0, stats.processingCount - 1),
-                    completedToday: stats.completedToday + 1,
-                  }
-                  break
-                case "failed":
-                  processing = processing.filter((t) => t.id !== taskId)
-                  stats = {
-                    ...stats,
-                    processingCount: Math.max(0, stats.processingCount - 1),
-                    failedToday: stats.failedToday + 1,
-                  }
-                  break
-                case "cancelled":
-                  pending = pending.filter((t) => t.id !== taskId)
-                  stats = { ...stats, pendingCount: Math.max(0, stats.pendingCount - 1) }
-                  break
-              }
-
-              return { ...prev, pending, processing, stats }
-            })
-          }
-        },
-        () => {
-          console.error("Task SSE error")
-          if (!cancelled) {
-            setTaskSSEConnected(false)
-          }
-        },
-        token
-      )
-    }
-
-    setupTaskSSE()
-
-    return () => {
-      cancelled = true
-      if (taskEventSourceRef.current) {
-        taskEventSourceRef.current.close()
-        taskEventSourceRef.current = null
-      }
-      setTaskSSEConnected(false)
-    }
-  }, [user])
 
   // Setup chat SSE
   useEffect(() => {
@@ -728,10 +609,6 @@ function SidePanel() {
           focusEventSourceRef.current.close()
           focusEventSourceRef.current = null
         }
-        if (taskEventSourceRef.current) {
-          taskEventSourceRef.current.close()
-          taskEventSourceRef.current = null
-        }
 
         if (change.newValue) {
           const api = createApiClient(apiUrl)
@@ -747,8 +624,6 @@ function SidePanel() {
                 setFocuses([])
                 setSessions([])
                 setMessages([])
-                setTaskQueueStatus(null)
-                setTaskSSEConnected(false)
               }
             },
             async () => {
@@ -758,8 +633,6 @@ function SidePanel() {
               setFocuses([])
               setSessions([])
               setMessages([])
-              setTaskQueueStatus(null)
-              setTaskSSEConnected(false)
             },
             change.newValue
           )
@@ -770,8 +643,6 @@ function SidePanel() {
           setFocuses([])
           setSessions([])
           setMessages([])
-          setTaskQueueStatus(null)
-          setTaskSSEConnected(false)
         }
       }
     }
@@ -894,8 +765,6 @@ function SidePanel() {
           onToggleSetting={handleToggleSetting}
           onUpdateIgnoreList={handleUpdateIgnoreList}
           onUpdateSetting={handleUpdateSetting}
-          taskQueueStatus={taskQueueStatus}
-          taskSSEConnected={taskSSEConnected}
         />
       )}
     </div>
@@ -1069,50 +938,19 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   )
 }
 
-// Helper functions for task display
-const TASK_TYPE_LABELS: Record<string, string> = {
-  "focus-calculation": "Focus Calculation",
-  "quiz-generation": "Quiz Generation",
-  "summarization": "Summarization",
-}
-
-const TASK_STATUS_COLORS: Record<string, string> = {
-  pending: "#ffc107",
-  processing: "#17a2b8",
-  completed: "#28a745",
-  failed: "#dc3545",
-  cancelled: "#6c757d",
-}
-
-function formatTimeAgo(dateStr: string | undefined): string {
-  if (!dateStr) return "-"
-  const date = new Date(dateStr)
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-
-  if (diff < 60000) return "just now"
-  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
-  return `${Math.floor(diff / 86400000)}d ago`
-}
-
 // Settings Tab Component
 function SettingsTab({
   settings,
   savingSettings,
   onToggleSetting,
   onUpdateIgnoreList,
-  onUpdateSetting,
-  taskQueueStatus,
-  taskSSEConnected
+  onUpdateSetting
 }: {
   settings: UserSettings | null
   savingSettings: boolean
   onToggleSetting: (key: keyof UserSettings) => void
   onUpdateIgnoreList: (value: string | null) => void
   onUpdateSetting: (updates: Partial<UserSettings>) => void
-  taskQueueStatus: UserTaskQueueStatus | null
-  taskSSEConnected: boolean
 }) {
   const [ignoreListValue, setIgnoreListValue] = useState("")
   const [ignoreListDirty, setIgnoreListDirty] = useState(false)
@@ -1317,107 +1155,6 @@ function SettingsTab({
         )}
       </div>
 
-      {/* Background Tasks Section */}
-      <div style={styles.section}>
-        <div style={styles.taskHeader}>
-          <h3 style={styles.sectionTitle}>Background Tasks</h3>
-          {taskSSEConnected && (
-            <span style={styles.liveIndicator}>
-              <span style={styles.liveDot} />
-              Live
-            </span>
-          )}
-        </div>
-        {taskQueueStatus ? (
-          <div style={styles.settingsList}>
-            {/* Stats Row */}
-            <div style={styles.taskStatsRow}>
-              <div style={styles.taskStat}>
-                <span style={{ ...styles.taskStatValue, color: "#ffc107" }}>
-                  {taskQueueStatus.stats.pendingCount}
-                </span>
-                <span style={styles.taskStatLabel}>Pending</span>
-              </div>
-              <div style={styles.taskStat}>
-                <span style={{ ...styles.taskStatValue, color: "#17a2b8" }}>
-                  {taskQueueStatus.stats.processingCount}
-                </span>
-                <span style={styles.taskStatLabel}>Processing</span>
-              </div>
-              <div style={styles.taskStat}>
-                <span style={{ ...styles.taskStatValue, color: "#28a745" }}>
-                  {taskQueueStatus.stats.completedToday}
-                </span>
-                <span style={styles.taskStatLabel}>Done</span>
-              </div>
-              <div style={styles.taskStat}>
-                <span style={{ ...styles.taskStatValue, color: "#dc3545" }}>
-                  {taskQueueStatus.stats.failedToday}
-                </span>
-                <span style={styles.taskStatLabel}>Failed</span>
-              </div>
-            </div>
-
-            {/* Active Tasks */}
-            {(taskQueueStatus.pending.length > 0 || taskQueueStatus.processing.length > 0) && (
-              <div style={styles.taskListSection}>
-                <span style={styles.taskListTitle}>Active Tasks</span>
-                {[...taskQueueStatus.processing, ...taskQueueStatus.pending].map((task) => (
-                  <div
-                    key={task.id}
-                    style={{
-                      ...styles.taskItem,
-                      background: task.status === "processing" ? "#e3f2fd" : "#f8f9fa",
-                    }}
-                  >
-                    <div style={styles.taskItemLeft}>
-                      <span style={styles.taskItemName}>
-                        {TASK_TYPE_LABELS[task.type] || task.type}
-                      </span>
-                      <span
-                        style={{
-                          ...styles.taskStatusBadge,
-                          background: TASK_STATUS_COLORS[task.status],
-                        }}
-                      >
-                        {task.status}
-                      </span>
-                    </div>
-                    <span style={styles.taskItemTime}>{formatTimeAgo(task.createdAt)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Recent History */}
-            {taskQueueStatus.history && taskQueueStatus.history.length > 0 && (
-              <div style={styles.taskListSection}>
-                <span style={styles.taskListTitle}>Recent History</span>
-                {taskQueueStatus.history.slice(0, 5).map((task) => (
-                  <div key={task.id} style={styles.taskItem}>
-                    <div style={styles.taskItemLeft}>
-                      <span style={styles.taskItemName}>
-                        {TASK_TYPE_LABELS[task.type] || task.type}
-                      </span>
-                      <span
-                        style={{
-                          ...styles.taskStatusBadge,
-                          background: TASK_STATUS_COLORS[task.status],
-                        }}
-                      >
-                        {task.status}
-                      </span>
-                    </div>
-                    <span style={styles.taskItemTime}>{formatTimeAgo(task.completedAt)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <p style={styles.text}>Loading tasks...</p>
-        )}
-      </div>
     </div>
   )
 }
@@ -1805,94 +1542,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#999",
     fontStyle: "italic" as const
   },
-  // Task queue styles
-  taskHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12
-  },
-  liveIndicator: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 4,
-    padding: "2px 8px",
-    background: "#d4edda",
-    color: "#155724",
-    borderRadius: 10,
-    fontSize: 9,
-    fontWeight: 500
-  },
-  liveDot: {
-    width: 5,
-    height: 5,
-    borderRadius: "50%",
-    background: "#28a745"
-  },
-  taskStatsRow: {
-    display: "flex",
-    justifyContent: "space-around",
-    padding: 10,
-    background: "#f8f9fa",
-    borderRadius: 6,
-    textAlign: "center" as const
-  },
-  taskStat: {
-    display: "flex",
-    flexDirection: "column" as const,
-    alignItems: "center",
-    gap: 2
-  },
-  taskStatValue: {
-    fontSize: 16,
-    fontWeight: 600
-  },
-  taskStatLabel: {
-    fontSize: 9,
-    color: "#666"
-  },
-  taskListSection: {
-    padding: 10,
-    background: "#f8f9fa",
-    borderRadius: 6
-  },
-  taskListTitle: {
-    display: "block",
-    fontSize: 11,
-    fontWeight: 600,
-    color: "#333",
-    marginBottom: 8
-  },
-  taskItem: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 8,
-    background: "#fff",
-    borderRadius: 4,
-    marginBottom: 4
-  },
-  taskItemLeft: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6
-  },
-  taskItemName: {
-    fontSize: 11,
-    fontWeight: 500,
-    color: "#333"
-  },
-  taskStatusBadge: {
-    padding: "1px 6px",
-    borderRadius: 3,
-    fontSize: 9,
-    color: "#fff",
-    fontWeight: 500
-  },
-  taskItemTime: {
-    fontSize: 9,
-    color: "#888"
-  }
 }
 
 export default SidePanel
