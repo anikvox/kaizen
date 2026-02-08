@@ -316,5 +316,16 @@ model QuizResult {
   @@map("quiz_results")
 }
 
+model Pulse {
+  id        String   @id @default(cuid())
+  userId    String
+  message   String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@map("pulses")
+}
+
 // Note: Background jobs are now managed by pg-boss which creates its own tables in the pgboss schema
 

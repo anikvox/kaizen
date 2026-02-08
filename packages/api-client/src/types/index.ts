@@ -680,7 +680,15 @@ export type UnifiedSSEEventType =
   | "device-token-revoked"
   | "device-list-changed"
   | "active-tab-changed"
+  | "pulses-updated"
   | "ping";
+
+// Pulse types
+export interface Pulse {
+  id: string;
+  message: string;
+  createdAt: string;
+}
 
 export interface UnifiedSSEConnectedData {
   type: "connected";
@@ -692,6 +700,7 @@ export interface UnifiedSSEConnectedData {
   settings: UserSettings;
   focuses: Focus[];
   pomodoro: PomodoroStatus;
+  pulses: Pulse[];
 }
 
 export interface UnifiedSSESettingsChangedData {
@@ -776,6 +785,11 @@ export interface UnifiedSSEActiveTabChangedData {
   timestamp: number;
 }
 
+export interface UnifiedSSEPulsesUpdatedData {
+  type: "pulses-updated";
+  pulses: Pulse[];
+}
+
 export interface UnifiedSSEPingData {
   type: "ping";
   time: string;
@@ -796,5 +810,6 @@ export type UnifiedSSEData =
   | UnifiedSSEDeviceTokenRevokedData
   | UnifiedSSEDeviceListChangedData
   | UnifiedSSEActiveTabChangedData
+  | UnifiedSSEPulsesUpdatedData
   | UnifiedSSEPingData;
 

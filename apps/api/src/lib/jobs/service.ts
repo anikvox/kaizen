@@ -18,7 +18,11 @@ import {
   type FocusCalculationPayload,
   type QuizGenerationPayload,
   type VisitSummarizationPayload,
+  type PulseGenerationPayload,
 } from "./types.js";
+
+// Pulse generation interval: 15 minutes
+const PULSE_GENERATION_INTERVAL_MS = 15 * 60 * 1000;
 
 /**
  * Send a focus calculation job
@@ -71,6 +75,21 @@ export async function sendVisitSummarization(
 }
 
 /**
+ * Send a pulse generation job
+ */
+export async function sendPulseGeneration(userId: string): Promise<string | null> {
+  const boss = await getBoss();
+  return boss.send(
+    JOB_NAMES.PULSE_GENERATION,
+    { userId } as PulseGenerationPayload,
+    {
+      singletonKey: `pulse-${userId}`,
+      singletonSeconds: 60, // Prevent duplicates within 1 minute
+    }
+  );
+}
+
+/**
  * Cancel a job by ID
  */
 export async function cancelJob(jobId: string): Promise<boolean> {
@@ -110,6 +129,14 @@ export async function scheduleInitialJobs(
     singletonKey: `visit-summarize-${userId}`,
     startAfter: Math.floor(summarizationInterval / 1000), // Convert ms to seconds
     singletonSeconds: Math.floor(summarizationInterval / 1000),
+  });
+
+  // Schedule pulse generation (every 15 minutes)
+  const pulseInterval = PULSE_GENERATION_INTERVAL_MS;
+  await boss.send(JOB_NAMES.PULSE_GENERATION, { userId }, {
+    singletonKey: `pulse-${userId}`,
+    startAfter: Math.floor(pulseInterval / 1000),
+    singletonSeconds: Math.floor(pulseInterval / 1000),
   });
 }
 
@@ -323,6 +350,7 @@ export async function scheduleAllUserJobs(): Promise<void> {
     try {
       const focusInterval = user.focusCalculationIntervalMs || 30000;
       const summarizationInterval = user.attentionSummarizationIntervalMs || 60000;
+      const pulseInterval = PULSE_GENERATION_INTERVAL_MS;
 
       // Schedule focus calculation
       await boss.send(JOB_NAMES.FOCUS_CALCULATION, { userId: user.userId }, {
@@ -336,6 +364,13 @@ export async function scheduleAllUserJobs(): Promise<void> {
         singletonKey: `visit-summarize-${user.userId}`,
         startAfter: Math.floor(summarizationInterval / 1000), // Convert ms to seconds
         singletonSeconds: Math.floor(summarizationInterval / 1000),
+      });
+
+      // Schedule pulse generation
+      await boss.send(JOB_NAMES.PULSE_GENERATION, { userId: user.userId }, {
+        singletonKey: `pulse-${user.userId}`,
+        startAfter: Math.floor(pulseInterval / 1000),
+        singletonSeconds: Math.floor(pulseInterval / 1000),
       });
 
       scheduled++;

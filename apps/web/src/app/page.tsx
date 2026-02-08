@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth, SignInButton, SignOutButton, useUser } from "@clerk/nextjs";
-import { createApiClient, type User, type Focus, type PomodoroStatus, type UnifiedSSEData } from "@kaizen/api-client";
+import { createApiClient, type User, type Focus, type PomodoroStatus, type Pulse, type UnifiedSSEData } from "@kaizen/api-client";
 import Link from "next/link";
 
 const apiUrl =
@@ -15,6 +15,7 @@ export default function Home() {
   const [time, setTime] = useState("");
   const [user, setUser] = useState<User | null>(null);
   const [focuses, setFocuses] = useState<Focus[]>([]);
+  const [pulses, setPulses] = useState<Pulse[]>([]);
   const [error, setError] = useState("");
   const [pomodoroStatus, setPomodoroStatus] = useState<PomodoroStatus | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -78,6 +79,7 @@ export default function Home() {
             case "connected":
               setFocuses(data.focuses);
               setPomodoroStatus(data.pomodoro);
+              setPulses(data.pulses);
               break;
 
             case "focus-changed":
@@ -95,6 +97,10 @@ export default function Home() {
             case "pomodoro-tick":
             case "pomodoro-status-changed":
               setPomodoroStatus(data.status);
+              break;
+
+            case "pulses-updated":
+              setPulses(data.pulses);
               break;
 
             case "ping":
@@ -259,6 +265,50 @@ export default function Home() {
               {pomodoroStatus ? formatTime(pomodoroStatus.elapsedSeconds) : "0:00"}
             </p>
           </div>
+
+          {/* Pulses - Learning Progress Updates */}
+          {pulses.length > 0 && (
+            <div style={{
+              margin: "1rem 0",
+              padding: "1rem",
+              borderRadius: "8px",
+              background: "#f8f4ff",
+              border: "1px solid #d4c4f5"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+                <span style={{
+                  width: "10px",
+                  height: "10px",
+                  borderRadius: "50%",
+                  background: "#8b5cf6",
+                  display: "inline-block"
+                }} />
+                <strong style={{ fontSize: "0.9rem", color: "#333" }}>Learning Pulses</strong>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                {pulses.map((pulse) => (
+                  <div key={pulse.id} style={{
+                    padding: "0.5rem 0.75rem",
+                    background: "white",
+                    borderRadius: "4px",
+                    borderLeft: "3px solid #8b5cf6",
+                    fontSize: "0.9rem",
+                    color: "#4a4a4a"
+                  }}>
+                    {pulse.message}
+                  </div>
+                ))}
+              </div>
+              <p style={{
+                margin: "0.5rem 0 0 0",
+                fontSize: "0.7rem",
+                color: "#999",
+                textAlign: "right"
+              }}>
+                Updated {pulses[0] && new Date(pulses[0].createdAt).toLocaleTimeString()}
+              </p>
+            </div>
+          )}
 
           <p style={{ fontSize: "0.8rem", color: "#999" }}>SSE: {time || "connecting..."}</p>
           {error && <p style={{ color: "red" }}>{error}</p>}

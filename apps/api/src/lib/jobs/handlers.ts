@@ -19,6 +19,7 @@ import {
 import { MAX_ATTENTION_WINDOW_MS, NO_FOCUS_ATTENTION_WINDOW_MS } from "../focus/types.js";
 import { processUserSummarization } from "../summarization.js";
 import { generateQuiz } from "../quiz/service.js";
+import { generatePulses } from "../pulse/index.js";
 import { getBoss } from "./boss.js";
 import {
   JOB_NAMES,
@@ -28,6 +29,8 @@ import {
   type QuizGenerationResult,
   type VisitSummarizationPayload,
   type VisitSummarizationResult,
+  type PulseGenerationPayload,
+  type PulseGenerationResult,
 } from "./types.js";
 
 // Cache processed attention hashes to avoid reprocessing
@@ -229,6 +232,35 @@ async function handleVisitSummarization(
   return { visitsSummarized };
 }
 
+// Pulse generation interval: 15 minutes
+const PULSE_GENERATION_INTERVAL_MS = 15 * 60 * 1000;
+
+/**
+ * Handle pulse generation job
+ */
+async function handlePulseGeneration(
+  job: Job<PulseGenerationPayload>
+): Promise<PulseGenerationResult> {
+  const { userId } = job.data;
+
+  try {
+    const pulsesGenerated = await generatePulses(userId);
+    return { pulsesGenerated };
+  } finally {
+    // Self-schedule next run
+    try {
+      const boss = await getBoss();
+      await boss.send(JOB_NAMES.PULSE_GENERATION, { userId }, {
+        singletonKey: `pulse-${userId}`,
+        startAfter: Math.floor(PULSE_GENERATION_INTERVAL_MS / 1000),
+        singletonSeconds: Math.floor(PULSE_GENERATION_INTERVAL_MS / 1000),
+      });
+    } catch (error) {
+      console.error(`[Jobs] Failed to schedule next pulse generation for user ${userId}:`, error);
+    }
+  }
+}
+
 /**
  * Register all job handlers with pg-boss
  */
@@ -257,6 +289,15 @@ export async function registerHandlers(boss: PgBoss): Promise<void> {
     async ([job]) => {
       console.log(`[Jobs] Processing visit summarization for user ${job.data.userId}`);
       return handleVisitSummarization(job);
+    }
+  );
+
+  // Pulse generation
+  await boss.work<PulseGenerationPayload, PulseGenerationResult>(
+    JOB_NAMES.PULSE_GENERATION,
+    async ([job]) => {
+      console.log(`[Jobs] Processing pulse generation for user ${job.data.userId}`);
+      return handlePulseGeneration(job);
     }
   );
 

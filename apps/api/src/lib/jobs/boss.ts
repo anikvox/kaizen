@@ -52,6 +52,7 @@ export async function startBoss(): Promise<PgBoss> {
     instance.createQueue(JOB_NAMES.FOCUS_CALCULATION),
     instance.createQueue(JOB_NAMES.QUIZ_GENERATION),
     instance.createQueue(JOB_NAMES.VISIT_SUMMARIZATION),
+    instance.createQueue(JOB_NAMES.PULSE_GENERATION),
   ]);
   console.log("[pg-boss] Queues ready");
 
