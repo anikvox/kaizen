@@ -131,6 +131,20 @@ export interface PulsesUpdatedEvent {
   pulses: PulseData[];
 }
 
+// Attention Insight Events
+export interface InsightData {
+  id: string;
+  userId: string;
+  message: string;
+  sourceUrl: string | null;
+  createdAt: Date;
+}
+
+export interface InsightCreatedEvent {
+  userId: string;
+  insight: InsightData;
+}
+
 // Pomodoro Events
 export type PomodoroState = "idle" | "running" | "paused" | "cooldown";
 
@@ -332,6 +346,16 @@ class AppEvents extends EventEmitter {
   onPulsesUpdated(callback: (data: PulsesUpdatedEvent) => void) {
     this.on("pulsesUpdated", callback);
     return () => this.off("pulsesUpdated", callback);
+  }
+
+  // Insight Events
+  emitInsightCreated(data: InsightCreatedEvent) {
+    this.emit("insightCreated", data);
+  }
+
+  onInsightCreated(callback: (data: InsightCreatedEvent) => void) {
+    this.on("insightCreated", callback);
+    return () => this.off("insightCreated", callback);
   }
 }
 

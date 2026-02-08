@@ -9,7 +9,8 @@ import {
   type ChatMessageStatus,
   type Focus,
   type PomodoroStatus,
-  type UnifiedSSEData
+  type UnifiedSSEData,
+  type AttentionInsight
 } from "@kaizen/api-client"
 import {
   COGNITIVE_ATTENTION_DEBUG_MODE,
@@ -32,7 +33,7 @@ interface UserInfo {
   name: string | null
 }
 
-type Tab = "chat" | "settings"
+type Tab = "chat" | "insights" | "settings"
 
 function SidePanel() {
   const [user, setUser] = useState<UserInfo | null>(null)
@@ -44,6 +45,9 @@ function SidePanel() {
 
   // Pomodoro state
   const [pomodoroStatus, setPomodoroStatus] = useState<PomodoroStatus | null>(null)
+
+  // Insights state
+  const [insights, setInsights] = useState<AttentionInsight[]>([])
 
   // Settings state
   const [settings, setSettings] = useState<UserSettings | null>(null)
@@ -382,6 +386,7 @@ function SidePanel() {
               setSettings(data.settings)
               setFocuses(data.focuses)
               setPomodoroStatus(data.pomodoro)
+              setInsights(data.insights || [])
               setLoading(false)
               break
 
@@ -470,12 +475,17 @@ function SidePanel() {
               }
               break
 
+            case "insight-created":
+              setInsights((prev) => [data.insight, ...prev].slice(0, 10))
+              break
+
             case "device-token-revoked":
               storage.remove("deviceToken")
               setUser(null)
               setSettings(null)
               setFocuses([])
               setPomodoroStatus(null)
+              setInsights([])
               break
 
             case "ping":
@@ -671,6 +681,16 @@ function SidePanel() {
           Chat
         </button>
         <button
+          onClick={() => setActiveTab("insights")}
+          style={{
+            ...styles.tab,
+            borderBottom: activeTab === "insights" ? "2px solid #8b5cf6" : "2px solid transparent",
+            color: activeTab === "insights" ? "#8b5cf6" : "#666"
+          }}
+        >
+          Insights
+        </button>
+        <button
           onClick={() => setActiveTab("settings")}
           style={{
             ...styles.tab,
@@ -700,6 +720,8 @@ function SidePanel() {
           onBackToList={handleBackToList}
           onDeleteSession={handleDeleteSession}
         />
+      ) : activeTab === "insights" ? (
+        <InsightsTab insights={insights} />
       ) : (
         <SettingsTab
           settings={settings}
@@ -873,6 +895,36 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         <span style={styles.statusText}>
           {message.status === "typing" ? "Typing..." : message.status === "streaming" ? "Streaming..." : ""}
         </span>
+      )}
+    </div>
+  )
+}
+
+// Insights Tab Component
+function InsightsTab({ insights }: { insights: AttentionInsight[] }) {
+  return (
+    <div style={styles.insightsContainer}>
+      {insights.length === 0 ? (
+        <div style={styles.insightsEmpty}>
+          <p style={styles.insightsEmptyTitle}>No insights yet</p>
+          <p style={styles.insightsEmptySubtitle}>
+            Insights will appear as you browse the web
+          </p>
+        </div>
+      ) : (
+        <div style={styles.insightsList}>
+          {insights.map((insight) => (
+            <div key={insight.id} style={styles.insightItem}>
+              <span style={styles.insightMessage}>{insight.message}</span>
+              <span style={styles.insightTime}>
+                {new Date(insight.createdAt).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit"
+                })}
+              </span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )
@@ -1338,6 +1390,56 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 24,
     fontWeight: 700,
     fontFamily: "monospace"
+  },
+  // Insights styles
+  insightsContainer: {
+    flex: 1,
+    overflow: "auto",
+    padding: 16
+  },
+  insightsEmpty: {
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "center",
+    justifyContent: "center",
+    height: "100%",
+    color: "#666",
+    textAlign: "center" as const
+  },
+  insightsEmptyTitle: {
+    margin: 0,
+    fontSize: 14,
+    fontWeight: 500
+  },
+  insightsEmptySubtitle: {
+    margin: "4px 0 0",
+    fontSize: 12,
+    color: "#999"
+  },
+  insightsList: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: 8
+  },
+  insightItem: {
+    padding: "10px 12px",
+    background: "#f8f4ff",
+    borderRadius: 8,
+    borderLeft: "3px solid #8b5cf6",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8
+  },
+  insightMessage: {
+    fontSize: 13,
+    color: "#333",
+    flex: 1
+  },
+  insightTime: {
+    fontSize: 10,
+    color: "#999",
+    whiteSpace: "nowrap" as const
   },
 }
 
