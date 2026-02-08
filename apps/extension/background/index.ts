@@ -23,6 +23,10 @@ async function syncActiveTab() {
   const token = await storage.get<string>("deviceToken")
   if (!token) return
 
+  // Check if tracking is enabled (default to true)
+  const trackingEnabled = await storage.get<boolean>("trackingEnabled")
+  if (trackingEnabled === false) return
+
   try {
     // Get the currently active tab in the focused window
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })

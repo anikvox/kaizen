@@ -26,7 +26,8 @@ import {
   BarChart3,
   Paperclip,
   X,
-  FileText
+  FileText,
+  AlertTriangle
 } from "lucide-react"
 import {
   COGNITIVE_ATTENTION_DEBUG_MODE,
@@ -79,6 +80,9 @@ function SidePanel() {
 
   // Focus time tracking - map of focus id to elapsed time string
   const [focusElapsedTimes, setFocusElapsedTimes] = useState<Record<string, string>>({})
+
+  // Tracking enabled state (local to extension)
+  const [trackingEnabled, setTrackingEnabled] = useState(true)
 
   // Helpers
   const sortSessionsByDate = (sessions: ChatSessionListItem[]) =>
@@ -233,6 +237,12 @@ function SidePanel() {
     }
   }
 
+  const handleToggleTracking = async () => {
+    const newValue = !trackingEnabled
+    await storage.set("trackingEnabled", newValue)
+    setTrackingEnabled(newValue)
+  }
+
   const fetchMessages = async (sessionId: string) => {
     const token = await storage.get<string>("deviceToken")
     if (!token) return
@@ -333,6 +343,10 @@ function SidePanel() {
         setLoading(false)
         return
       }
+
+      // Load tracking enabled state (default to true)
+      const trackingEnabledValue = await storage.get<boolean>("trackingEnabled")
+      setTrackingEnabled(trackingEnabledValue !== false)
 
       const api = createApiClient(apiUrl)
 
@@ -680,6 +694,8 @@ function SidePanel() {
                 onToggleSetting={handleToggleSetting}
                 onUnlink={handleUnlink}
                 user={user}
+                trackingEnabled={trackingEnabled}
+                onToggleTracking={handleToggleTracking}
               />
             )}
           </div>
@@ -983,13 +999,17 @@ function ExploreTab({
   savingSettings,
   onToggleSetting,
   onUnlink,
-  user
+  user,
+  trackingEnabled,
+  onToggleTracking
 }: {
   settings: UserSettings | null
   savingSettings: boolean
   onToggleSetting: (key: keyof UserSettings) => void
   onUnlink: () => void
   user: UserInfo
+  trackingEnabled: boolean
+  onToggleTracking: () => void
 }) {
   return (
     <div className="flex-1 overflow-auto p-3">
@@ -1010,11 +1030,45 @@ function ExploreTab({
           </div>
         </div>
 
-        {/* Settings */}
+        {/* Tracking Toggle */}
+        <div className="bg-white/40 backdrop-blur-sm rounded-xl p-4 border border-gray-300/50">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <Settings className="w-4 h-4" />
+                Activity Tracking
+              </h3>
+              <p className="text-[10px] text-gray-500 mt-1">
+                Track browsing activity and website visits
+              </p>
+            </div>
+            <button
+              onClick={onToggleTracking}
+              className={cn(
+                "text-[10px] h-6 px-3 rounded-lg font-medium transition-all",
+                trackingEnabled
+                  ? "bg-green-500 text-white"
+                  : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+              )}
+            >
+              {trackingEnabled ? "ON" : "OFF"}
+            </button>
+          </div>
+          {!trackingEnabled && (
+            <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <p className="text-[10px] text-amber-700">
+                All features including focus tracking, insights, quizzes, and learning pulses are disabled when tracking is off.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Attention Tracking Settings */}
         <div className="bg-white/40 backdrop-blur-sm rounded-xl p-4 border border-gray-300/50">
           <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
             <Settings className="w-4 h-4" />
-            Attention Tracking
+            Display Settings
           </h3>
           {settings ? (
             <div className="space-y-2">

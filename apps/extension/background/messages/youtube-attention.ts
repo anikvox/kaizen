@@ -39,6 +39,13 @@ const handler: PlasmoMessaging.MessageHandler<YoutubeAttentionEvent> = async (re
     return
   }
 
+  // Check if tracking is enabled (default to true)
+  const trackingEnabled = await storage.get<boolean>("trackingEnabled")
+  if (trackingEnabled === false) {
+    res.send({ success: false, error: "Tracking disabled" })
+    return
+  }
+
   const api = getApiClient()
 
   try {
