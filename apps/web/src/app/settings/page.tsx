@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useAuth, SignInButton, useUser } from "@clerk/nextjs";
+import { useAuth, SignInButton, useUser, useClerk } from "@clerk/nextjs";
 import {
   createApiClient,
   type UserSettings,
@@ -28,6 +28,9 @@ import {
   Clock,
   FileText,
   Sparkles,
+  AlertTriangle,
+  Trash2,
+  User,
 } from "lucide-react";
 
 const apiUrl =
@@ -39,17 +42,22 @@ const PROVIDER_LABELS: Record<LLMProviderType, string> = {
   openai: "OpenAI",
 };
 
-type SettingsTab = "tracking" | "ai" | "focus" | "quiz";
+type SettingsTab = "tracking" | "ai" | "focus" | "quiz" | "account";
 
 export default function Settings() {
   const { isSignedIn, isLoaded, getToken } = useAuth();
   const { user: clerkUser } = useUser();
+  const { signOut } = useClerk();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<SettingsTab>("tracking");
   const eventSourceRef = useRef<EventSource | null>(null);
+
+  // Delete account state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Ignore list state
   const [ignoreListValue, setIgnoreListValue] = useState("");
@@ -377,7 +385,24 @@ export default function Settings() {
     { id: "ai" as SettingsTab, label: "AI", icon: Sparkles },
     { id: "focus" as SettingsTab, label: "Focus", icon: Target },
     { id: "quiz" as SettingsTab, label: "Quiz", icon: HelpCircle },
+    { id: "account" as SettingsTab, label: "Account", icon: User },
   ];
+
+  const handleDeleteAllData = async () => {
+    setDeleting(true);
+    const api = createApiClient(apiUrl, getTokenFn);
+
+    try {
+      await api.users.deleteAccount();
+      // Sign out and redirect to home
+      await signOut({ redirectUrl: "/" });
+    } catch (err) {
+      console.error("Delete account error:", err);
+      setError("Failed to delete account. Please try again.");
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
 
   if (!isLoaded || loading) {
     return (
@@ -1012,6 +1037,116 @@ export default function Settings() {
                   </p>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Account Tab */}
+        {activeTab === "account" && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-semibold mb-1">Account</h2>
+              <p className="text-sm text-muted-foreground">
+                Manage your account and data
+              </p>
+            </div>
+
+            {/* User Info */}
+            {clerkUser && (
+              <div className="rounded-2xl border border-border bg-card p-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                    {clerkUser.imageUrl ? (
+                      <img
+                        src={clerkUser.imageUrl}
+                        alt={clerkUser.fullName || "User"}
+                        className="w-12 h-12 rounded-full"
+                      />
+                    ) : (
+                      <User className="w-6 h-6 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-medium">
+                      {clerkUser.fullName || "User"}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {clerkUser.emailAddresses[0]?.emailAddress}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Danger Zone */}
+            <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <AlertTriangle className="w-5 h-5 text-destructive" />
+                <h3 className="font-semibold text-destructive">Danger Zone</h3>
+              </div>
+
+              {!showDeleteConfirm ? (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Permanently delete your account and all associated data.
+                    This action cannot be undone.
+                  </p>
+                  <Button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    variant="destructive"
+                    className="flex items-center gap-2"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete All My Data
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20">
+                    <p className="text-sm text-destructive font-medium mb-2">
+                      Are you absolutely sure?
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      This will permanently delete all your data including:
+                    </p>
+                    <ul className="text-sm text-muted-foreground mt-2 list-disc list-inside space-y-1">
+                      <li>All browsing history and attention data</li>
+                      <li>All chat sessions and messages</li>
+                      <li>All focus sessions and insights</li>
+                      <li>All quizzes and quiz results</li>
+                      <li>All scheduled background jobs</li>
+                      <li>Your user account and settings</li>
+                    </ul>
+                  </div>
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={() => setShowDeleteConfirm(false)}
+                      disabled={deleting}
+                      variant="outline"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleDeleteAllData}
+                      disabled={deleting}
+                      variant="destructive"
+                      className="flex items-center gap-2"
+                    >
+                      {deleting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="w-4 h-4" />
+                          Yes, Delete Everything
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

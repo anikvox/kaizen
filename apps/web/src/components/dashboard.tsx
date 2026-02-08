@@ -59,6 +59,7 @@ import {
   FileIcon,
   Download,
   Image as ImageIcon,
+  RefreshCw,
 } from "lucide-react";
 
 const PROVIDER_LABELS: Record<LLMProviderType, string> = {
@@ -1128,8 +1129,17 @@ export function Dashboard({ initialTab }: DashboardProps) {
             {/* Chat Main Area */}
             <div className="flex-1 flex flex-col min-w-0 min-h-0">
               {error && (
-                <div className="p-3 px-4 bg-destructive/10 text-destructive text-sm">
-                  {error}
+                <div className="p-3 px-4 bg-destructive/10 text-destructive text-sm flex items-center justify-between">
+                  <span>{error}</span>
+                  {error.toLowerCase().includes("sse") && (
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="ml-4 flex items-center gap-1.5 px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs font-medium rounded-lg transition-colors"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      Reload
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -1261,8 +1271,17 @@ export function Dashboard({ initialTab }: DashboardProps) {
       ) : (
         <div className="flex-1 min-h-0 max-w-6xl mx-auto w-full px-6 py-6 pb-12">
           {error && (
-            <div className="mb-4 p-4 rounded-xl bg-destructive/10 text-destructive text-sm">
-              {error}
+            <div className="mb-4 p-4 rounded-xl bg-destructive/10 text-destructive text-sm flex items-center justify-between">
+              <span>{error}</span>
+              {error.toLowerCase().includes("sse") && (
+                <button
+                  onClick={() => window.location.reload()}
+                  className="ml-4 flex items-center gap-1.5 px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs font-medium rounded-lg transition-colors"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  Reload
+                </button>
+              )}
             </div>
           )}
 

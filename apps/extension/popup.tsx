@@ -4,6 +4,7 @@ import { Button, Logo, Card, CardContent } from "@kaizen/ui"
 import "./styles.css"
 
 const webUrl = process.env.PLASMO_PUBLIC_KAIZEN_WEB_URL || "http://localhost:60091"
+const logoUrl = chrome.runtime.getURL("assets/kaizen-logo.png")
 
 const storage = new Storage()
 
@@ -64,7 +65,7 @@ function IndexPopup() {
   if (loading) {
     return (
       <div className="p-4 min-w-[300px]">
-        <Logo size="md" showText />
+        <Logo size="md" showText src={logoUrl} />
         <p className="text-muted-foreground mt-2">Loading...</p>
       </div>
     )
@@ -72,7 +73,7 @@ function IndexPopup() {
 
   return (
     <div className="p-4 min-w-[300px]">
-      <Logo size="md" showText className="mb-4" />
+      <Logo size="md" showText className="mb-4" src={logoUrl} />
       <p className="text-sm text-muted-foreground mb-4">
         Link this extension to your Kaizen account to get started.
       </p>

@@ -26,7 +26,6 @@ import {
   BarChart3,
   Paperclip,
   X,
-  Image as ImageIcon,
   FileText
 } from "lucide-react"
 import {
