@@ -32,6 +32,7 @@ const kaizenWebUrl =
 const isKaizenWebApp = location.href.startsWith(kaizenWebUrl);
 
 const storage = new Storage();
+const currentUrl = location.href;
 
 function SelectionCard() {
   const [visible, setVisible] = useState(false);
@@ -39,6 +40,31 @@ function SelectionCard() {
   const [selectedText, setSelectedText] = useState("");
   const [hoveredButton, setHoveredButton] = useState<string | null>(null);
   const [lastSelectionText, setLastSelectionText] = useState("");
+  const [isEnabled, setIsEnabled] = useState(true);
+
+  // Check ignore list on mount and watch for changes
+  useEffect(() => {
+    const checkIgnoreList = async () => {
+      const ignoreList = await storage.get<string | null>(
+        ATTENTION_TRACKING_IGNORE_LIST.key
+      );
+      const shouldIgnore = shouldIgnoreUrlSync(currentUrl, ignoreList);
+      setIsEnabled(!shouldIgnore);
+    };
+
+    checkIgnoreList();
+
+    // Watch for changes to the ignore list
+    storage.watch({
+      [ATTENTION_TRACKING_IGNORE_LIST.key]: checkIgnoreList,
+    });
+
+    return () => {
+      storage.unwatch({
+        [ATTENTION_TRACKING_IGNORE_LIST.key]: checkIgnoreList,
+      });
+    };
+  }, []);
 
   useEffect(() => {
     const handleSelection = () => {
@@ -116,7 +142,8 @@ function SelectionCard() {
     }
   };
 
-  if (!visible) return null;
+  // Don't render on Kaizen web app, if disabled by ignore list, or if not visible
+  if (isKaizenWebApp || !isEnabled || !visible) return null;
 
   const buttonStyle = (isHovered: boolean, isPrimary: boolean = false) => ({
     padding: "10px 16px",
@@ -248,27 +275,6 @@ function SelectionCard() {
       </div>
     </div>
   );
-}
-
-/**
- * Initialize the selection popup
- */
-async function initSelectionPopup() {
-  if (isKaizenWebApp) return;
-
-  // Check user's ignore list
-  const ignoreList = await storage.get<string | null>(
-    ATTENTION_TRACKING_IGNORE_LIST.key
-  );
-  if (shouldIgnoreUrlSync(location.href, ignoreList)) {
-    return;
-  }
-
-  // The component handles all the event listeners
-}
-
-if (!isKaizenWebApp) {
-  initSelectionPopup();
 }
 
 export default SelectionCard;
