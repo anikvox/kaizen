@@ -1095,6 +1095,896 @@ export function createChatTools(userId: string) {
     }),
 
     /**
+     * Get top domains visited by the user
+     */
+    get_top_domains: tool({
+      description:
+        "Get the most visited domains/websites by the user in a time period. Use this when the user asks about their most visited sites, where they spend most time online, or wants to see their browsing habits by domain.",
+      parameters: z.object({
+        minutes: z
+          .number()
+          .min(1)
+          .max(10080)
+          .optional()
+          .describe(
+            "Number of minutes to look back (1-10080). Default is 1440 (24 hours).",
+          ),
+        limit: z
+          .number()
+          .min(1)
+          .max(50)
+          .optional()
+          .describe(
+            "Maximum number of domains to return (1-50). Default is 10.",
+          ),
+        sortBy: z
+          .enum(["visits", "time", "words"])
+          .optional()
+          .describe(
+            "Sort by: 'visits' (number of page visits), 'time' (total active time), or 'words' (words read). Default is 'time'.",
+          ),
+      }),
+      execute: async ({ minutes = 1440, limit = 10, sortBy = "time" }) => {
+        try {
+          const now = new Date();
+          const from = new Date(now.getTime() - minutes * 60 * 1000);
+
+          // Fetch website visits
+          const visits = await db.websiteVisit.findMany({
+            where: {
+              userId,
+              openedAt: { gte: from, lte: now },
+            },
+          });
+
+          // Fetch text attention for word counts
+          const textAttentions = await db.textAttention.findMany({
+            where: {
+              userId,
+              timestamp: { gte: from, lte: now },
+            },
+          });
+
+          // Aggregate by domain
+          const domainStats = new Map<
+            string,
+            {
+              domain: string;
+              visits: number;
+              totalTime: number;
+              wordsRead: number;
+              pages: Set<string>;
+            }
+          >();
+
+          for (const visit of visits) {
+            const domain = (() => {
+              try {
+                return new URL(visit.url).hostname;
+              } catch {
+                return visit.url;
+              }
+            })();
+
+            if (!domainStats.has(domain)) {
+              domainStats.set(domain, {
+                domain,
+                visits: 0,
+                totalTime: 0,
+                wordsRead: 0,
+                pages: new Set(),
+              });
+            }
+            const stats = domainStats.get(domain)!;
+            stats.visits++;
+            stats.totalTime += visit.activeTime;
+            stats.pages.add(visit.url);
+          }
+
+          // Add word counts
+          for (const text of textAttentions) {
+            const domain = (() => {
+              try {
+                return new URL(text.url).hostname;
+              } catch {
+                return text.url;
+              }
+            })();
+
+            if (domainStats.has(domain)) {
+              domainStats.get(domain)!.wordsRead += text.wordsRead;
+            }
+          }
+
+          // Sort and limit
+          const sortedDomains = Array.from(domainStats.values())
+            .sort((a, b) => {
+              if (sortBy === "visits") return b.visits - a.visits;
+              if (sortBy === "words") return b.wordsRead - a.wordsRead;
+              return b.totalTime - a.totalTime;
+            })
+            .slice(0, limit);
+
+          if (sortedDomains.length === 0) {
+            return {
+              found: false,
+              message: `No browsing activity found in the last ${formatDuration(minutes * 60 * 1000)}.`,
+              timeRange: formatDuration(minutes * 60 * 1000),
+            };
+          }
+
+          return {
+            found: true,
+            timeRange: formatDuration(minutes * 60 * 1000),
+            sortedBy: sortBy,
+            domains: sortedDomains.map((d) => ({
+              domain: d.domain,
+              visits: d.visits,
+              uniquePages: d.pages.size,
+              totalTime: formatDuration(d.totalTime),
+              totalTimeMs: d.totalTime,
+              wordsRead: d.wordsRead,
+            })),
+          };
+        } catch (error) {
+          return {
+            found: false,
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to fetch top domains",
+          };
+        }
+      },
+    }),
+
+    /**
+     * Get browsing patterns and habits
+     */
+    get_browsing_patterns: tool({
+      description:
+        "Analyze the user's browsing patterns including peak activity hours, session durations, and browsing habits. Use this when the user asks about their browsing habits, when they're most active online, or wants insights into their internet usage patterns.",
+      parameters: z.object({
+        minutes: z
+          .number()
+          .min(60)
+          .max(10080)
+          .optional()
+          .describe(
+            "Number of minutes to analyze (60-10080). Default is 1440 (24 hours). Minimum 1 hour for meaningful patterns.",
+          ),
+      }),
+      execute: async ({ minutes = 1440 }) => {
+        try {
+          const now = new Date();
+          const from = new Date(now.getTime() - minutes * 60 * 1000);
+
+          const visits = await db.websiteVisit.findMany({
+            where: {
+              userId,
+              openedAt: { gte: from, lte: now },
+            },
+            orderBy: { openedAt: "asc" },
+          });
+
+          if (visits.length === 0) {
+            return {
+              found: false,
+              message: `No browsing activity found in the last ${formatDuration(minutes * 60 * 1000)}.`,
+              timeRange: formatDuration(minutes * 60 * 1000),
+            };
+          }
+
+          // Analyze hourly activity
+          const hourlyActivity = new Array(24).fill(0);
+          const hourlyTime = new Array(24).fill(0);
+          for (const visit of visits) {
+            const hour = visit.openedAt.getHours();
+            hourlyActivity[hour]++;
+            hourlyTime[hour] += visit.activeTime;
+          }
+
+          // Find peak hours
+          const peakActivityHour = hourlyActivity.indexOf(
+            Math.max(...hourlyActivity),
+          );
+          const peakTimeHour = hourlyTime.indexOf(Math.max(...hourlyTime));
+
+          // Calculate session patterns (gap of 30+ minutes = new session)
+          const sessions: { start: Date; end: Date; pages: number }[] = [];
+          let currentSession = {
+            start: visits[0].openedAt,
+            end: visits[0].openedAt,
+            pages: 1,
+          };
+
+          for (let i = 1; i < visits.length; i++) {
+            const gap =
+              visits[i].openedAt.getTime() - visits[i - 1].openedAt.getTime();
+            if (gap > 30 * 60 * 1000) {
+              // 30 minute gap
+              sessions.push({ ...currentSession });
+              currentSession = {
+                start: visits[i].openedAt,
+                end: visits[i].openedAt,
+                pages: 1,
+              };
+            } else {
+              currentSession.end = visits[i].openedAt;
+              currentSession.pages++;
+            }
+          }
+          sessions.push(currentSession);
+
+          // Calculate average session length
+          const sessionLengths = sessions.map(
+            (s) => s.end.getTime() - s.start.getTime(),
+          );
+          const avgSessionLength =
+            sessionLengths.reduce((a, b) => a + b, 0) / sessions.length;
+
+          // Categorize domains
+          const domainCategories = new Map<string, number>();
+          for (const visit of visits) {
+            const domain = (() => {
+              try {
+                return new URL(visit.url).hostname;
+              } catch {
+                return "other";
+              }
+            })();
+
+            // Simple categorization based on domain
+            let category = "other";
+            if (
+              domain.includes("youtube") ||
+              domain.includes("netflix") ||
+              domain.includes("twitch")
+            )
+              category = "video";
+            else if (
+              domain.includes("twitter") ||
+              domain.includes("facebook") ||
+              domain.includes("instagram") ||
+              domain.includes("reddit") ||
+              domain.includes("linkedin")
+            )
+              category = "social";
+            else if (
+              domain.includes("github") ||
+              domain.includes("stackoverflow") ||
+              domain.includes("gitlab")
+            )
+              category = "development";
+            else if (
+              domain.includes("docs.") ||
+              domain.includes("documentation") ||
+              domain.includes("wiki")
+            )
+              category = "documentation";
+            else if (domain.includes("news") || domain.includes("medium"))
+              category = "news/articles";
+            else if (
+              domain.includes("mail") ||
+              domain.includes("gmail") ||
+              domain.includes("outlook")
+            )
+              category = "email";
+            else if (
+              domain.includes("google") ||
+              domain.includes("bing") ||
+              domain.includes("duckduckgo")
+            )
+              category = "search";
+
+            domainCategories.set(
+              category,
+              (domainCategories.get(category) || 0) + 1,
+            );
+          }
+
+          return {
+            found: true,
+            timeRange: formatDuration(minutes * 60 * 1000),
+            totalPages: visits.length,
+            totalActiveTime: formatDuration(
+              visits.reduce((sum, v) => sum + v.activeTime, 0),
+            ),
+            patterns: {
+              peakActivityHour: `${peakActivityHour}:00 - ${peakActivityHour + 1}:00`,
+              peakTimeSpentHour: `${peakTimeHour}:00 - ${peakTimeHour + 1}:00`,
+              totalSessions: sessions.length,
+              averageSessionLength: formatDuration(avgSessionLength),
+              averagePagesPerSession: Math.round(
+                visits.length / sessions.length,
+              ),
+            },
+            categories: Object.fromEntries(domainCategories),
+            hourlyBreakdown: hourlyActivity.map((count, hour) => ({
+              hour: `${hour}:00`,
+              pageVisits: count,
+              activeTime: formatDuration(hourlyTime[hour]),
+            })),
+          };
+        } catch (error) {
+          return {
+            found: false,
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to analyze browsing patterns",
+          };
+        }
+      },
+    }),
+
+    /**
+     * Get media consumption statistics
+     */
+    get_media_stats: tool({
+      description:
+        "Get statistics about the user's media consumption including videos watched, audio listened, and images viewed. Use this when the user asks about their media consumption, video watching habits, or wants to know how much multimedia content they've consumed.",
+      parameters: z.object({
+        minutes: z
+          .number()
+          .min(1)
+          .max(10080)
+          .optional()
+          .describe(
+            "Number of minutes to look back (1-10080). Default is 1440 (24 hours).",
+          ),
+      }),
+      execute: async ({ minutes = 1440 }) => {
+        try {
+          const now = new Date();
+          const from = new Date(now.getTime() - minutes * 60 * 1000);
+
+          const [imageAttentions, audioAttentions, youtubeAttentions] =
+            await Promise.all([
+              db.imageAttention.findMany({
+                where: {
+                  userId,
+                  timestamp: { gte: from, lte: now },
+                },
+              }),
+              db.audioAttention.findMany({
+                where: {
+                  userId,
+                  timestamp: { gte: from, lte: now },
+                },
+              }),
+              db.youtubeAttention.findMany({
+                where: {
+                  userId,
+                  timestamp: { gte: from, lte: now },
+                },
+              }),
+            ]);
+
+          // Process YouTube data
+          const youtubeVideos = new Map<
+            string,
+            {
+              videoId: string | null;
+              title: string | null;
+              channelName: string | null;
+              watchTime: number;
+            }
+          >();
+
+          for (const yt of youtubeAttentions) {
+            const key = yt.videoId || yt.url || `unknown-${yt.id}`;
+            if (!youtubeVideos.has(key)) {
+              youtubeVideos.set(key, {
+                videoId: yt.videoId,
+                title: yt.title,
+                channelName: yt.channelName,
+                watchTime: 0,
+              });
+            }
+            if (
+              yt.event === "active-watch-time-update" &&
+              yt.activeWatchTime !== null
+            ) {
+              const video = youtubeVideos.get(key)!;
+              video.watchTime = Math.max(video.watchTime, yt.activeWatchTime);
+            }
+          }
+
+          const totalYoutubeWatchTime = Array.from(
+            youtubeVideos.values(),
+          ).reduce((sum, v) => sum + v.watchTime, 0);
+          const totalAudioTime = audioAttentions.reduce(
+            (sum, a) => sum + a.playbackDuration,
+            0,
+          );
+          const totalImageHoverTime = imageAttentions.reduce(
+            (sum, i) => sum + i.hoverDuration,
+            0,
+          );
+
+          const hasAnyMedia =
+            imageAttentions.length > 0 ||
+            audioAttentions.length > 0 ||
+            youtubeVideos.size > 0;
+
+          if (!hasAnyMedia) {
+            return {
+              found: false,
+              message: `No media consumption found in the last ${formatDuration(minutes * 60 * 1000)}.`,
+              timeRange: formatDuration(minutes * 60 * 1000),
+            };
+          }
+
+          return {
+            found: true,
+            timeRange: formatDuration(minutes * 60 * 1000),
+            summary: {
+              totalMediaTime: formatDuration(
+                totalYoutubeWatchTime + totalAudioTime,
+              ),
+            },
+            youtube: {
+              videosWatched: youtubeVideos.size,
+              totalWatchTime: formatDuration(totalYoutubeWatchTime),
+              topVideos: Array.from(youtubeVideos.values())
+                .sort((a, b) => b.watchTime - a.watchTime)
+                .slice(0, 5)
+                .map((v) => ({
+                  title: v.title,
+                  channel: v.channelName,
+                  watchTime: formatDuration(v.watchTime),
+                })),
+            },
+            audio: {
+              tracksPlayed: audioAttentions.length,
+              totalListenTime: formatDuration(totalAudioTime),
+              uniqueSources: new Set(audioAttentions.map((a) => a.src)).size,
+            },
+            images: {
+              imagesViewed: imageAttentions.length,
+              totalHoverTime: formatDuration(totalImageHoverTime),
+              uniqueImages: new Set(imageAttentions.map((i) => i.src)).size,
+            },
+          };
+        } catch (error) {
+          return {
+            found: false,
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to fetch media stats",
+          };
+        }
+      },
+    }),
+
+    /**
+     * Compare browsing activity between two time periods
+     */
+    compare_activity: tool({
+      description:
+        "Compare the user's browsing activity between two time periods. Use this when the user wants to compare their activity between different times, like 'today vs yesterday' or 'this hour vs last hour'.",
+      parameters: z.object({
+        period1Start: z
+          .number()
+          .describe(
+            "Start of first period in minutes ago from now (e.g., 120 for 2 hours ago)",
+          ),
+        period1End: z
+          .number()
+          .describe(
+            "End of first period in minutes ago from now (e.g., 60 for 1 hour ago)",
+          ),
+        period2Start: z
+          .number()
+          .describe(
+            "Start of second period in minutes ago from now (e.g., 60 for 1 hour ago)",
+          ),
+        period2End: z
+          .number()
+          .describe("End of second period in minutes ago from now (e.g., 0 for now)"),
+      }),
+      execute: async ({ period1Start, period1End, period2Start, period2End }) => {
+        try {
+          const now = new Date();
+          const p1From = new Date(now.getTime() - period1Start * 60 * 1000);
+          const p1To = new Date(now.getTime() - period1End * 60 * 1000);
+          const p2From = new Date(now.getTime() - period2Start * 60 * 1000);
+          const p2To = new Date(now.getTime() - period2End * 60 * 1000);
+
+          const [visits1, visits2, text1, text2] = await Promise.all([
+            db.websiteVisit.findMany({
+              where: {
+                userId,
+                openedAt: { gte: p1From, lte: p1To },
+              },
+            }),
+            db.websiteVisit.findMany({
+              where: {
+                userId,
+                openedAt: { gte: p2From, lte: p2To },
+              },
+            }),
+            db.textAttention.findMany({
+              where: {
+                userId,
+                timestamp: { gte: p1From, lte: p1To },
+              },
+            }),
+            db.textAttention.findMany({
+              where: {
+                userId,
+                timestamp: { gte: p2From, lte: p2To },
+              },
+            }),
+          ]);
+
+          const stats1 = {
+            pages: visits1.length,
+            activeTime: visits1.reduce((sum, v) => sum + v.activeTime, 0),
+            wordsRead: text1.reduce((sum, t) => sum + t.wordsRead, 0),
+            domains: new Set(
+              visits1.map((v) => {
+                try {
+                  return new URL(v.url).hostname;
+                } catch {
+                  return v.url;
+                }
+              }),
+            ).size,
+          };
+
+          const stats2 = {
+            pages: visits2.length,
+            activeTime: visits2.reduce((sum, v) => sum + v.activeTime, 0),
+            wordsRead: text2.reduce((sum, t) => sum + t.wordsRead, 0),
+            domains: new Set(
+              visits2.map((v) => {
+                try {
+                  return new URL(v.url).hostname;
+                } catch {
+                  return v.url;
+                }
+              }),
+            ).size,
+          };
+
+          const calculateChange = (old: number, current: number) => {
+            if (old === 0) return current > 0 ? "+100%" : "0%";
+            const change = ((current - old) / old) * 100;
+            return `${change > 0 ? "+" : ""}${change.toFixed(0)}%`;
+          };
+
+          return {
+            found: true,
+            period1: {
+              label: `${formatDuration(period1Start * 60 * 1000)} ago to ${formatDuration(period1End * 60 * 1000)} ago`,
+              pages: stats1.pages,
+              activeTime: formatDuration(stats1.activeTime),
+              wordsRead: stats1.wordsRead,
+              uniqueDomains: stats1.domains,
+            },
+            period2: {
+              label: `${formatDuration(period2Start * 60 * 1000)} ago to ${period2End === 0 ? "now" : formatDuration(period2End * 60 * 1000) + " ago"}`,
+              pages: stats2.pages,
+              activeTime: formatDuration(stats2.activeTime),
+              wordsRead: stats2.wordsRead,
+              uniqueDomains: stats2.domains,
+            },
+            comparison: {
+              pagesChange: calculateChange(stats1.pages, stats2.pages),
+              activeTimeChange: calculateChange(
+                stats1.activeTime,
+                stats2.activeTime,
+              ),
+              wordsReadChange: calculateChange(stats1.wordsRead, stats2.wordsRead),
+              domainsChange: calculateChange(stats1.domains, stats2.domains),
+            },
+          };
+        } catch (error) {
+          return {
+            found: false,
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to compare activity",
+          };
+        }
+      },
+    }),
+
+    /**
+     * Open and view a website's content
+     */
+    open_website: tool({
+      description:
+        "Fetch and view a website's content. Use this when the user asks you to visit a URL, check a webpage, read content from a specific site, or when you need to see what's on a webpage. Returns the HTML content converted to readable text.",
+      parameters: z.object({
+        url: z
+          .string()
+          .url()
+          .describe("The full URL of the website to fetch (must include https:// or http://)"),
+        extractText: z
+          .boolean()
+          .optional()
+          .describe(
+            "If true, extract only text content. If false, return raw HTML. Default is true.",
+          ),
+        maxLength: z
+          .number()
+          .min(1000)
+          .max(50000)
+          .optional()
+          .describe(
+            "Maximum characters to return (1000-50000). Default is 15000.",
+          ),
+      }),
+      execute: async ({ url, extractText = true, maxLength = 15000 }) => {
+        try {
+          const response = await fetch(url, {
+            headers: {
+              "User-Agent":
+                "Mozilla/5.0 (compatible; KaizenBot/1.0; +https://kaizen.app)",
+              Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+            redirect: "follow",
+          });
+
+          if (!response.ok) {
+            return {
+              success: false,
+              error: `Failed to fetch URL: ${response.status} ${response.statusText}`,
+              url,
+            };
+          }
+
+          const contentType = response.headers.get("content-type") || "";
+          if (
+            !contentType.includes("text/html") &&
+            !contentType.includes("text/plain") &&
+            !contentType.includes("application/xhtml")
+          ) {
+            return {
+              success: false,
+              error: `Cannot read content type: ${contentType}. This tool only supports HTML and text pages.`,
+              url,
+            };
+          }
+
+          let html = await response.text();
+
+          if (extractText) {
+            // Remove script and style elements
+            html = html.replace(
+              /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
+              "",
+            );
+            html = html.replace(
+              /<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi,
+              "",
+            );
+            // Remove HTML comments
+            html = html.replace(/<!--[\s\S]*?-->/g, "");
+            // Remove all HTML tags but keep content
+            html = html.replace(/<[^>]+>/g, " ");
+            // Decode HTML entities
+            html = html
+              .replace(/&nbsp;/g, " ")
+              .replace(/&amp;/g, "&")
+              .replace(/&lt;/g, "<")
+              .replace(/&gt;/g, ">")
+              .replace(/&quot;/g, '"')
+              .replace(/&#39;/g, "'");
+            // Collapse whitespace
+            html = html.replace(/\s+/g, " ").trim();
+          }
+
+          // Truncate if necessary
+          const truncated = html.length > maxLength;
+          const content = truncated ? html.slice(0, maxLength) + "..." : html;
+
+          // Extract title if possible
+          const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+          const title = titleMatch ? titleMatch[1].trim() : null;
+
+          return {
+            success: true,
+            url,
+            title,
+            contentType: extractText ? "text" : "html",
+            characterCount: content.length,
+            truncated,
+            content,
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error:
+              error instanceof Error ? error.message : "Failed to fetch website",
+            url,
+          };
+        }
+      },
+    }),
+
+    /**
+     * Search for content across all attention data
+     */
+    search_content: tool({
+      description:
+        "Search for specific content across all of the user's browsing activity including text read, image descriptions, and video captions. Use this when the user is trying to find something specific they saw or read online.",
+      parameters: z.object({
+        query: z
+          .string()
+          .describe("The search query to find in the user's browsing content"),
+        minutes: z
+          .number()
+          .min(1)
+          .max(10080)
+          .optional()
+          .describe(
+            "Number of minutes to search back (1-10080). Default is 1440 (24 hours).",
+          ),
+        contentType: z
+          .enum(["all", "text", "images", "videos"])
+          .optional()
+          .describe(
+            "Filter by content type: 'all', 'text', 'images', or 'videos'. Default is 'all'.",
+          ),
+        limit: z
+          .number()
+          .min(1)
+          .max(50)
+          .optional()
+          .describe("Maximum number of results to return (1-50). Default is 20."),
+      }),
+      execute: async ({
+        query,
+        minutes = 1440,
+        contentType = "all",
+        limit = 20,
+      }) => {
+        try {
+          const now = new Date();
+          const from = new Date(now.getTime() - minutes * 60 * 1000);
+          const queryLower = query.toLowerCase();
+
+          const results: Array<{
+            type: string;
+            url: string;
+            matchedContent: string;
+            timestamp: string;
+          }> = [];
+
+          // Search text content
+          if (contentType === "all" || contentType === "text") {
+            const textAttentions = await db.textAttention.findMany({
+              where: {
+                userId,
+                timestamp: { gte: from, lte: now },
+                text: { contains: query, mode: "insensitive" },
+              },
+              take: limit,
+              orderBy: { timestamp: "desc" },
+            });
+
+            for (const t of textAttentions) {
+              // Extract context around the match
+              const lowerText = t.text.toLowerCase();
+              const matchIndex = lowerText.indexOf(queryLower);
+              const start = Math.max(0, matchIndex - 100);
+              const end = Math.min(t.text.length, matchIndex + query.length + 100);
+              const excerpt = (start > 0 ? "..." : "") + t.text.slice(start, end) + (end < t.text.length ? "..." : "");
+
+              results.push({
+                type: "text",
+                url: t.url,
+                matchedContent: excerpt,
+                timestamp: t.timestamp.toISOString(),
+              });
+            }
+          }
+
+          // Search image descriptions/alt text
+          if (contentType === "all" || contentType === "images") {
+            const imageAttentions = await db.imageAttention.findMany({
+              where: {
+                userId,
+                timestamp: { gte: from, lte: now },
+                OR: [
+                  { alt: { contains: query, mode: "insensitive" } },
+                  { title: { contains: query, mode: "insensitive" } },
+                  { summary: { contains: query, mode: "insensitive" } },
+                ],
+              },
+              take: limit,
+              orderBy: { timestamp: "desc" },
+            });
+
+            for (const i of imageAttentions) {
+              results.push({
+                type: "image",
+                url: i.url,
+                matchedContent:
+                  i.summary || i.alt || i.title || "Image without description",
+                timestamp: i.timestamp.toISOString(),
+              });
+            }
+          }
+
+          // Search video titles and captions
+          if (contentType === "all" || contentType === "videos") {
+            const youtubeAttentions = await db.youtubeAttention.findMany({
+              where: {
+                userId,
+                timestamp: { gte: from, lte: now },
+                OR: [
+                  { title: { contains: query, mode: "insensitive" } },
+                  { caption: { contains: query, mode: "insensitive" } },
+                  { channelName: { contains: query, mode: "insensitive" } },
+                ],
+              },
+              take: limit,
+              orderBy: { timestamp: "desc" },
+            });
+
+            // Deduplicate by video
+            const seenVideos = new Set<string>();
+            for (const yt of youtubeAttentions) {
+              const key = yt.videoId || yt.url || `${yt.id}`;
+              if (seenVideos.has(key)) continue;
+              seenVideos.add(key);
+
+              results.push({
+                type: "video",
+                url:
+                  yt.url ||
+                  (yt.videoId
+                    ? `https://www.youtube.com/watch?v=${yt.videoId}`
+                    : "unknown"),
+                matchedContent: `${yt.title || "Unknown video"} by ${yt.channelName || "Unknown channel"}${yt.caption ? ` - "${yt.caption}"` : ""}`,
+                timestamp: yt.timestamp.toISOString(),
+              });
+            }
+          }
+
+          // Sort by timestamp and limit
+          results.sort(
+            (a, b) =>
+              new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+          );
+          const limitedResults = results.slice(0, limit);
+
+          if (limitedResults.length === 0) {
+            return {
+              found: false,
+              message: `No content matching "${query}" found in the last ${formatDuration(minutes * 60 * 1000)}.`,
+              query,
+              timeRange: formatDuration(minutes * 60 * 1000),
+            };
+          }
+
+          return {
+            found: true,
+            query,
+            timeRange: formatDuration(minutes * 60 * 1000),
+            resultCount: limitedResults.length,
+            results: limitedResults,
+          };
+        } catch (error) {
+          return {
+            found: false,
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to search content",
+          };
+        }
+      },
+    }),
+
+    /**
      * Calculate mathematical expressions with high precision
      */
     calculate: tool({
@@ -1229,6 +2119,35 @@ export function formatToolResultMessage(
     case "calculate":
       if (!r.success) return `Calculation failed: ${r.error}`;
       return `${r.expression} = ${r.result}`;
+
+    case "get_top_domains":
+      if (!r.found) return (r.message as string) || "No domains found";
+      const domains = r.domains as Array<{ domain: string }>;
+      return `Top domains: ${domains.slice(0, 3).map((d) => d.domain).join(", ")}${domains.length > 3 ? ` (+${domains.length - 3} more)` : ""}`;
+
+    case "get_browsing_patterns":
+      if (!r.found) return (r.message as string) || "No patterns found";
+      const patterns = r.patterns as { peakActivityHour: string; totalSessions: number };
+      return `Browsing patterns: ${patterns.totalSessions} sessions, peak at ${patterns.peakActivityHour}`;
+
+    case "get_media_stats":
+      if (!r.found) return (r.message as string) || "No media stats found";
+      const yt = r.youtube as { videosWatched: number } | undefined;
+      const summary = r.summary as { totalMediaTime: string };
+      return `Media stats: ${yt?.videosWatched || 0} videos, ${summary.totalMediaTime} total`;
+
+    case "compare_activity":
+      if (!r.found) return (r.message as string) || "Could not compare";
+      const comparison = r.comparison as { pagesChange: string; activeTimeChange: string };
+      return `Activity comparison: pages ${comparison.pagesChange}, time ${comparison.activeTimeChange}`;
+
+    case "open_website":
+      if (!r.success) return (r.error as string) || "Failed to open website";
+      return `Fetched ${r.title || r.url} (${r.characterCount} chars)`;
+
+    case "search_content":
+      if (!r.found) return (r.message as string) || "No content found";
+      return `Found ${r.resultCount} results for "${r.query}"`;
 
     default:
       return `Tool ${toolName} completed`;

@@ -1042,8 +1042,8 @@ export function Dashboard({ initialTab }: DashboardProps) {
 
       {/* Main content */}
       {activeTab === "chat" ? (
-        <div className="flex-1 min-h-0 max-w-6xl mx-auto w-full px-6 py-6">
-          <div className="flex h-full rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="flex-1 min-h-0 max-w-6xl mx-auto w-full px-6 pt-6 pb-10 flex flex-col overflow-hidden">
+          <div className="flex flex-1 min-h-0 rounded-2xl border border-border bg-card overflow-hidden">
             {/* Chat Sidebar */}
             <aside
               className={`border-r border-border flex flex-col bg-muted/30 flex-shrink-0 transition-all duration-200 ${
@@ -2206,7 +2206,7 @@ export function Dashboard({ initialTab }: DashboardProps) {
 function PendingToolLine({ toolName }: { toolName: string }) {
   const { loadingText } = getToolDisplayInfo(toolName);
   return (
-    <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground self-start">
+    <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground self-start flex-shrink-0">
       <span className="text-[8px]">○</span>
       <span className="opacity-70">{loadingText}...</span>
       <Loader2 className="w-3 h-3 animate-spin" />
@@ -2225,7 +2225,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   if (isTool) {
     const text = formatToolResultMessage(message.toolName, message.content);
     return (
-      <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground self-start">
+      <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground self-start flex-shrink-0">
         <span className="text-[8px]">●</span>
         <span>{text}</span>
       </div>
@@ -2249,7 +2249,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
   return (
     <div
-      className={`max-w-[80%] px-4 py-3 rounded-xl relative overflow-hidden ${
+      className={`max-w-[80%] px-4 py-3 rounded-xl relative overflow-hidden flex-shrink-0 ${
         isUser
           ? "self-end bg-primary text-primary-foreground"
           : "self-start bg-muted"
