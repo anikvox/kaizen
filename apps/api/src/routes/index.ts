@@ -9,3 +9,4 @@ export { default as settingsRoutes, settingsSSE as settingsSSERoutes } from "./s
 export { default as chatsRoutes, chatSSE as chatSSERoutes } from "./chats.js";
 export { default as focusRoutes, focusSSE as focusSSERoutes } from "./focus.js";
 export { default as quizRoutes } from "./quiz.js";
+export { default as pomodoroRoutes, pomodoroSSE as pomodoroSSERoutes } from "./pomodoro.js";

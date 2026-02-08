@@ -3,9 +3,13 @@ import { env } from "./lib/index.js";
 import app from "./app.js";
 import { initTelemetry } from "./lib/llm/index.js";
 import { startBoss, stopBoss, registerHandlers, scheduleAllUserJobs } from "./lib/jobs/index.js";
+import { initPomodoroListeners } from "./lib/pomodoro/index.js";
 
 // Initialize telemetry for LLM tracing (async, runs in background)
 initTelemetry().catch((err) => console.warn("[Telemetry] Init failed:", err));
+
+// Initialize Pomodoro event listeners
+initPomodoroListeners();
 
 console.log(`Server running on http://localhost:${env.port}`);
 

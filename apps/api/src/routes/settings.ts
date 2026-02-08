@@ -118,6 +118,8 @@ app.get("/", dualAuthMiddleware, async (c) => {
     // Quiz settings
     quizAnswerOptionsCount: settings.quizAnswerOptionsCount,
     quizActivityDays: settings.quizActivityDays,
+    // Pomodoro settings
+    pomodoroCooldownMs: settings.pomodoroCooldownMs,
   });
 });
 
@@ -206,6 +208,8 @@ app.post("/", dualAuthMiddleware, async (c) => {
     // Quiz settings
     quizAnswerOptionsCount?: number;
     quizActivityDays?: number;
+    // Pomodoro settings
+    pomodoroCooldownMs?: number;
   }>();
 
   // Build update data - using Prisma's unchecked types for direct field assignment
@@ -228,6 +232,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
     openaiApiKeyEncrypted: null as string | null,
     quizAnswerOptionsCount: 2 as number,
     quizActivityDays: 3 as number,
+    pomodoroCooldownMs: 120000 as number,
   };
 
   // Cognitive attention settings
@@ -315,6 +320,14 @@ app.post("/", dualAuthMiddleware, async (c) => {
     createData.quizActivityDays = days;
   }
 
+  // Pomodoro settings
+  if (body.pomodoroCooldownMs !== undefined) {
+    // Enforce minimum of 30 seconds, max of 10 minutes
+    const cooldown = Math.min(600000, Math.max(30000, body.pomodoroCooldownMs));
+    updateData.pomodoroCooldownMs = cooldown;
+    createData.pomodoroCooldownMs = cooldown;
+  }
+
   const settings = await db.userSettings.upsert({
     where: { userId },
     update: updateData,
@@ -355,6 +368,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
       hasOpenaiApiKey: !!settings.openaiApiKeyEncrypted,
       quizAnswerOptionsCount: settings.quizAnswerOptionsCount,
       quizActivityDays: settings.quizActivityDays,
+      pomodoroCooldownMs: settings.pomodoroCooldownMs,
     },
   });
 
@@ -375,6 +389,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
     hasOpenaiApiKey: !!settings.openaiApiKeyEncrypted,
     quizAnswerOptionsCount: settings.quizAnswerOptionsCount,
     quizActivityDays: settings.quizActivityDays,
+    pomodoroCooldownMs: settings.pomodoroCooldownMs,
   });
 });
 

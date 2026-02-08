@@ -344,6 +344,8 @@ export interface UserSettings {
   // Quiz settings
   quizAnswerOptionsCount?: number; // 2, 3, or 4
   quizActivityDays?: number; // 1-7
+  // Pomodoro settings
+  pomodoroCooldownMs?: number; // Default 120000 (2 minutes)
 }
 
 export interface UserSettingsUpdateRequest {
@@ -367,6 +369,8 @@ export interface UserSettingsUpdateRequest {
   // Quiz settings
   quizAnswerOptionsCount?: number;
   quizActivityDays?: number;
+  // Pomodoro settings
+  pomodoroCooldownMs?: number;
 }
 
 export interface SSESettingsConnectedData {
@@ -631,5 +635,32 @@ export interface QuizHistoryResponse {
     totalQuestions: number;
     totalCorrect: number;
   };
+}
+
+// Pomodoro Types
+export type PomodoroState = "idle" | "running" | "paused" | "cooldown";
+
+export interface PomodoroStatus {
+  state: PomodoroState;
+  elapsedSeconds: number;
+  isPaused: boolean;
+  lastActivityAt: string;
+}
+
+export interface PomodoroStatusResponse {
+  status: PomodoroStatus;
+}
+
+export interface SSEPomodoroConnectedData {
+  connected: true;
+  status: PomodoroStatus;
+}
+
+export interface SSEPomodoroStatusChangedData {
+  status: PomodoroStatus;
+}
+
+export interface SSEPomodoroTickData {
+  status: PomodoroStatus;
 }
 
