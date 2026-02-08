@@ -130,8 +130,9 @@ function NudgeOverlay() {
     }
   }, [visible, nudge, handleResponse]);
 
-  // Don't render on Kaizen web app, if disabled by ignore list, or if not visible
-  if (isKaizenWebApp || !isEnabled || !visible || !nudge) return null;
+  // Don't render on Kaizen web app, if disabled by ignore list, not visible, or if it's an "all_clear" type
+  // "all_clear" nudges are for Health tab visibility only, not popup notifications
+  if (isKaizenWebApp || !isEnabled || !visible || !nudge || nudge.type === "all_clear") return null;
 
   const getNudgeColor = (type: string) => {
     switch (type) {
@@ -145,6 +146,8 @@ function NudgeOverlay() {
         return { bg: "#fefce8", border: "#fef08a", icon: "#ca8a04" };
       case "encouragement":
         return { bg: "#eff6ff", border: "#bfdbfe", icon: "#2563eb" };
+      case "all_clear":
+        return { bg: "#ecfdf5", border: "#a7f3d0", icon: "#059669" };
       default:
         return { bg: "#f9fafb", border: "#e5e7eb", icon: "#6b7280" };
     }
@@ -244,6 +247,7 @@ function NudgeOverlay() {
             {nudge.type === "break" && "☕"}
             {nudge.type === "focus_drift" && "🎯"}
             {nudge.type === "encouragement" && "🌟"}
+            {nudge.type === "all_clear" && "✅"}
           </span>
         </div>
         <div style={{ flex: 1 }}>

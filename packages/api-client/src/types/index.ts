@@ -734,13 +734,44 @@ export interface AttentionInsight {
 }
 
 // Agent Nudge types
-export type AgentNudgeType = "doomscroll" | "distraction" | "break" | "focus_drift" | "encouragement";
+export type AgentNudgeType = "doomscroll" | "distraction" | "break" | "focus_drift" | "encouragement" | "all_clear";
 
 export interface AgentNudge {
   id: string;
   type: AgentNudgeType;
   message: string;
   createdAt: string;
+}
+
+export interface AgentNudgeContext {
+  recentDomains?: string[];
+  domainSwitchCount?: number;
+  averageDwellTime?: number;
+  hasActiveFocus?: boolean;
+  focusTopics?: string[];
+  socialMediaTime?: number;
+  readingTime?: number;
+  sessionDuration?: number;
+}
+
+export interface AgentNudgeDetail {
+  id: string;
+  type: AgentNudgeType;
+  message: string;
+  confidence: number;
+  reasoning: string | null;
+  context: AgentNudgeContext;
+  response: "acknowledged" | "false_positive" | "dismissed" | null;
+  respondedAt: string | null;
+  createdAt: string;
+}
+
+export interface AgentNudgeStats {
+  totalNudges: number;
+  acknowledgedCount: number;
+  falsePositiveCount: number;
+  dismissedCount: number;
+  nudgesByType: Record<string, number>;
 }
 
 export interface AgentNudgeResponse {
@@ -759,6 +790,8 @@ export interface UnifiedSSEConnectedData {
   pomodoro: PomodoroStatus;
   pulses: Pulse[];
   insights: AttentionInsight[];
+  nudges: AgentNudgeDetail[];
+  nudgeStats: AgentNudgeStats;
 }
 
 export interface UnifiedSSESettingsChangedData {

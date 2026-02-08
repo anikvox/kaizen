@@ -13,6 +13,7 @@ import { events } from "../events.js";
 
 const ANALYSIS_WINDOW_MS = 15 * 60 * 1000; // Look at last 15 minutes
 const MIN_ACTIVITY_FOR_ANALYSIS = 5; // Need at least 5 attention events to analyze
+const ALL_CLEAR_INTERVAL_MS = 15 * 60 * 1000; // Only log "all clear" every 15 minutes
 
 export interface NudgeContext {
   recentDomains: string[];
@@ -27,7 +28,7 @@ export interface NudgeContext {
 
 export interface AgentDecision {
   shouldNudge: boolean;
-  nudgeType: "doomscroll" | "distraction" | "break" | "focus_drift" | "encouragement";
+  nudgeType: "doomscroll" | "distraction" | "break" | "focus_drift" | "encouragement" | "all_clear";
   message: string;
   confidence: number;
   reasoning: string;
@@ -86,7 +87,47 @@ export async function runFocusAgent(userId: string): Promise<AgentDecision | nul
   const decision = await makeDecision(userId, context, recentFeedback, settings.focusAgentSensitivity);
 
   if (!decision.shouldNudge) {
-    return null;
+    // Check if we should log an "all clear" decision (throttled)
+    const lastAllClear = await db.agentNudge.findFirst({
+      where: { userId, type: "all_clear" },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const shouldLogAllClear = !lastAllClear ||
+      (Date.now() - lastAllClear.createdAt.getTime() > ALL_CLEAR_INTERVAL_MS);
+
+    if (shouldLogAllClear) {
+      // Store the "all clear" decision for visibility
+      const allClearNudge = await db.agentNudge.create({
+        data: {
+          userId,
+          type: "all_clear",
+          message: "You're doing great! Staying focused.",
+          context: context as object,
+          confidence: 1 - decision.confidence, // Inverse - high confidence means clearly focused
+          reasoning: decision.reasoning || "No concerning patterns detected",
+        },
+      });
+
+      // Emit for real-time updates
+      events.emitAgentNudge({
+        userId,
+        nudge: {
+          id: allClearNudge.id,
+          type: allClearNudge.type,
+          message: allClearNudge.message,
+          createdAt: allClearNudge.createdAt,
+        },
+      });
+    }
+
+    // Update last run time
+    await db.userSettings.update({
+      where: { userId },
+      data: { focusAgentLastRunAt: new Date() },
+    });
+
+    return { ...decision, nudgeType: "all_clear" as const };
   }
 
   // Store the nudge
