@@ -133,6 +133,11 @@ app.get("/", dualAuthMiddleware, async (c) => {
     quizActivityDays: settings.quizActivityDays,
     // Pomodoro settings
     pomodoroCooldownMs: settings.pomodoroCooldownMs,
+    // Focus agent settings
+    focusAgentEnabled: settings.focusAgentEnabled,
+    focusAgentSensitivity: settings.focusAgentSensitivity,
+    focusAgentCooldownMs: settings.focusAgentCooldownMs,
+    focusAgentIntervalMs: settings.focusAgentIntervalMs,
   });
 });
 
@@ -230,6 +235,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
     focusAgentEnabled?: boolean;
     focusAgentSensitivity?: number;
     focusAgentCooldownMs?: number;
+    focusAgentIntervalMs?: number;
   }>();
 
   // Build update data - using Prisma's unchecked types for direct field assignment
@@ -290,8 +296,8 @@ app.post("/", dualAuthMiddleware, async (c) => {
     createData.focusCalculationEnabled = body.focusCalculationEnabled;
   }
   if (body.focusCalculationIntervalMs !== undefined) {
-    // Enforce minimum interval of 30 seconds
-    const interval = Math.max(30000, body.focusCalculationIntervalMs);
+    // Enforce minimum interval of 15 seconds
+    const interval = Math.max(15000, body.focusCalculationIntervalMs);
     updateData.focusCalculationIntervalMs = interval;
     createData.focusCalculationIntervalMs = interval;
   }
@@ -380,6 +386,11 @@ app.post("/", dualAuthMiddleware, async (c) => {
     const cooldown = Math.max(60000, body.focusAgentCooldownMs);
     updateData.focusAgentCooldownMs = cooldown;
   }
+  if (body.focusAgentIntervalMs !== undefined) {
+    // Enforce minimum of 30 seconds
+    const interval = Math.max(30000, body.focusAgentIntervalMs);
+    updateData.focusAgentIntervalMs = interval;
+  }
 
   const settings = await db.userSettings.upsert({
     where: { userId },
@@ -390,7 +401,8 @@ app.post("/", dualAuthMiddleware, async (c) => {
   // Reschedule jobs if interval settings changed
   const jobSettingsChanged =
     body.focusCalculationIntervalMs !== undefined ||
-    body.attentionSummarizationIntervalMs !== undefined;
+    body.attentionSummarizationIntervalMs !== undefined ||
+    body.focusAgentIntervalMs !== undefined;
 
   if (jobSettingsChanged) {
     try {
@@ -426,6 +438,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
       focusAgentEnabled: settings.focusAgentEnabled,
       focusAgentSensitivity: settings.focusAgentSensitivity,
       focusAgentCooldownMs: settings.focusAgentCooldownMs,
+      focusAgentIntervalMs: settings.focusAgentIntervalMs,
     },
   });
 
@@ -450,6 +463,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
     focusAgentEnabled: settings.focusAgentEnabled,
     focusAgentSensitivity: settings.focusAgentSensitivity,
     focusAgentCooldownMs: settings.focusAgentCooldownMs,
+    focusAgentIntervalMs: settings.focusAgentIntervalMs,
   });
 });
 

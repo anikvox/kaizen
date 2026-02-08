@@ -31,6 +31,7 @@ import {
   AlertTriangle,
   Trash2,
   User,
+  Shield,
 } from "lucide-react";
 
 const apiUrl =
@@ -860,6 +861,7 @@ export default function Settings() {
                     disabled={saving}
                     className="w-full p-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
+                    <option value={15000}>15 seconds</option>
                     <option value={30000}>30 seconds</option>
                     <option value={60000}>1 minute</option>
                     <option value={120000}>2 minutes</option>
@@ -953,6 +955,109 @@ export default function Settings() {
                 <p className="text-xs text-muted-foreground mt-2">
                   How long the timer continues after focus ends before resetting
                 </p>
+              </div>
+            </div>
+
+            {/* Focus Guardian */}
+            <div className="rounded-2xl border border-border bg-card p-6">
+              <div className="flex items-center gap-2 mb-1">
+                <Shield className="w-4 h-4 text-green-600" />
+                <h3 className="font-medium">Focus Guardian</h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-6">
+                AI agent that monitors your browsing and nudges you when it detects
+                unfocused patterns like doomscrolling
+              </p>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="flex items-start justify-between gap-4 p-4 rounded-xl bg-muted/30">
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium mb-1">Enable Guardian</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Get helpful nudges when you&apos;re off track
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => handleToggle("focusAgentEnabled")}
+                    disabled={saving}
+                    variant={settings.focusAgentEnabled ? "default" : "outline"}
+                    size="sm"
+                    className="flex-shrink-0"
+                  >
+                    {settings.focusAgentEnabled ? "ON" : "OFF"}
+                  </Button>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Check Interval
+                  </label>
+                  <select
+                    value={settings.focusAgentIntervalMs ?? 60000}
+                    onChange={(e) =>
+                      handleUpdate({
+                        focusAgentIntervalMs: Number(e.target.value),
+                      })
+                    }
+                    disabled={saving}
+                    className="w-full p-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value={30000}>30 seconds</option>
+                    <option value={60000}>1 minute</option>
+                    <option value={120000}>2 minutes</option>
+                    <option value={300000}>5 minutes</option>
+                  </select>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    How often the guardian checks your activity
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Nudge Cooldown
+                  </label>
+                  <select
+                    value={settings.focusAgentCooldownMs ?? 300000}
+                    onChange={(e) =>
+                      handleUpdate({
+                        focusAgentCooldownMs: Number(e.target.value),
+                      })
+                    }
+                    disabled={saving}
+                    className="w-full p-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value={60000}>1 minute</option>
+                    <option value={120000}>2 minutes</option>
+                    <option value={300000}>5 minutes</option>
+                    <option value={600000}>10 minutes</option>
+                    <option value={900000}>15 minutes</option>
+                  </select>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Minimum time between nudges
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Sensitivity: {Math.round((settings.focusAgentSensitivity ?? 0.5) * 100)}%
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={Math.round((settings.focusAgentSensitivity ?? 0.5) * 100)}
+                    onChange={(e) =>
+                      handleUpdate({
+                        focusAgentSensitivity: Number(e.target.value) / 100,
+                      })
+                    }
+                    disabled={saving}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Higher = more nudges, Lower = fewer nudges
+                  </p>
+                </div>
               </div>
             </div>
           </div>

@@ -275,8 +275,8 @@ async function handleVisitSummarization(
 // Pulse generation interval: 15 minutes
 const PULSE_GENERATION_INTERVAL_MS = 15 * 60 * 1000;
 
-// Focus agent interval: 1 minute
-const FOCUS_AGENT_INTERVAL_MS = 60 * 1000;
+// Focus guardian interval: 1 minute
+const FOCUS_GUARDIAN_INTERVAL_MS = 60 * 1000;
 
 /**
  * Handle pulse generation job
@@ -312,9 +312,9 @@ async function handlePulseGeneration(
 }
 
 /**
- * Handle focus agent job (autonomous focus guardian)
+ * Handle focus guardian job (autonomous focus guardian)
  */
-async function handleFocusAgent(
+async function handleFocusGuardian(
   job: Job<FocusAgentPayload>
 ): Promise<FocusAgentResult> {
   const { userId } = job.data;
@@ -332,16 +332,21 @@ async function handleFocusAgent(
 
     return { nudgeSent: false };
   } finally {
-    // Self-schedule next run
+    // Self-schedule next run with user's configured interval
     try {
+      const settings = await db.userSettings.findUnique({
+        where: { userId },
+      });
       const boss = await getBoss();
-      await boss.send(JOB_NAMES.FOCUS_AGENT, { userId }, {
-        singletonKey: `focus-agent-${userId}`,
-        startAfter: Math.floor(FOCUS_AGENT_INTERVAL_MS / 1000),
-        singletonSeconds: Math.floor(FOCUS_AGENT_INTERVAL_MS / 1000),
+      const interval = settings?.focusAgentIntervalMs || FOCUS_GUARDIAN_INTERVAL_MS;
+
+      await boss.send(JOB_NAMES.FOCUS_GUARDIAN, { userId }, {
+        singletonKey: `focus-guardian-${userId}`,
+        startAfter: Math.floor(interval / 1000),
+        singletonSeconds: Math.floor(interval / 1000),
       });
     } catch (error) {
-      console.error(`[Jobs] Failed to schedule next focus agent run for user ${userId}:`, error);
+      console.error(`[Jobs] Failed to schedule next focus guardian run for user ${userId}:`, error);
     }
   }
 }
@@ -394,12 +399,12 @@ export async function registerHandlers(boss: PgBoss): Promise<void> {
     },
   );
 
-  // Focus agent (autonomous guardian)
+  // Focus guardian (autonomous guardian)
   await boss.work<FocusAgentPayload, FocusAgentResult>(
-    JOB_NAMES.FOCUS_AGENT,
+    JOB_NAMES.FOCUS_GUARDIAN,
     async ([job]) => {
-      console.log(`[Jobs] Running focus agent for user ${job.data.userId}`);
-      return handleFocusAgent(job);
+      console.log(`[Jobs] Running focus guardian for user ${job.data.userId}`);
+      return handleFocusGuardian(job);
     }
   );
 

@@ -26,7 +26,7 @@ import {
 const PULSE_GENERATION_INTERVAL_MS = 15 * 60 * 1000;
 
 // Focus agent interval: 1 minute
-const FOCUS_AGENT_INTERVAL_MS = 60 * 1000;
+const FOCUS_GUARDIAN_INTERVAL_MS = 60 * 1000;
 
 /**
  * Send a focus calculation job
@@ -100,15 +100,15 @@ export async function sendPulseGeneration(
 }
 
 /**
- * Send a focus agent job (autonomous focus guardian)
+ * Send a focus guardian job (autonomous focus guardian)
  */
-export async function sendFocusAgent(userId: string): Promise<string | null> {
+export async function sendFocusGuardian(userId: string): Promise<string | null> {
   const boss = await getBoss();
   return boss.send(
-    JOB_NAMES.FOCUS_AGENT,
+    JOB_NAMES.FOCUS_GUARDIAN,
     { userId } as FocusAgentPayload,
     {
-      singletonKey: `focus-agent-${userId}`,
+      singletonKey: `focus-guardian-${userId}`,
       singletonSeconds: 30, // Prevent duplicates within 30 seconds
     }
   );
@@ -136,6 +136,7 @@ export async function scheduleInitialJobs(
   settings: {
     focusCalculationIntervalMs?: number | null;
     attentionSummarizationIntervalMs?: number | null;
+    focusAgentIntervalMs?: number | null;
   },
 ): Promise<void> {
   const boss = await getBoss();
@@ -177,15 +178,15 @@ export async function scheduleInitialJobs(
     },
   );
 
-  // Schedule focus agent (every 1 minute)
-  const focusAgentInterval = FOCUS_AGENT_INTERVAL_MS;
+  // Schedule focus guardian (configurable, default 1 minute)
+  const focusGuardianInterval = settings.focusAgentIntervalMs || FOCUS_GUARDIAN_INTERVAL_MS;
   await boss.send(
-    JOB_NAMES.FOCUS_AGENT,
+    JOB_NAMES.FOCUS_GUARDIAN,
     { userId },
     {
-      singletonKey: `focus-agent-${userId}`,
-      startAfter: Math.floor(focusAgentInterval / 1000),
-      singletonSeconds: Math.floor(focusAgentInterval / 1000),
+      singletonKey: `focus-guardian-${userId}`,
+      startAfter: Math.floor(focusGuardianInterval / 1000),
+      singletonSeconds: Math.floor(focusGuardianInterval / 1000),
     },
   );
 }
@@ -199,6 +200,7 @@ export async function rescheduleUserJobs(
   settings: {
     focusCalculationIntervalMs?: number | null;
     attentionSummarizationIntervalMs?: number | null;
+    focusAgentIntervalMs?: number | null;
   },
 ): Promise<void> {
   const boss = await getBoss();
@@ -227,6 +229,18 @@ export async function rescheduleUserJobs(
       singletonKey: `visit-summarize-${userId}`,
       startAfter: 1, // Run in 1 second (0 may cause issues)
       singletonSeconds: Math.floor(summarizationInterval / 1000),
+    },
+  );
+
+  // Reschedule focus guardian
+  const focusGuardianInterval = settings.focusAgentIntervalMs || FOCUS_GUARDIAN_INTERVAL_MS;
+  await boss.send(
+    JOB_NAMES.FOCUS_GUARDIAN,
+    { userId },
+    {
+      singletonKey: `focus-guardian-${userId}`,
+      startAfter: 1, // Run in 1 second
+      singletonSeconds: Math.floor(focusGuardianInterval / 1000),
     },
   );
 }
@@ -399,6 +413,7 @@ export async function scheduleAllUserJobs(): Promise<void> {
       userId: true,
       focusCalculationIntervalMs: true,
       attentionSummarizationIntervalMs: true,
+      focusAgentIntervalMs: true,
     },
   });
 
@@ -447,12 +462,12 @@ export async function scheduleAllUserJobs(): Promise<void> {
         },
       );
 
-      // Schedule focus agent
-      const focusAgentInterval = FOCUS_AGENT_INTERVAL_MS;
-      await boss.send(JOB_NAMES.FOCUS_AGENT, { userId: user.userId }, {
-        singletonKey: `focus-agent-${user.userId}`,
-        startAfter: Math.floor(focusAgentInterval / 1000),
-        singletonSeconds: Math.floor(focusAgentInterval / 1000),
+      // Schedule focus guardian
+      const focusGuardianInterval = user.focusAgentIntervalMs || FOCUS_GUARDIAN_INTERVAL_MS;
+      await boss.send(JOB_NAMES.FOCUS_GUARDIAN, { userId: user.userId }, {
+        singletonKey: `focus-guardian-${user.userId}`,
+        startAfter: Math.floor(focusGuardianInterval / 1000),
+        singletonSeconds: Math.floor(focusGuardianInterval / 1000),
       });
 
       scheduled++;

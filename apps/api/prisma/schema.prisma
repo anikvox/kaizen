@@ -186,6 +186,7 @@ model UserSettings {
   focusAgentSensitivity         Float    @default(0.5)    // 0-1, learned from feedback
   focusAgentLastRunAt           DateTime?                 // Last time the agent ran for this user
   focusAgentCooldownMs          Int      @default(300000) // Default 5 minutes between nudges
+  focusAgentIntervalMs          Int      @default(60000)  // Default 1 minute - how often to run the agent
   createdAt                     DateTime @default(now())
   updatedAt                     DateTime @updatedAt
 

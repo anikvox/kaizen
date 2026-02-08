@@ -349,6 +349,7 @@ export interface UserSettings {
   focusAgentEnabled?: boolean; // Default true
   focusAgentSensitivity?: number; // 0-1, Default 0.5
   focusAgentCooldownMs?: number; // Default 300000 (5 minutes)
+  focusAgentIntervalMs?: number; // Default 60000 (1 minute)
 }
 
 export interface UserSettingsUpdateRequest {
@@ -378,6 +379,7 @@ export interface UserSettingsUpdateRequest {
   focusAgentEnabled?: boolean;
   focusAgentSensitivity?: number;
   focusAgentCooldownMs?: number;
+  focusAgentIntervalMs?: number;
 }
 
 export interface SSESettingsConnectedData {
@@ -407,6 +409,7 @@ export interface SSESettingsChangedData {
   focusAgentEnabled?: boolean;
   focusAgentSensitivity?: number;
   focusAgentCooldownMs?: number;
+  focusAgentIntervalMs?: number;
 }
 
 // Chat Types

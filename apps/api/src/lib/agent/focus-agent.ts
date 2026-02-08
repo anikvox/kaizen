@@ -51,40 +51,57 @@ const ENTERTAINMENT_DOMAINS = [
  * Run the focus guardian agent for a user
  */
 export async function runFocusAgent(userId: string): Promise<AgentDecision | null> {
+  console.log(`[FocusGuardian] Running for user ${userId}`);
+
   // Get user settings
   const settings = await db.userSettings.findUnique({
     where: { userId },
   });
 
   if (!settings?.focusAgentEnabled) {
+    console.log(`[FocusGuardian] Disabled for user ${userId}`);
     return null;
   }
 
-  // Check cooldown - don't nudge too frequently
+  // Check cooldown for actual nudges (not analysis)
   const lastNudge = await db.agentNudge.findFirst({
-    where: { userId },
+    where: { userId, type: { not: "all_clear" } },
     orderBy: { createdAt: "desc" },
   });
 
-  if (lastNudge) {
-    const timeSinceLastNudge = Date.now() - lastNudge.createdAt.getTime();
-    if (timeSinceLastNudge < settings.focusAgentCooldownMs) {
-      return null;
-    }
-  }
+  const cooldownActive = lastNudge &&
+    (Date.now() - lastNudge.createdAt.getTime()) < settings.focusAgentCooldownMs;
 
   // Gather context
   const context = await gatherContext(userId);
 
   if (!context) {
+    console.log(`[FocusGuardian] Not enough activity data for user ${userId} (need ${MIN_ACTIVITY_FOR_ANALYSIS} events)`);
     return null; // Not enough data to analyze
   }
+
+  console.log(`[FocusGuardian] Analyzing activity for user ${userId}: ${context.domainSwitchCount} domains, ${Math.round(context.socialMediaTime / 1000)}s social media, ${context.hasActiveFocus ? 'has focus' : 'no focus'}`)
 
   // Get past feedback to inform the decision
   const recentFeedback = await getRecentFeedback(userId);
 
   // Make decision using LLM
   const decision = await makeDecision(userId, context, recentFeedback, settings.focusAgentSensitivity);
+
+  console.log(`[FocusGuardian] Decision for user ${userId}: shouldNudge=${decision.shouldNudge}, type=${decision.nudgeType}, confidence=${decision.confidence}`);
+
+  // If cooldown is active, don't send nudge but still log the decision
+  if (decision.shouldNudge && cooldownActive) {
+    console.log(`[FocusGuardian] Cooldown active for user ${userId}, skipping nudge (${Math.round((Date.now() - lastNudge!.createdAt.getTime()) / 1000)}s since last, cooldown is ${settings.focusAgentCooldownMs / 1000}s)`);
+
+    // Update last run time
+    await db.userSettings.update({
+      where: { userId },
+      data: { focusAgentLastRunAt: new Date() },
+    });
+
+    return { ...decision, shouldNudge: false };
+  }
 
   if (!decision.shouldNudge) {
     // Check if we should log an "all clear" decision (throttled)
