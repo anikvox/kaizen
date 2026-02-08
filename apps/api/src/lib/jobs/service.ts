@@ -19,10 +19,14 @@ import {
   type QuizGenerationPayload,
   type VisitSummarizationPayload,
   type PulseGenerationPayload,
+  type FocusAgentPayload,
 } from "./types.js";
 
 // Pulse generation interval: 15 minutes
 const PULSE_GENERATION_INTERVAL_MS = 15 * 60 * 1000;
+
+// Focus agent interval: 1 minute
+const FOCUS_AGENT_INTERVAL_MS = 60 * 1000;
 
 /**
  * Send a focus calculation job
@@ -96,6 +100,21 @@ export async function sendPulseGeneration(
 }
 
 /**
+ * Send a focus agent job (autonomous focus guardian)
+ */
+export async function sendFocusAgent(userId: string): Promise<string | null> {
+  const boss = await getBoss();
+  return boss.send(
+    JOB_NAMES.FOCUS_AGENT,
+    { userId } as FocusAgentPayload,
+    {
+      singletonKey: `focus-agent-${userId}`,
+      singletonSeconds: 30, // Prevent duplicates within 30 seconds
+    }
+  );
+}
+
+/**
  * Cancel a job by ID
  */
 export async function cancelJob(jobId: string): Promise<boolean> {
@@ -155,6 +174,18 @@ export async function scheduleInitialJobs(
       singletonKey: `pulse-${userId}`,
       startAfter: Math.floor(pulseInterval / 1000),
       singletonSeconds: Math.floor(pulseInterval / 1000),
+    },
+  );
+
+  // Schedule focus agent (every 1 minute)
+  const focusAgentInterval = FOCUS_AGENT_INTERVAL_MS;
+  await boss.send(
+    JOB_NAMES.FOCUS_AGENT,
+    { userId },
+    {
+      singletonKey: `focus-agent-${userId}`,
+      startAfter: Math.floor(focusAgentInterval / 1000),
+      singletonSeconds: Math.floor(focusAgentInterval / 1000),
     },
   );
 }
@@ -415,6 +446,14 @@ export async function scheduleAllUserJobs(): Promise<void> {
           singletonSeconds: Math.floor(pulseInterval / 1000),
         },
       );
+
+      // Schedule focus agent
+      const focusAgentInterval = FOCUS_AGENT_INTERVAL_MS;
+      await boss.send(JOB_NAMES.FOCUS_AGENT, { userId: user.userId }, {
+        singletonKey: `focus-agent-${user.userId}`,
+        startAfter: Math.floor(focusAgentInterval / 1000),
+        singletonSeconds: Math.floor(focusAgentInterval / 1000),
+      });
 
       scheduled++;
     } catch (error) {

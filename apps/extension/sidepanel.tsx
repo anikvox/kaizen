@@ -10,7 +10,9 @@ import {
   type Focus,
   type PomodoroStatus,
   type UnifiedSSEData,
-  type AttentionInsight
+  type AttentionInsight,
+  type AgentNudgeDetail,
+  type AgentNudgeStats
 } from "@kaizen/api-client"
 import {
   cn,
@@ -27,7 +29,13 @@ import {
   Paperclip,
   X,
   FileText,
-  AlertTriangle
+  AlertTriangle,
+  Heart,
+  Shield,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Brain
 } from "lucide-react"
 import {
   COGNITIVE_ATTENTION_DEBUG_MODE,
@@ -50,7 +58,7 @@ interface UserInfo {
   name: string | null
 }
 
-type Tab = "focus" | "insights" | "learning" | "explore"
+type Tab = "focus" | "insights" | "health" | "explore"
 
 function SidePanel() {
   const [user, setUser] = useState<UserInfo | null>(null)
@@ -65,6 +73,10 @@ function SidePanel() {
 
   // Insights state
   const [insights, setInsights] = useState<AttentionInsight[]>([])
+
+  // Agent nudges state
+  const [nudges, setNudges] = useState<AgentNudgeDetail[]>([])
+  const [nudgeStats, setNudgeStats] = useState<AgentNudgeStats | null>(null)
 
   // Settings state
   const [settings, setSettings] = useState<UserSettings | null>(null)
@@ -368,6 +380,8 @@ function SidePanel() {
               setFocuses(data.focuses)
               setPomodoroStatus(data.pomodoro)
               setInsights(data.insights || [])
+              setNudges((data as any).nudges || [])
+              setNudgeStats((data as any).nudgeStats || null)
               setLoading(false)
               break
 
@@ -459,6 +473,30 @@ function SidePanel() {
               setInsights((prev) => [data.insight, ...prev].slice(0, 10))
               break
 
+            case "agent-nudge":
+              // Add new nudge to the list (with full details for health tab)
+              setNudges((prev) => [{
+                id: data.nudge.id,
+                type: data.nudge.type,
+                message: data.nudge.message,
+                confidence: 0,
+                reasoning: null,
+                context: {},
+                response: null,
+                respondedAt: null,
+                createdAt: data.nudge.createdAt,
+              }, ...prev].slice(0, 20))
+              // Update stats
+              setNudgeStats((prev) => prev ? {
+                ...prev,
+                totalNudges: prev.totalNudges + 1,
+                nudgesByType: {
+                  ...prev.nudgesByType,
+                  [data.nudge.type]: (prev.nudgesByType[data.nudge.type] || 0) + 1
+                }
+              } : null)
+              break
+
             case "device-token-revoked":
               storage.remove("deviceToken")
               setUser(null)
@@ -466,6 +504,8 @@ function SidePanel() {
               setFocuses([])
               setPomodoroStatus(null)
               setInsights([])
+              setNudges([])
+              setNudgeStats(null)
               break
 
             case "ping":
@@ -647,7 +687,7 @@ function SidePanel() {
               {[
                 { id: "focus" as Tab, icon: Target, label: "Focus" },
                 { id: "insights" as Tab, icon: BarChart3, label: "Insights" },
-                { id: "learning" as Tab, icon: Lightbulb, label: "Learning" },
+                { id: "health" as Tab, icon: Heart, label: "Health" },
                 { id: "explore" as Tab, icon: Settings, label: "Settings" },
               ].map((tab) => (
                 <button
@@ -686,7 +726,13 @@ function SidePanel() {
               />
             )}
             {activeTab === "insights" && <InsightsTab insights={insights} />}
-            {activeTab === "learning" && <LearningTab />}
+            {activeTab === "health" && (
+              <HealthTab
+                settings={settings}
+                nudges={nudges}
+                nudgeStats={nudgeStats}
+              />
+            )}
             {activeTab === "explore" && (
               <ExploreTab
                 settings={settings}
@@ -976,19 +1022,204 @@ function InsightsTab({ insights }: { insights: AttentionInsight[] }) {
   )
 }
 
-// Learning Tab (placeholder for future features)
-function LearningTab() {
+// Health Tab - Focus Guardian Agent visibility
+function HealthTab({
+  settings,
+  nudges,
+  nudgeStats
+}: {
+  settings: UserSettings | null
+  nudges: AgentNudgeDetail[]
+  nudgeStats: AgentNudgeStats | null
+}) {
+  const getNudgeIcon = (type: string) => {
+    switch (type) {
+      case "doomscroll": return "🌀"
+      case "distraction": return "📱"
+      case "break": return "☕"
+      case "focus_drift": return "🎯"
+      case "encouragement": return "🌟"
+      case "all_clear": return "✅"
+      default: return "💭"
+    }
+  }
+
+  const getNudgeColor = (type: string) => {
+    switch (type) {
+      case "doomscroll": return "border-red-400 bg-red-50/50"
+      case "distraction": return "border-amber-400 bg-amber-50/50"
+      case "break": return "border-green-400 bg-green-50/50"
+      case "focus_drift": return "border-yellow-400 bg-yellow-50/50"
+      case "encouragement": return "border-blue-400 bg-blue-50/50"
+      case "all_clear": return "border-emerald-400 bg-emerald-50/50"
+      default: return "border-gray-400 bg-gray-50/50"
+    }
+  }
+
+  const getNudgeLabel = (type: string) => {
+    switch (type) {
+      case "doomscroll": return "Doomscroll"
+      case "distraction": return "Distraction"
+      case "break": return "Break Needed"
+      case "focus_drift": return "Focus Drift"
+      case "encouragement": return "Encouragement"
+      case "all_clear": return "All Clear"
+      default: return type
+    }
+  }
+
+  const getResponseIcon = (response: string | null) => {
+    switch (response) {
+      case "acknowledged": return <CheckCircle className="w-3 h-3 text-green-500" />
+      case "false_positive": return <XCircle className="w-3 h-3 text-red-500" />
+      case "dismissed": return <X className="w-3 h-3 text-gray-400" />
+      default: return <Clock className="w-3 h-3 text-gray-400" />
+    }
+  }
+
+  const formatTime = (dateStr: string) => {
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+
+    if (diffMins < 1) return "just now"
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`
+    return date.toLocaleDateString()
+  }
+
   return (
-    <div className="flex-1 overflow-auto p-3">
-      <div className="h-full flex flex-col items-center justify-center text-center p-4">
-        <div className="bg-white/40 backdrop-blur-sm rounded-xl p-6 border border-gray-300/50">
-          <Lightbulb className="w-8 h-8 text-yellow-500 mx-auto mb-3" />
-          <p className="text-sm font-medium text-gray-700">Learning Features</p>
-          <p className="text-xs text-gray-500 mt-1">
-            Coming soon: Quiz yourself on your browsing activity!
-          </p>
+    <div className="flex-1 overflow-auto p-3 space-y-3">
+      {/* Agent Status Card */}
+      <div className="bg-white/40 backdrop-blur-sm rounded-xl p-4 border border-gray-300/50">
+        <div className="flex items-center gap-3 mb-3">
+          <div className={cn(
+            "w-10 h-10 rounded-xl flex items-center justify-center",
+            settings?.focusAgentEnabled ? "bg-green-100" : "bg-gray-100"
+          )}>
+            <Shield className={cn(
+              "w-5 h-5",
+              settings?.focusAgentEnabled ? "text-green-600" : "text-gray-400"
+            )} />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-gray-900">Focus Guardian</h3>
+            <p className={cn(
+              "text-[10px] font-medium",
+              settings?.focusAgentEnabled ? "text-green-600" : "text-gray-500"
+            )}>
+              {settings?.focusAgentEnabled ? "Active & Monitoring" : "Disabled"}
+            </p>
+          </div>
+          <Brain className="w-5 h-5 text-purple-400" />
         </div>
+
+        {settings?.focusAgentEnabled && (
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="bg-white/50 rounded-lg p-2">
+              <p className="text-lg font-bold text-gray-900">{nudgeStats?.totalNudges || 0}</p>
+              <p className="text-[9px] text-gray-500">Total Nudges</p>
+            </div>
+            <div className="bg-white/50 rounded-lg p-2">
+              <p className="text-lg font-bold text-green-600">{nudgeStats?.acknowledgedCount || 0}</p>
+              <p className="text-[9px] text-gray-500">Helpful</p>
+            </div>
+            <div className="bg-white/50 rounded-lg p-2">
+              <p className="text-lg font-bold text-gray-900">
+                {settings.focusAgentSensitivity !== undefined
+                  ? Math.round(settings.focusAgentSensitivity * 100)
+                  : 50}%
+              </p>
+              <p className="text-[9px] text-gray-500">Sensitivity</p>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Recent Decisions */}
+      <div className="bg-white/40 backdrop-blur-sm rounded-xl p-4 border border-gray-300/50">
+        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+          <Lightbulb className="w-4 h-4 text-amber-500" />
+          Agent Decisions
+        </h3>
+
+        {nudges.length === 0 ? (
+          <div className="text-center py-4">
+            <CheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2 opacity-50" />
+            <p className="text-xs text-gray-500">No nudges yet</p>
+            <p className="text-[10px] text-gray-400 mt-1">
+              The agent is watching for unfocused patterns
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-64 overflow-auto">
+            {nudges.map((nudge) => (
+              <div
+                key={nudge.id}
+                className={cn(
+                  "rounded-lg p-3 border-l-2",
+                  getNudgeColor(nudge.type)
+                )}
+              >
+                <div className="flex items-start gap-2">
+                  <span className="text-base">{getNudgeIcon(nudge.type)}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-medium text-gray-500 uppercase">
+                        {getNudgeLabel(nudge.type)}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        {getResponseIcon(nudge.response)}
+                        <span className="text-[9px] text-gray-400">
+                          {formatTime(nudge.createdAt)}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-700 mt-1">{nudge.message}</p>
+                    {nudge.reasoning && (
+                      <p className="text-[10px] text-gray-500 mt-1 italic">
+                        {nudge.reasoning}
+                      </p>
+                    )}
+                    {nudge.confidence > 0 && (
+                      <div className="flex items-center gap-1 mt-1">
+                        <div className="flex-1 h-1 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-purple-400 rounded-full"
+                            style={{ width: `${nudge.confidence * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-[9px] text-gray-400">
+                          {Math.round(nudge.confidence * 100)}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Nudge Type Breakdown */}
+      {nudgeStats && nudgeStats.totalNudges > 0 && (
+        <div className="bg-white/40 backdrop-blur-sm rounded-xl p-4 border border-gray-300/50">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Pattern Breakdown</h3>
+          <div className="space-y-2">
+            {Object.entries(nudgeStats.nudgesByType).map(([type, count]) => (
+              <div key={type} className="flex items-center gap-2">
+                <span className="text-sm">{getNudgeIcon(type)}</span>
+                <span className="text-xs text-gray-600 flex-1">
+                  {getNudgeLabel(type)}
+                </span>
+                <span className="text-xs font-medium text-gray-900">{count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

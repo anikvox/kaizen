@@ -47,3 +47,7 @@ prompts-status:
 
 prompts-sync:
     pnpm --filter @kaizen/api prompts:sync
+
+# Seed fake activity data for testing focus agent
+seed-activity:
+    pnpm --filter @kaizen/api seed:activity

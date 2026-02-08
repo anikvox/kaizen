@@ -181,6 +181,11 @@ model UserSettings {
   quizActivityDays              Int      @default(3)    // 1-7 days of activity to use for quiz
   // Pomodoro Settings
   pomodoroCooldownMs            Int      @default(120000) // Default 2 minutes - inactivity before timer resets
+  // Focus Agent Settings
+  focusAgentEnabled             Boolean  @default(true)   // Enable/disable the autonomous focus guardian
+  focusAgentSensitivity         Float    @default(0.5)    // 0-1, learned from feedback
+  focusAgentLastRunAt           DateTime?                 // Last time the agent ran for this user
+  focusAgentCooldownMs          Int      @default(300000) // Default 5 minutes between nudges
   createdAt                     DateTime @default(now())
   updatedAt                     DateTime @updatedAt
 
@@ -339,6 +344,27 @@ model AttentionInsight {
   @@index([userId])
   @@index([userId, createdAt])
   @@map("attention_insights")
+}
+
+model AgentNudge {
+  id          String    @id @default(cuid())
+  userId      String
+  type        String    // "doomscroll" | "distraction" | "break" | "focus_drift" | "encouragement"
+  message     String    @db.Text
+  context     Json      // Snapshot of what triggered it (domains, patterns, etc.)
+  confidence  Float     // 0-1, how confident the agent was
+  reasoning   String?   @db.Text // Why the agent decided to nudge
+
+  // User response
+  response    String?   // "acknowledged" | "false_positive" | "dismissed"
+  respondedAt DateTime?
+
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([userId, response]) // For learning from feedback
+  @@map("agent_nudges")
 }
 
 // Note: Background jobs are now managed by pg-boss which creates its own tables in the pgboss schema

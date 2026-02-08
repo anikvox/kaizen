@@ -4,6 +4,7 @@ import { db, events } from "../lib/index.js";
 import { getPomodoroStatus } from "../lib/pomodoro/index.js";
 import { getUserPulses } from "../lib/pulse/index.js";
 import { getUserInsights } from "../lib/insight/index.js";
+import { getUserNudges, getNudgeStats } from "../lib/agent/nudge-service.js";
 
 /**
  * Unified SSE endpoint that combines all real-time streams into a single connection.
@@ -101,7 +102,7 @@ app.get("/", async (c) => {
     let id = 0;
 
     // Gather initial state
-    const [settings, focuses, pomodoroStatus, pulses, insights] =
+    const [settings, focuses, pomodoroStatus, pulses, insights, nudges, nudgeStats] =
       await Promise.all([
         db.userSettings.upsert({
           where: { userId },
@@ -119,6 +120,8 @@ app.get("/", async (c) => {
         getPomodoroStatus(userId),
         getUserPulses(userId),
         getUserInsights(userId),
+        getUserNudges(userId),
+        getNudgeStats(userId),
       ]);
 
     // Send initial connection with all state
@@ -149,6 +152,9 @@ app.get("/", async (c) => {
           quizAnswerOptionsCount: settings.quizAnswerOptionsCount,
           quizActivityDays: settings.quizActivityDays,
           pomodoroCooldownMs: settings.pomodoroCooldownMs,
+          focusAgentEnabled: settings.focusAgentEnabled,
+          focusAgentSensitivity: settings.focusAgentSensitivity,
+          focusAgentCooldownMs: settings.focusAgentCooldownMs,
         },
         focuses: focuses.map((f) => ({
           id: f.id,
@@ -171,6 +177,18 @@ app.get("/", async (c) => {
           sourceUrl: i.sourceUrl,
           createdAt: i.createdAt.toISOString(),
         })),
+        nudges: nudges.map((n) => ({
+          id: n.id,
+          type: n.type,
+          message: n.message,
+          confidence: n.confidence,
+          reasoning: n.reasoning,
+          context: n.context,
+          response: n.response,
+          respondedAt: n.respondedAt?.toISOString() || null,
+          createdAt: n.createdAt.toISOString(),
+        })),
+        nudgeStats,
       }),
       event: "message",
       id: String(id++),
@@ -421,6 +439,27 @@ app.get("/", async (c) => {
           });
         }
       }),
+    );
+
+    // Agent nudge
+    cleanups.push(
+      events.onAgentNudge(async (data) => {
+        if (data.userId === userId) {
+          await stream.writeSSE({
+            data: JSON.stringify({
+              type: "agent-nudge",
+              nudge: {
+                id: data.nudge.id,
+                type: data.nudge.type,
+                message: data.nudge.message,
+                createdAt: data.nudge.createdAt.toISOString(),
+              },
+            }),
+            event: "message",
+            id: String(id++),
+          });
+        }
+      })
     );
 
     // Keep-alive ping and pomodoro ticks

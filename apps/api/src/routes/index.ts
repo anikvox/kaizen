@@ -11,3 +11,4 @@ export { default as quizRoutes } from "./quiz.js";
 export { default as pomodoroRoutes } from "./pomodoro.js";
 export { default as unifiedSSERoutes } from "./unified-sse.js";
 export { default as journeyRoutes } from "./journey.js";
+export { default as agentRoutes } from "./agent.js";
