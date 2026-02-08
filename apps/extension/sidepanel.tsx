@@ -945,8 +945,7 @@ function SettingsTab({
   settings: UserSettings | null
   savingSettings: boolean
   onToggleSetting: (key: keyof UserSettings) => void
-})
-
+}) {
   return (
     <div style={styles.settingsContainer}>
       <div style={styles.section}>
