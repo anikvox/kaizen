@@ -1,5 +1,5 @@
 import { Storage } from "@plasmohq/storage"
-import { createApiClient } from "@kaizen/api-client"
+import { createApiClient, type UnifiedSSEData } from "@kaizen/api-client"
 
 import {
   COGNITIVE_ATTENTION_DEBUG_MODE,
@@ -23,18 +23,22 @@ export async function startSettingsSync() {
 
   const api = createApiClient(apiUrl)
 
-  settingsEventSource = api.settings.subscribeSettings(
-    // On connected - sync initial settings from server
-    async (data) => {
-      if (data.settings) {
-        await syncSettingsToStorage(data.settings)
+  settingsEventSource = api.sse.subscribeUnified(
+    async (data: UnifiedSSEData) => {
+      switch (data.type) {
+        case "connected":
+          // Sync initial settings from server
+          if (data.settings) {
+            await syncSettingsToStorage(data.settings)
+          }
+          break
+
+        case "settings-changed":
+          // Update local storage when settings change
+          await syncSettingsToStorage(data.settings)
+          break
       }
     },
-    // On settings changed - update local storage
-    async (data) => {
-      await syncSettingsToStorage(data)
-    },
-    // On error
     (error) => {
       console.error("[Settings Sync] SSE error:", error)
       // Don't clear on error - will retry on next storage watch trigger

@@ -1,12 +1,12 @@
 export { default as healthRoutes } from "./health.js";
 export { default as usersRoutes } from "./users.js";
-export { default as sseRoutes, deviceTokenSSE as deviceTokenSSERoutes } from "./sse.js";
 export { default as deviceTokenRoutes } from "./device-tokens.js";
 export { default as websiteVisitsRoutes } from "./website-visits.js";
 export { default as attentionRoutes } from "./attention.js";
 export { default as exportRoutes } from "./export.js";
-export { default as settingsRoutes, settingsSSE as settingsSSERoutes } from "./settings.js";
-export { default as chatsRoutes, chatSSE as chatSSERoutes } from "./chats.js";
-export { default as focusRoutes, focusSSE as focusSSERoutes } from "./focus.js";
+export { default as settingsRoutes } from "./settings.js";
+export { default as chatsRoutes } from "./chats.js";
+export { default as focusRoutes } from "./focus.js";
 export { default as quizRoutes } from "./quiz.js";
-export { default as pomodoroRoutes, pomodoroSSE as pomodoroSSERoutes } from "./pomodoro.js";
+export { default as pomodoroRoutes } from "./pomodoro.js";
+export { default as unifiedSSERoutes } from "./unified-sse.js";

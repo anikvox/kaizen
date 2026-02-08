@@ -2,8 +2,6 @@ import type { HttpClient } from "../http.js";
 import type {
   UserSettings,
   UserSettingsUpdateRequest,
-  SSESettingsConnectedData,
-  SSESettingsChangedData,
   LLMModels,
   LLMProviderType,
   ModelInfo,
@@ -78,35 +76,5 @@ export class SettingsEndpoint {
       return response.json();
     }
     return this.http.get<ModelInfo[]>(`/settings/llm/models/${provider}`, true);
-  }
-
-  subscribeSettings(
-    onConnected: (data: SSESettingsConnectedData) => void,
-    onSettingsChanged: (data: SSESettingsChangedData) => void,
-    onError?: (error: Event) => void,
-    deviceToken?: string
-  ): EventSource {
-    const url = new URL(`${this.http.getBaseUrl()}/sse/settings`);
-    if (deviceToken) {
-      url.searchParams.set("token", deviceToken);
-    }
-
-    const eventSource = new EventSource(url.toString());
-
-    eventSource.addEventListener("connected", (e) => {
-      const data = JSON.parse((e as MessageEvent).data);
-      onConnected(data);
-    });
-
-    eventSource.addEventListener("settings-changed", (e) => {
-      const data = JSON.parse((e as MessageEvent).data);
-      onSettingsChanged(data);
-    });
-
-    if (onError) {
-      eventSource.onerror = onError;
-    }
-
-    return eventSource;
   }
 }

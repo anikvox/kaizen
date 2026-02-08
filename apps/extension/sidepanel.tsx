@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from "react"
 import { Storage } from "@plasmohq/storage"
-import { sendToBackground } from "@plasmohq/messaging"
 import {
   createApiClient,
   formatToolResultMessage,
@@ -9,11 +8,13 @@ import {
   type ChatMessage,
   type ChatMessageStatus,
   type Focus,
-  type PomodoroStatus
+  type PomodoroStatus,
+  type UnifiedSSEData
 } from "@kaizen/api-client"
 import {
   COGNITIVE_ATTENTION_DEBUG_MODE,
-  COGNITIVE_ATTENTION_SHOW_OVERLAY
+  COGNITIVE_ATTENTION_SHOW_OVERLAY,
+  ATTENTION_TRACKING_IGNORE_LIST
 } from "./cognitive-attention/default-settings"
 
 const apiUrl = process.env.PLASMO_PUBLIC_KAIZEN_API_URL || "http://localhost:60092"
@@ -66,12 +67,14 @@ function SidePanel() {
 
 
   // Refs
-  const eventSourceRef = useRef<EventSource | null>(null)
-  const settingsEventSourceRef = useRef<EventSource | null>(null)
-  const chatEventSourceRef = useRef<EventSource | null>(null)
-  const focusEventSourceRef = useRef<EventSource | null>(null)
-  const pomodoroEventSourceRef = useRef<EventSource | null>(null)
-  const messagesEndRef = useRef<EventSource | null>(null)
+  const unifiedEventSourceRef = useRef<EventSource | null>(null)
+  const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const activeSessionIdRef = useRef<string | null>(null)
+
+  // Keep activeSessionIdRef in sync for SSE handler
+  useEffect(() => {
+    activeSessionIdRef.current = activeSessionId
+  }, [activeSessionId])
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -188,23 +191,26 @@ function SidePanel() {
     const newValue = !settings[key]
 
     try {
-      // Add timeout to prevent hanging
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Request timeout")), 5000)
-      )
+      // Update local storage immediately for UI feedback
+      if (key === "cognitiveAttentionDebugMode") {
+        await storage.set(COGNITIVE_ATTENTION_DEBUG_MODE.key, newValue)
+      } else if (key === "cognitiveAttentionShowOverlay") {
+        await storage.set(COGNITIVE_ATTENTION_SHOW_OVERLAY.key, newValue)
+      }
 
-      await Promise.race([
-        sendToBackground({
-          name: "update-settings",
-          body: { [key]: newValue }
-        }),
-        timeoutPromise
-      ])
+      // Update local state
       setSettings({ ...settings, [key]: newValue })
+
+      // Push to server in background (don't await to keep UI responsive)
+      const token = await storage.get<string>("deviceToken")
+      if (token) {
+        const api = createApiClient(apiUrl, getTokenFn)
+        api.settings.update({ [key]: newValue }, token).catch((err) => {
+          console.error("Failed to sync setting to server:", err)
+        })
+      }
     } catch (error) {
       console.error("Failed to update setting:", error)
-      // Still update local state on error so UI isn't stuck
-      setSettings({ ...settings, [key]: newValue })
     } finally {
       setSavingSettings(false)
     }
@@ -216,41 +222,22 @@ function SidePanel() {
     setSavingSettings(true)
 
     try {
-      // Add timeout to prevent hanging
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Request timeout")), 5000)
-      )
+      // Update local storage immediately
+      await storage.set(ATTENTION_TRACKING_IGNORE_LIST.key, value)
 
-      await Promise.race([
-        sendToBackground({
-          name: "update-settings",
-          body: { attentionTrackingIgnoreList: value }
-        }),
-        timeoutPromise
-      ])
+      // Update local state
       setSettings({ ...settings, attentionTrackingIgnoreList: value })
+
+      // Push to server in background
+      const token = await storage.get<string>("deviceToken")
+      if (token) {
+        const api = createApiClient(apiUrl, getTokenFn)
+        api.settings.update({ attentionTrackingIgnoreList: value }, token).catch((err) => {
+          console.error("Failed to sync ignore list to server:", err)
+        })
+      }
     } catch (error) {
       console.error("Failed to update ignore list:", error)
-      // Still update local state on error
-      setSettings({ ...settings, attentionTrackingIgnoreList: value })
-    } finally {
-      setSavingSettings(false)
-    }
-  }
-
-  const handleUpdateSetting = async (updates: Partial<UserSettings>) => {
-    if (!settings) return
-
-    setSavingSettings(true)
-
-    try {
-      await sendToBackground({
-        name: "update-settings",
-        body: updates
-      })
-      setSettings({ ...settings, ...updates })
-    } catch (error) {
-      console.error("Failed to update setting:", error)
     } finally {
       setSavingSettings(false)
     }
@@ -355,40 +342,150 @@ function SidePanel() {
     return () => port.disconnect()
   }, [])
 
-  // Setup auth SSE
+  // Setup unified SSE - single connection for all real-time events
   useEffect(() => {
     let cancelled = false
 
-    const setupSSE = async () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close()
-        eventSourceRef.current = null
+    const setupUnifiedSSE = async () => {
+      if (unifiedEventSourceRef.current) {
+        unifiedEventSourceRef.current.close()
+        unifiedEventSourceRef.current = null
       }
 
       const token = await storage.get<string>("deviceToken")
       if (!token) {
         setUser(null)
+        setSettings(null)
+        setFocuses([])
+        setPomodoroStatus(null)
         setLoading(false)
         return
       }
 
       const api = createApiClient(apiUrl)
-      const eventSource = api.sse.subscribeDeviceToken(
-        (data) => {
-          if (!cancelled) {
-            setUser(data.user)
-            setLoading(false)
-          }
-        },
-        async (data) => {
-          if (data.token === token) {
-            await storage.remove("deviceToken")
-            if (!cancelled) {
+
+      // Fetch initial chat sessions
+      try {
+        const sessions = await api.chats.list()
+        setSessions(sortSessionsByDate(sessions))
+      } catch (error) {
+        console.error("Failed to fetch sessions:", error)
+      }
+
+      const eventSource = api.sse.subscribeUnified(
+        (data: UnifiedSSEData) => {
+          if (cancelled) return
+
+          switch (data.type) {
+            case "connected":
+              setUser(data.user)
+              setSettings(data.settings)
+              setFocuses(data.focuses)
+              setPomodoroStatus(data.pomodoro)
+              setLoading(false)
+              break
+
+            case "settings-changed":
+              setSettings((prev) => prev ? { ...prev, ...data.settings } : null)
+              break
+
+            case "focus-changed":
+              if (data.changeType === "ended") {
+                setFocuses((prev) => prev.filter((f) => f.id !== data.focus?.id))
+              } else if (data.changeType === "created" && data.focus) {
+                setFocuses((prev) => [data.focus!, ...prev])
+              } else if (data.focus) {
+                setFocuses((prev) =>
+                  prev.map((f) => (f.id === data.focus!.id ? data.focus! : f))
+                )
+              }
+              break
+
+            case "pomodoro-tick":
+            case "pomodoro-status-changed":
+              setPomodoroStatus(data.status)
+              break
+
+            case "chat-session-created":
+              setSessions((prev) =>
+                sortSessionsByDate([
+                  {
+                    id: data.session.id,
+                    title: data.session.title,
+                    attentionRange: data.session.attentionRange,
+                    messageCount: 0,
+                    createdAt: data.session.createdAt,
+                    updatedAt: data.session.updatedAt
+                  },
+                  ...prev
+                ])
+              )
+              break
+
+            case "chat-session-updated":
+              setSessions((prev) =>
+                sortSessionsByDate(
+                  prev.map((s) =>
+                    s.id === data.sessionId ? { ...s, ...data.updates } : s
+                  )
+                )
+              )
+              break
+
+            case "chat-session-deleted":
+              setSessions((prev) => prev.filter((s) => s.id !== data.sessionId))
+              if (activeSessionIdRef.current === data.sessionId) {
+                setActiveSessionId(null)
+                setMessages([])
+                setShowSessionList(true)
+              }
+              break
+
+            case "chat-message-created":
+              if (data.sessionId === activeSessionIdRef.current) {
+                setMessages((prev) => sortMessagesByDate([...prev, data.message]))
+              }
+              setSessions((prev) =>
+                sortSessionsByDate(
+                  prev.map((s) =>
+                    s.id === data.sessionId
+                      ? { ...s, messageCount: s.messageCount + 1, updatedAt: new Date().toISOString() }
+                      : s
+                  )
+                )
+              )
+              break
+
+            case "chat-message-updated":
+              if (data.sessionId === activeSessionIdRef.current) {
+                setMessages((prev) =>
+                  sortMessagesByDate(
+                    prev.map((m) =>
+                      m.id === data.messageId
+                        ? { ...m, ...data.updates, updatedAt: new Date().toISOString() }
+                        : m
+                    )
+                  )
+                )
+              }
+              break
+
+            case "device-token-revoked":
+              storage.remove("deviceToken")
               setUser(null)
-            }
+              setSettings(null)
+              setFocuses([])
+              setPomodoroStatus(null)
+              break
+
+            case "ping":
+              // Keep-alive, no action needed
+              break
           }
         },
         async () => {
+          console.error("Unified SSE error")
+          // On error, clear auth state
           await storage.remove("deviceToken")
           if (!cancelled) {
             setUser(null)
@@ -398,289 +495,19 @@ function SidePanel() {
         token
       )
 
-      eventSourceRef.current = eventSource
+      unifiedEventSourceRef.current = eventSource
     }
 
-    setupSSE()
+    setupUnifiedSSE()
 
     return () => {
       cancelled = true
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close()
-        eventSourceRef.current = null
+      if (unifiedEventSourceRef.current) {
+        unifiedEventSourceRef.current.close()
+        unifiedEventSourceRef.current = null
       }
     }
   }, [])
-
-  // Setup settings SSE
-  useEffect(() => {
-    let cancelled = false
-
-    const setupSettingsSSE = async () => {
-      if (settingsEventSourceRef.current) {
-        settingsEventSourceRef.current.close()
-        settingsEventSourceRef.current = null
-      }
-
-      const token = await storage.get<string>("deviceToken")
-      if (!token) {
-        setSettings(null)
-        return
-      }
-
-      const api = createApiClient(apiUrl)
-      const eventSource = api.settings.subscribeSettings(
-        (data) => {
-          if (!cancelled && data.settings) {
-            setSettings(data.settings)
-          }
-        },
-        (newSettings) => {
-          if (!cancelled) {
-            setSettings(newSettings)
-          }
-        },
-        () => {
-          console.error("Settings SSE error")
-        },
-        token
-      )
-
-      settingsEventSourceRef.current = eventSource
-    }
-
-    setupSettingsSSE()
-
-    return () => {
-      cancelled = true
-      if (settingsEventSourceRef.current) {
-        settingsEventSourceRef.current.close()
-        settingsEventSourceRef.current = null
-      }
-    }
-  }, [user])
-
-  // Setup focus SSE
-  useEffect(() => {
-    let cancelled = false
-
-    const setupFocusSSE = async () => {
-      if (focusEventSourceRef.current) {
-        focusEventSourceRef.current.close()
-        focusEventSourceRef.current = null
-      }
-
-      const token = await storage.get<string>("deviceToken")
-      if (!token || !user) {
-        setFocuses([])
-        return
-      }
-
-      const api = createApiClient(apiUrl)
-      const eventSource = api.focus.subscribeFocus(
-        (data) => {
-          if (!cancelled) {
-            setFocuses(data.focuses)
-          }
-        },
-        (data) => {
-          if (!cancelled) {
-            if (data.changeType === "ended") {
-              // Remove the ended focus from the list
-              setFocuses((prev) => prev.filter((f) => f.id !== data.focus?.id))
-            } else if (data.changeType === "created") {
-              // Add new focus to the list
-              if (data.focus) {
-                setFocuses((prev) => [data.focus!, ...prev])
-              }
-            } else {
-              // Update existing focus
-              if (data.focus) {
-                setFocuses((prev) =>
-                  prev.map((f) => (f.id === data.focus!.id ? data.focus! : f))
-                )
-              }
-            }
-          }
-        },
-        () => {
-          console.error("Focus SSE error")
-        },
-        token
-      )
-
-      focusEventSourceRef.current = eventSource
-    }
-
-    setupFocusSSE()
-
-    return () => {
-      cancelled = true
-      if (focusEventSourceRef.current) {
-        focusEventSourceRef.current.close()
-        focusEventSourceRef.current = null
-      }
-    }
-  }, [user])
-
-  // Setup Pomodoro SSE
-  useEffect(() => {
-    let cancelled = false
-
-    const setupPomodoroSSE = async () => {
-      if (pomodoroEventSourceRef.current) {
-        pomodoroEventSourceRef.current.close()
-        pomodoroEventSourceRef.current = null
-      }
-
-      const token = await storage.get<string>("deviceToken")
-      if (!token || !user) {
-        setPomodoroStatus(null)
-        return
-      }
-
-      const api = createApiClient(apiUrl)
-      const eventSource = api.pomodoro.subscribePomodoro(
-        (data) => {
-          if (!cancelled) {
-            setPomodoroStatus(data.status)
-          }
-        },
-        (data) => {
-          if (!cancelled) {
-            setPomodoroStatus(data.status)
-          }
-        },
-        (data) => {
-          if (!cancelled) {
-            setPomodoroStatus(data.status)
-          }
-        },
-        () => {
-          console.error("Pomodoro SSE error")
-        },
-        token
-      )
-
-      pomodoroEventSourceRef.current = eventSource
-    }
-
-    setupPomodoroSSE()
-
-    return () => {
-      cancelled = true
-      if (pomodoroEventSourceRef.current) {
-        pomodoroEventSourceRef.current.close()
-        pomodoroEventSourceRef.current = null
-      }
-    }
-  }, [user])
-
-
-  // Setup chat SSE
-  useEffect(() => {
-    let cancelled = false
-
-    const setupChatSSE = async () => {
-      if (chatEventSourceRef.current) {
-        chatEventSourceRef.current.close()
-        chatEventSourceRef.current = null
-      }
-
-      const token = await storage.get<string>("deviceToken")
-      if (!token || !user) return
-
-      // Fetch initial sessions
-      await fetchSessions()
-
-      const api = createApiClient(apiUrl)
-      chatEventSourceRef.current = api.chats.subscribeToAllChats(
-        {
-          onConnected: () => {
-            console.log("Chat SSE connected")
-          },
-          onSessionCreated: (data) => {
-            if (!cancelled) {
-              setSessions((prev) =>
-                sortSessionsByDate([
-                  {
-                    id: data.session.id,
-                    title: data.session.title,
-                    messageCount: 0,
-                    createdAt: data.session.createdAt,
-                    updatedAt: data.session.updatedAt
-                  },
-                  ...prev
-                ])
-              )
-            }
-          },
-          onSessionUpdated: (data) => {
-            if (!cancelled) {
-              setSessions((prev) =>
-                sortSessionsByDate(
-                  prev.map((s) =>
-                    s.id === data.sessionId ? { ...s, ...data.updates } : s
-                  )
-                )
-              )
-            }
-          },
-          onSessionDeleted: (data) => {
-            if (!cancelled) {
-              setSessions((prev) => prev.filter((s) => s.id !== data.sessionId))
-              if (activeSessionId === data.sessionId) {
-                setActiveSessionId(null)
-                setMessages([])
-                setShowSessionList(true)
-              }
-            }
-          },
-          onMessageCreated: (data) => {
-            if (!cancelled && data.sessionId === activeSessionId) {
-              setMessages((prev) => sortMessagesByDate([...prev, data.message]))
-            }
-            setSessions((prev) =>
-              sortSessionsByDate(
-                prev.map((s) =>
-                  s.id === data.sessionId
-                    ? { ...s, messageCount: s.messageCount + 1, updatedAt: new Date().toISOString() }
-                    : s
-                )
-              )
-            )
-          },
-          onMessageUpdated: (data) => {
-            if (!cancelled && data.sessionId === activeSessionId) {
-              setMessages((prev) =>
-                sortMessagesByDate(
-                  prev.map((m) =>
-                    m.id === data.messageId
-                      ? { ...m, ...data.updates, updatedAt: new Date().toISOString() }
-                      : m
-                  )
-                )
-              )
-            }
-          },
-          onError: () => {
-            console.error("Chat SSE error")
-          }
-        },
-        token
-      )
-    }
-
-    setupChatSSE()
-
-    return () => {
-      cancelled = true
-      if (chatEventSourceRef.current) {
-        chatEventSourceRef.current.close()
-        chatEventSourceRef.current = null
-      }
-    }
-  }, [user, activeSessionId])
 
   // Load messages when active session changes
   useEffect(() => {
@@ -691,58 +518,28 @@ function SidePanel() {
     }
   }, [activeSessionId])
 
-  // Storage changes
+  // Storage changes - reconnect unified SSE when token changes
   useEffect(() => {
     const callbackMap = {
       deviceToken: async (change: { newValue?: string }) => {
-        if (eventSourceRef.current) {
-          eventSourceRef.current.close()
-          eventSourceRef.current = null
-        }
-        if (settingsEventSourceRef.current) {
-          settingsEventSourceRef.current.close()
-          settingsEventSourceRef.current = null
-        }
-        if (chatEventSourceRef.current) {
-          chatEventSourceRef.current.close()
-          chatEventSourceRef.current = null
-        }
-        if (focusEventSourceRef.current) {
-          focusEventSourceRef.current.close()
-          focusEventSourceRef.current = null
+        // Close existing SSE connection
+        if (unifiedEventSourceRef.current) {
+          unifiedEventSourceRef.current.close()
+          unifiedEventSourceRef.current = null
         }
 
         if (change.newValue) {
-          const api = createApiClient(apiUrl)
-          const eventSource = api.sse.subscribeDeviceToken(
-            (data) => {
-              setUser(data.user)
-            },
-            async (data) => {
-              if (data.token === change.newValue) {
-                await storage.remove("deviceToken")
-                setUser(null)
-                setSettings(null)
-                setFocuses([])
-                setSessions([])
-                setMessages([])
-              }
-            },
-            async () => {
-              await storage.remove("deviceToken")
-              setUser(null)
-              setSettings(null)
-              setFocuses([])
-              setSessions([])
-              setMessages([])
-            },
-            change.newValue
-          )
-          eventSourceRef.current = eventSource
+          // Token was set - the main useEffect will handle reconnection
+          // Just trigger a re-render by updating loading state briefly
+          setLoading(true)
+          // Small delay to allow useEffect to pick up the new token
+          setTimeout(() => setLoading(false), 100)
         } else {
+          // Token was removed - clear all state
           setUser(null)
           setSettings(null)
           setFocuses([])
+          setPomodoroStatus(null)
           setSessions([])
           setMessages([])
         }

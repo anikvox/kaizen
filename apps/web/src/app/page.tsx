@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth, SignInButton, SignOutButton, useUser } from "@clerk/nextjs";
-import { createApiClient, type User, type Focus, type PomodoroStatus } from "@kaizen/api-client";
+import { createApiClient, type User, type Focus, type PomodoroStatus, type UnifiedSSEData } from "@kaizen/api-client";
 import Link from "next/link";
 
 const apiUrl =
@@ -18,8 +18,6 @@ export default function Home() {
   const [error, setError] = useState("");
   const [pomodoroStatus, setPomodoroStatus] = useState<PomodoroStatus | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
-  const focusEventSourceRef = useRef<EventSource | null>(null);
-  const pomodoroEventSourceRef = useRef<EventSource | null>(null);
 
   const getTokenFn = useCallback(async () => {
     return getToken();
@@ -54,7 +52,7 @@ export default function Home() {
     syncUser();
   }, [isSignedIn, clerkUser, getTokenFn]);
 
-  // SSE connection
+  // Unified SSE connection
   useEffect(() => {
     if (!isSignedIn) return;
 
@@ -65,11 +63,44 @@ export default function Home() {
         return;
       }
 
+      // Close existing connection
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+
       const api = createApiClient(apiUrl);
-      eventSourceRef.current = api.sse.subscribeTicks(
-        (data) => {
-          setTime(data.time);
+      eventSourceRef.current = api.sse.subscribeUnified(
+        (data: UnifiedSSEData) => {
           setError("");
+
+          switch (data.type) {
+            case "connected":
+              setFocuses(data.focuses);
+              setPomodoroStatus(data.pomodoro);
+              break;
+
+            case "focus-changed":
+              if (data.changeType === "ended") {
+                setFocuses((prev) => prev.filter((f) => f.id !== data.focus?.id));
+              } else if (data.changeType === "created" && data.focus) {
+                setFocuses((prev) => [data.focus!, ...prev]);
+              } else if (data.focus) {
+                setFocuses((prev) =>
+                  prev.map((f) => (f.id === data.focus!.id ? data.focus! : f))
+                );
+              }
+              break;
+
+            case "pomodoro-tick":
+            case "pomodoro-status-changed":
+              setPomodoroStatus(data.status);
+              break;
+
+            case "ping":
+              setTime(data.time);
+              break;
+          }
         },
         () => setError("SSE connection error"),
         token
@@ -83,94 +114,6 @@ export default function Home() {
       eventSourceRef.current = null;
     };
   }, [isSignedIn, getToken]);
-
-  // Focus SSE connection
-  useEffect(() => {
-    if (!isSignedIn || !user) return;
-
-    const setupFocusSSE = async () => {
-      const token = await getToken();
-      if (!token) return;
-
-      // Close existing connection
-      if (focusEventSourceRef.current) {
-        focusEventSourceRef.current.close();
-        focusEventSourceRef.current = null;
-      }
-
-      const api = createApiClient(apiUrl);
-      focusEventSourceRef.current = api.focus.subscribeFocus(
-        (data) => {
-          setFocuses(data.focuses);
-        },
-        (data) => {
-          if (data.changeType === "ended") {
-            // Remove the ended focus from the list
-            setFocuses((prev) => prev.filter((f) => f.id !== data.focus?.id));
-          } else if (data.changeType === "created") {
-            // Add new focus to the list
-            if (data.focus) {
-              setFocuses((prev) => [data.focus!, ...prev]);
-            }
-          } else {
-            // Update existing focus
-            if (data.focus) {
-              setFocuses((prev) =>
-                prev.map((f) => (f.id === data.focus!.id ? data.focus! : f))
-              );
-            }
-          }
-        },
-        () => console.error("Focus SSE connection error"),
-        token
-      );
-    };
-
-    setupFocusSSE();
-
-    return () => {
-      focusEventSourceRef.current?.close();
-      focusEventSourceRef.current = null;
-    };
-  }, [isSignedIn, user, getToken]);
-
-  // Pomodoro SSE connection
-  useEffect(() => {
-    if (!isSignedIn || !user) return;
-
-    const setupPomodoroSSE = async () => {
-      const token = await getToken();
-      if (!token) return;
-
-      // Close existing connection
-      if (pomodoroEventSourceRef.current) {
-        pomodoroEventSourceRef.current.close();
-        pomodoroEventSourceRef.current = null;
-      }
-
-      const api = createApiClient(apiUrl, getTokenFn);
-      pomodoroEventSourceRef.current = api.pomodoro.subscribePomodoro(
-        (data) => {
-          setPomodoroStatus(data.status);
-        },
-        (data) => {
-          setPomodoroStatus(data.status);
-        },
-        (data) => {
-          setPomodoroStatus(data.status);
-        },
-        () => console.error("Pomodoro SSE connection error"),
-        token
-      );
-    };
-
-    setupPomodoroSSE();
-
-    return () => {
-      pomodoroEventSourceRef.current?.close();
-      pomodoroEventSourceRef.current = null;
-    };
-  }, [isSignedIn, user, getToken, getTokenFn]);
 
   // Format seconds to HH:MM:SS
   const formatTime = (seconds: number): string => {

@@ -664,3 +664,137 @@ export interface SSEPomodoroTickData {
   status: PomodoroStatus;
 }
 
+// Unified SSE Types
+export type UnifiedSSEEventType =
+  | "connected"
+  | "settings-changed"
+  | "focus-changed"
+  | "pomodoro-tick"
+  | "pomodoro-status-changed"
+  | "chat-session-created"
+  | "chat-session-updated"
+  | "chat-session-deleted"
+  | "chat-message-created"
+  | "chat-message-updated"
+  | "tool-call-started"
+  | "device-token-revoked"
+  | "device-list-changed"
+  | "active-tab-changed"
+  | "ping";
+
+export interface UnifiedSSEConnectedData {
+  type: "connected";
+  user: {
+    id: string;
+    email: string;
+    name: string | null;
+  };
+  settings: UserSettings;
+  focuses: Focus[];
+  pomodoro: PomodoroStatus;
+}
+
+export interface UnifiedSSESettingsChangedData {
+  type: "settings-changed";
+  settings: SSESettingsChangedData;
+}
+
+export interface UnifiedSSEFocusChangedData {
+  type: "focus-changed";
+  focus: Focus | null;
+  changeType: "created" | "updated" | "ended";
+}
+
+export interface UnifiedSSEPomodoroTickData {
+  type: "pomodoro-tick";
+  status: PomodoroStatus;
+}
+
+export interface UnifiedSSEPomodoroStatusChangedData {
+  type: "pomodoro-status-changed";
+  status: PomodoroStatus;
+}
+
+export interface UnifiedSSEChatSessionCreatedData {
+  type: "chat-session-created";
+  sessionId: string;
+  session: ChatSession;
+}
+
+export interface UnifiedSSEChatSessionUpdatedData {
+  type: "chat-session-updated";
+  sessionId: string;
+  updates: {
+    title?: string | null;
+  };
+}
+
+export interface UnifiedSSEChatSessionDeletedData {
+  type: "chat-session-deleted";
+  sessionId: string;
+}
+
+export interface UnifiedSSEChatMessageCreatedData {
+  type: "chat-message-created";
+  sessionId: string;
+  message: ChatMessage;
+}
+
+export interface UnifiedSSEChatMessageUpdatedData {
+  type: "chat-message-updated";
+  sessionId: string;
+  messageId: string;
+  updates: {
+    content?: string;
+    status?: ChatMessageStatus;
+    errorMessage?: string | null;
+  };
+}
+
+export interface UnifiedSSEToolCallStartedData {
+  type: "tool-call-started";
+  sessionId: string;
+  toolCallId: string;
+  toolName: string;
+}
+
+export interface UnifiedSSEDeviceTokenRevokedData {
+  type: "device-token-revoked";
+  token: string;
+}
+
+export interface UnifiedSSEDeviceListChangedData {
+  type: "device-list-changed";
+  action: "created" | "deleted";
+  deviceId: string;
+}
+
+export interface UnifiedSSEActiveTabChangedData {
+  type: "active-tab-changed";
+  url: string | null;
+  title: string | null;
+  timestamp: number;
+}
+
+export interface UnifiedSSEPingData {
+  type: "ping";
+  time: string;
+}
+
+export type UnifiedSSEData =
+  | UnifiedSSEConnectedData
+  | UnifiedSSESettingsChangedData
+  | UnifiedSSEFocusChangedData
+  | UnifiedSSEPomodoroTickData
+  | UnifiedSSEPomodoroStatusChangedData
+  | UnifiedSSEChatSessionCreatedData
+  | UnifiedSSEChatSessionUpdatedData
+  | UnifiedSSEChatSessionDeletedData
+  | UnifiedSSEChatMessageCreatedData
+  | UnifiedSSEChatMessageUpdatedData
+  | UnifiedSSEToolCallStartedData
+  | UnifiedSSEDeviceTokenRevokedData
+  | UnifiedSSEDeviceListChangedData
+  | UnifiedSSEActiveTabChangedData
+  | UnifiedSSEPingData;
+
