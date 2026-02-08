@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { env } from "./lib/index.js";
 import app from "./app.js";
 import { initTelemetry } from "./lib/llm/index.js";
-import { startWorker, registerAllHandlers } from "./lib/task-queue/index.js";
+import { startBoss, stopBoss, registerHandlers, startScheduler, stopScheduler } from "./lib/jobs/index.js";
 
 // Initialize telemetry for LLM tracing (async, runs in background)
 initTelemetry().catch((err) => console.warn("[Telemetry] Init failed:", err));
@@ -14,8 +14,31 @@ serve({
   port: env.port,
 });
 
-// Initialize and start the task queue worker
-// This replaces the old setInterval-based background jobs
-registerAllHandlers();
-startWorker();
-console.log("[TaskQueue] Worker initialized and started");
+// Initialize and start the job queue
+async function initJobs() {
+  try {
+    const boss = await startBoss();
+    await registerHandlers(boss);
+    startScheduler(boss);
+    console.log("[Jobs] pg-boss initialized and started");
+  } catch (error) {
+    console.error("[Jobs] Failed to initialize:", error);
+  }
+}
+
+initJobs();
+
+// Graceful shutdown
+process.on("SIGTERM", async () => {
+  console.log("Shutting down...");
+  stopScheduler();
+  await stopBoss();
+  process.exit(0);
+});
+
+process.on("SIGINT", async () => {
+  console.log("Shutting down...");
+  stopScheduler();
+  await stopBoss();
+  process.exit(0);
+});

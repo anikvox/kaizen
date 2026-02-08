@@ -609,68 +609,57 @@ export interface QuizHistoryResponse {
   };
 }
 
-// Task Queue Types
-export type TaskType = "focus_calculation" | "quiz_generation" | "summarization";
-export type TaskStatus = "pending" | "processing" | "completed" | "failed" | "cancelled";
+// Job Queue Types (pg-boss)
+export type JobName = "focus-calculation" | "quiz-generation" | "summarization";
+export type JobState = "created" | "retry" | "active" | "completed" | "failed" | "cancelled";
 
-export interface TaskQueueItem {
+export interface JobItem {
   id: string;
-  type: TaskType;
-  status: TaskStatus;
-  priority: number;
-  payload: Record<string, unknown>;
-  scheduledFor?: string;
-  startedAt?: string;
-  completedAt?: string;
-  attempts: number;
-  maxAttempts: number;
-  result?: Record<string, unknown>;
-  error?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  name: JobName;
+  state: JobState;
+  data: Record<string, unknown>;
+  output?: Record<string, unknown>;
+  createdOn?: string;
+  startedOn?: string;
+  completedOn?: string;
+  retryCount: number;
 }
 
-export interface TaskHistoryItem {
-  id: string;
-  type: TaskType;
-  status: TaskStatus;
-  priority: number;
-  payload: Record<string, unknown>;
-  scheduledFor?: string;
-  startedAt?: string;
-  completedAt?: string;
-  attempts: number;
-  durationMs?: number;
-  result?: Record<string, unknown>;
-  error?: string;
-  archivedAt?: string;
-}
-
-export interface TaskQueueStats {
+export interface JobQueueStats {
   pendingCount: number;
   processingCount: number;
   completedToday: number;
   failedToday: number;
 }
 
-export interface UserTaskQueueStatus {
-  pending: TaskQueueItem[];
-  processing: TaskQueueItem[];
-  history: TaskHistoryItem[];
-  stats: TaskQueueStats;
+export interface UserJobsStatus {
+  pending: JobItem[];
+  processing: JobItem[];
+  history: JobItem[];
+  stats: JobQueueStats;
 }
 
-export interface TaskCreatedResponse {
-  taskId: string;
-  status: TaskStatus;
-  type: TaskType;
+export interface JobCreatedResponse {
+  jobId: string | null;
+  status: string;
+  type: JobName;
 }
 
-export interface SSETaskQueueChangedData {
-  taskId: string;
-  type: TaskType;
-  status: TaskStatus;
-  changeType: "created" | "started" | "completed" | "failed" | "cancelled";
+export interface SSEJobChangedData {
+  jobId: string;
+  type: JobName;
+  status: JobState;
+  changeType: "created" | "completed" | "failed";
   result?: Record<string, unknown>;
   error?: string;
 }
+
+// Legacy aliases for backwards compatibility
+export type TaskType = JobName;
+export type TaskStatus = JobState;
+export type TaskQueueItem = JobItem;
+export type TaskHistoryItem = JobItem;
+export type TaskQueueStats = JobQueueStats;
+export type UserTaskQueueStatus = UserJobsStatus;
+export type TaskCreatedResponse = JobCreatedResponse;
+export type SSETaskQueueChangedData = SSEJobChangedData;

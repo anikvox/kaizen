@@ -1,24 +1,22 @@
 /**
- * Task Queue Routes
+ * Jobs Routes
  *
- * API endpoints for task queue visibility and management.
+ * API endpoints for job queue visibility and management.
  */
 
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { db } from "../lib/index.js";
 import {
-  getUserQueueStatus,
+  getUserJobsStatus,
   getQueueStats,
-  getTask,
-  cancelTask,
-  pushFocusCalculation,
-  pushQuizGeneration,
-  pushSummarization,
-  getWorkerStatus,
-  TASK_TYPES,
-  type TaskType,
-} from "../lib/task-queue/index.js";
+  getJob,
+  cancelJob,
+  sendFocusCalculation,
+  sendQuizGeneration,
+  sendSummarization,
+  JOB_NAMES,
+} from "../lib/jobs/index.js";
 import { events } from "../lib/events.js";
 
 // Combined variables type for routes that support both auth methods
@@ -88,13 +86,12 @@ async function dualAuthMiddleware(c: any, next: () => Promise<void>) {
 }
 
 // ============================================================================
-// User Task Queue Endpoints
+// User Job Queue Endpoints
 // ============================================================================
 
 /**
  * GET /tasks
- * Get the current user's task queue status.
- * Includes pending tasks, processing tasks, and recent history.
+ * Get the current user's job queue status.
  */
 app.get("/", dualAuthMiddleware, async (c) => {
   const userId = await getUserIdFromContext(c);
@@ -104,13 +101,18 @@ app.get("/", dualAuthMiddleware, async (c) => {
   }
 
   try {
-    const status = await getUserQueueStatus(userId);
+    const status = await getUserJobsStatus(userId);
 
     return c.json({
-      pending: status.pendingTasks.map(formatTask),
-      processing: status.processingTasks.map(formatTask),
-      history: status.recentHistory.map(formatHistoryItem),
-      stats: status.stats,
+      pending: status.pending,
+      processing: status.active,
+      history: status.recent,
+      stats: {
+        pendingCount: status.stats.pendingCount,
+        processingCount: status.stats.activeCount,
+        completedToday: status.stats.completedToday,
+        failedToday: status.stats.failedToday,
+      },
     });
   } catch (error) {
     console.error("[Tasks] Error getting queue status:", error);
@@ -119,80 +121,80 @@ app.get("/", dualAuthMiddleware, async (c) => {
 });
 
 /**
- * GET /tasks/:taskId
- * Get details of a specific task.
+ * GET /tasks/:jobId
+ * Get details of a specific job.
  */
-app.get("/:taskId", dualAuthMiddleware, async (c) => {
+app.get("/:jobId", dualAuthMiddleware, async (c) => {
   const userId = await getUserIdFromContext(c);
 
   if (!userId) {
     return c.json({ error: "User not found" }, 404);
   }
 
-  const taskId = c.req.param("taskId");
+  const jobId = c.req.param("jobId");
 
   try {
-    const task = await getTask(taskId);
+    const job = await getJob(jobId);
 
-    if (!task) {
-      return c.json({ error: "Task not found" }, 404);
+    if (!job) {
+      return c.json({ error: "Job not found" }, 404);
     }
 
-    if (task.userId !== userId) {
+    if ((job.data as any).userId !== userId) {
       return c.json({ error: "Unauthorized" }, 403);
     }
 
-    return c.json(formatTask(task));
+    return c.json(job);
   } catch (error) {
-    console.error("[Tasks] Error getting task:", error);
-    return c.json({ error: "Failed to get task" }, 500);
+    console.error("[Tasks] Error getting job:", error);
+    return c.json({ error: "Failed to get job" }, 500);
   }
 });
 
 /**
- * DELETE /tasks/:taskId
- * Cancel a pending task.
+ * DELETE /tasks/:jobId
+ * Cancel a pending job.
  */
-app.delete("/:taskId", dualAuthMiddleware, async (c) => {
+app.delete("/:jobId", dualAuthMiddleware, async (c) => {
   const userId = await getUserIdFromContext(c);
 
   if (!userId) {
     return c.json({ error: "User not found" }, 404);
   }
 
-  const taskId = c.req.param("taskId");
+  const jobId = c.req.param("jobId");
 
   try {
-    const task = await getTask(taskId);
+    const job = await getJob(jobId);
 
-    if (!task) {
-      return c.json({ error: "Task not found" }, 404);
+    if (!job) {
+      return c.json({ error: "Job not found" }, 404);
     }
 
-    if (task.userId !== userId) {
+    if ((job.data as any).userId !== userId) {
       return c.json({ error: "Unauthorized" }, 403);
     }
 
-    const cancelled = await cancelTask(taskId);
+    const cancelled = await cancelJob(jobId);
 
     if (!cancelled) {
-      return c.json({ error: "Task cannot be cancelled (not pending)" }, 400);
+      return c.json({ error: "Job cannot be cancelled" }, 400);
     }
 
-    return c.json({ success: true, taskId });
+    return c.json({ success: true, jobId });
   } catch (error) {
-    console.error("[Tasks] Error cancelling task:", error);
-    return c.json({ error: "Failed to cancel task" }, 500);
+    console.error("[Tasks] Error cancelling job:", error);
+    return c.json({ error: "Failed to cancel job" }, 500);
   }
 });
 
 // ============================================================================
-// Task Creation Endpoints
+// Job Creation Endpoints
 // ============================================================================
 
 /**
  * POST /tasks/focus
- * Trigger a focus calculation task.
+ * Trigger a focus calculation job.
  */
 app.post("/focus", dualAuthMiddleware, async (c) => {
   const userId = await getUserIdFromContext(c);
@@ -203,22 +205,22 @@ app.post("/focus", dualAuthMiddleware, async (c) => {
 
   try {
     const body = await c.req.json<{ force?: boolean }>().catch(() => ({} as { force?: boolean }));
-    const task = await pushFocusCalculation(userId, body.force);
+    const jobId = await sendFocusCalculation(userId, body.force);
 
     return c.json({
-      taskId: task.id,
-      status: task.status,
-      type: task.type,
+      jobId,
+      status: "created",
+      type: JOB_NAMES.FOCUS_CALCULATION,
     });
   } catch (error) {
-    console.error("[Tasks] Error creating focus task:", error);
-    return c.json({ error: "Failed to create task" }, 500);
+    console.error("[Tasks] Error creating focus job:", error);
+    return c.json({ error: "Failed to create job" }, 500);
   }
 });
 
 /**
  * POST /tasks/quiz
- * Trigger a quiz generation task.
+ * Trigger a quiz generation job.
  */
 app.post("/quiz", dualAuthMiddleware, async (c) => {
   const userId = await getUserIdFromContext(c);
@@ -229,22 +231,22 @@ app.post("/quiz", dualAuthMiddleware, async (c) => {
 
   try {
     const body = await c.req.json<{ answerOptionsCount?: number; activityDays?: number }>().catch(() => ({}));
-    const task = await pushQuizGeneration(userId, body);
+    const jobId = await sendQuizGeneration(userId, body);
 
     return c.json({
-      taskId: task.id,
-      status: task.status,
-      type: task.type,
+      jobId,
+      status: "created",
+      type: JOB_NAMES.QUIZ_GENERATION,
     });
   } catch (error) {
-    console.error("[Tasks] Error creating quiz task:", error);
-    return c.json({ error: "Failed to create task" }, 500);
+    console.error("[Tasks] Error creating quiz job:", error);
+    return c.json({ error: "Failed to create job" }, 500);
   }
 });
 
 /**
  * POST /tasks/summarize
- * Trigger a summarization task.
+ * Trigger a summarization job.
  */
 app.post("/summarize", dualAuthMiddleware, async (c) => {
   const userId = await getUserIdFromContext(c);
@@ -255,16 +257,16 @@ app.post("/summarize", dualAuthMiddleware, async (c) => {
 
   try {
     const body = await c.req.json<{ visitIds?: string[] }>().catch(() => ({} as { visitIds?: string[] }));
-    const task = await pushSummarization(userId, body.visitIds);
+    const jobId = await sendSummarization(userId, body.visitIds);
 
     return c.json({
-      taskId: task.id,
-      status: task.status,
-      type: task.type,
+      jobId,
+      status: "created",
+      type: JOB_NAMES.SUMMARIZATION,
     });
   } catch (error) {
-    console.error("[Tasks] Error creating summarization task:", error);
-    return c.json({ error: "Failed to create task" }, 500);
+    console.error("[Tasks] Error creating summarization job:", error);
+    return c.json({ error: "Failed to create job" }, 500);
   }
 });
 
@@ -274,7 +276,7 @@ app.post("/summarize", dualAuthMiddleware, async (c) => {
 
 /**
  * GET /tasks/admin/stats
- * Get global queue statistics (admin only - no auth for now).
+ * Get global queue statistics.
  */
 app.get("/admin/stats", async (c) => {
   try {
@@ -286,61 +288,6 @@ app.get("/admin/stats", async (c) => {
   }
 });
 
-/**
- * GET /tasks/admin/worker
- * Get worker status (admin only).
- */
-app.get("/admin/worker", async (c) => {
-  try {
-    const status = getWorkerStatus();
-    return c.json(status);
-  } catch (error) {
-    console.error("[Tasks] Error getting worker status:", error);
-    return c.json({ error: "Failed to get worker status" }, 500);
-  }
-});
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function formatTask(task: any) {
-  return {
-    id: task.id,
-    type: task.type,
-    status: task.status,
-    priority: task.priority,
-    payload: task.payload,
-    scheduledFor: task.scheduledFor?.toISOString(),
-    startedAt: task.startedAt?.toISOString(),
-    completedAt: task.completedAt?.toISOString(),
-    attempts: task.attempts,
-    maxAttempts: task.maxAttempts,
-    result: task.result,
-    error: task.error,
-    createdAt: task.createdAt?.toISOString(),
-    updatedAt: task.updatedAt?.toISOString(),
-  };
-}
-
-function formatHistoryItem(item: any) {
-  return {
-    id: item.id,
-    type: item.type,
-    status: item.status,
-    priority: item.priority,
-    payload: item.payload,
-    scheduledFor: item.scheduledFor?.toISOString(),
-    startedAt: item.startedAt?.toISOString(),
-    completedAt: item.completedAt?.toISOString(),
-    attempts: item.attempts,
-    durationMs: item.durationMs,
-    result: item.result,
-    error: item.error,
-    archivedAt: item.archivedAt?.toISOString(),
-  };
-}
-
 export default app;
 
 // ============================================================================
@@ -351,8 +298,7 @@ export const tasksSSE = new Hono();
 
 /**
  * GET /sse/tasks
- * Subscribe to real-time task queue updates.
- * Supports both device token and Clerk auth via query param.
+ * Subscribe to real-time job queue updates.
  */
 tasksSSE.get("/", async (c) => {
   const token = c.req.query("token");
@@ -397,32 +343,30 @@ tasksSSE.get("/", async (c) => {
     let id = 0;
 
     // Send initial status
-    const initialStatus = await getUserQueueStatus(userId);
+    const initialStatus = await getUserJobsStatus(userId);
     await stream.writeSSE({
       data: JSON.stringify({
-        pending: initialStatus.pendingTasks.map(formatTask),
-        processing: initialStatus.processingTasks.map(formatTask),
+        pending: initialStatus.pending,
+        processing: initialStatus.active,
         stats: initialStatus.stats,
       }),
       event: "connected",
       id: String(id++),
     });
 
-    // Subscribe to task queue events
-    const unsubscribe = events.onTaskQueueChanged(async (event) => {
+    // Subscribe to job events
+    const unsubscribeCreated = events.onJobCreated(async (event) => {
       if (event.userId !== userId) return;
 
       try {
         await stream.writeSSE({
           data: JSON.stringify({
-            taskId: event.taskId,
-            type: event.type,
-            status: event.status,
-            changeType: event.changeType,
-            result: event.result,
-            error: event.error,
+            jobId: event.jobId,
+            type: event.name,
+            status: "created",
+            changeType: "created",
           }),
-          event: "taskChanged",
+          event: "jobChanged",
           id: String(id++),
         });
       } catch {
@@ -430,7 +374,47 @@ tasksSSE.get("/", async (c) => {
       }
     });
 
-    // Keep connection alive with periodic pings
+    const unsubscribeCompleted = events.onJobCompleted(async (event) => {
+      if (event.userId !== userId) return;
+
+      try {
+        await stream.writeSSE({
+          data: JSON.stringify({
+            jobId: event.jobId,
+            type: event.name,
+            status: "completed",
+            changeType: "completed",
+            result: event.result,
+          }),
+          event: "jobChanged",
+          id: String(id++),
+        });
+      } catch {
+        // Stream closed
+      }
+    });
+
+    const unsubscribeFailed = events.onJobFailed(async (event) => {
+      if (event.userId !== userId) return;
+
+      try {
+        await stream.writeSSE({
+          data: JSON.stringify({
+            jobId: event.jobId,
+            type: event.name,
+            status: "failed",
+            changeType: "failed",
+            error: event.error,
+          }),
+          event: "jobChanged",
+          id: String(id++),
+        });
+      } catch {
+        // Stream closed
+      }
+    });
+
+    // Keep connection alive
     try {
       while (true) {
         await stream.writeSSE({
@@ -441,7 +425,9 @@ tasksSSE.get("/", async (c) => {
         await stream.sleep(30000);
       }
     } finally {
-      unsubscribe();
+      unsubscribeCreated();
+      unsubscribeCompleted();
+      unsubscribeFailed();
     }
   });
 });

@@ -76,12 +76,12 @@ export class TasksEndpoint {
       }
     });
 
-    eventSource.addEventListener("taskChanged", (event) => {
+    eventSource.addEventListener("jobChanged", (event) => {
       try {
         const data = JSON.parse((event as MessageEvent).data);
         onTaskChanged(data);
       } catch (e) {
-        console.error("Failed to parse task changed data:", e);
+        console.error("Failed to parse job changed data:", e);
       }
     });
 

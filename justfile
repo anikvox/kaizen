@@ -8,6 +8,7 @@ dev-up:
     @sleep 2
     pnpm --filter @kaizen/api db:generate
     pnpm --filter @kaizen/api db:push
+    PGBOSS_DATABASE_URL=$DATABASE_URL pnpm --filter @kaizen/api jobs:migrate
     pnpm --filter @kaizen/api-client build
     overmind start
 
