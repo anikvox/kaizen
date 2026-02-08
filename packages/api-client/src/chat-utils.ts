@@ -29,6 +29,7 @@ export function getToolDisplayInfo(toolName: string | null | undefined): ToolDis
                 get_reading_activity: { label: "Reading activity", loadingText: "Looking up reading activity" },
                 get_translation_language: { label: "Translation preference", loadingText: "Looking up translation preference" },
                 set_translation_language: { label: "Translation preference", loadingText: "Saving translation language" },
+                calculate: { label: "Calculator", loadingText: "Calculating" },
         };
         return info[toolName || ""] || { label: toolName || "Tool", loadingText: "Running tool" };
 }
@@ -102,6 +103,10 @@ export function formatToolResultMessage(toolName: string | null | undefined, con
                         case "set_translation_language":
                                 if (!r.success) return `Failed to save translation language`;
                                 return `Saved ${r.language} as preferred translation language`;
+
+                        case "calculate":
+                                if (!r.success) return `Calculation failed: ${r.error}`;
+                                return `Calculated: ${r.expression} = ${r.result}`;
 
                         default:
                                 return `Completed tool call`;

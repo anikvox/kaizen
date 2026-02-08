@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { tool } from "ai";
+import { calc } from "a-calc";
 import { db } from "../db.js";
 import { getAttentionData, serializeAttentionForLLM, formatDuration } from "../attention.js";
 import { getActiveFocuses, getUserFocusHistory } from "../focus/index.js";
@@ -892,6 +893,45 @@ export function createChatTools(userId: string) {
         }
       },
     }),
+
+    /**
+     * Calculate mathematical expressions with high precision
+     */
+    calculate: tool({
+      description:
+        "Calculate mathematical expressions with high precision. Supports basic arithmetic (+, -, *, /), parentheses, percentages, and comparisons. Use this for any math calculations to ensure accuracy. Examples: '2 + 3 * 4', '(100 - 20) / 4', '15% of 200', '1.1 + 2.2'.",
+      parameters: z.object({
+        expression: z
+          .string()
+          .describe("The mathematical expression to calculate. Use standard math notation."),
+      }),
+      execute: async ({ expression }) => {
+        try {
+          // Use a-calc for precise calculation
+          const result = calc(expression);
+
+          // Check if result is valid
+          if (result === null || result === undefined || (typeof result === "number" && isNaN(result))) {
+            return {
+              success: false,
+              error: `Could not evaluate expression: ${expression}`,
+            };
+          }
+
+          return {
+            success: true,
+            expression,
+            result: String(result),
+          };
+        } catch (error) {
+          return {
+            success: false,
+            expression,
+            error: error instanceof Error ? error.message : "Calculation failed",
+          };
+        }
+      },
+    }),
   };
 }
 
@@ -968,6 +1008,10 @@ export function formatToolResultMessage(toolName: string, result: unknown): stri
     case "set_translation_language":
       if (!r.success) return `Failed to save language preference`;
       return `Saved ${r.language} as preferred translation language`;
+
+    case "calculate":
+      if (!r.success) return `Calculation failed: ${r.error}`;
+      return `${r.expression} = ${r.result}`;
 
     default:
       return `Tool ${toolName} completed`;
