@@ -4,6 +4,7 @@ import { db, events, encrypt, ALL_MODELS, decryptApiKey, fetchModelsForProvider 
 import type { LLMProviderType } from "../lib/index.js";
 import { env } from "../lib/env.js";
 import { authMiddleware, deviceAuthMiddleware, type AuthVariables, type DeviceAuthVariables } from "../middleware/index.js";
+import { scheduleInitialJobs, rescheduleUserJobs } from "../lib/jobs/index.js";
 
 // Combined variables type for routes that support both auth methods
 type CombinedAuthVariables = {
@@ -92,6 +93,9 @@ app.get("/", dualAuthMiddleware, async (c) => {
       cognitiveAttentionShowOverlay: false,
     },
   });
+
+  // Note: Initial jobs are scheduled in POST /users/sync on user registration
+  // No need to schedule here as this endpoint is called after user creation
 
   return c.json({
     cognitiveAttentionDebugMode: settings.cognitiveAttentionDebugMode,
@@ -317,6 +321,20 @@ app.post("/", dualAuthMiddleware, async (c) => {
     create: createData,
   });
 
+  // Reschedule jobs if interval settings changed
+  const jobSettingsChanged =
+    body.focusCalculationIntervalMs !== undefined ||
+    body.attentionSummarizationIntervalMs !== undefined;
+
+  if (jobSettingsChanged) {
+    try {
+      await rescheduleUserJobs(userId, settings);
+    } catch (error) {
+      console.error("[Settings] Failed to reschedule jobs:", error);
+      // Don't fail the request, jobs will eventually self-schedule
+    }
+  }
+
   // Emit settings changed event for SSE subscribers
   events.emitSettingsChanged({
     userId,
@@ -420,6 +438,9 @@ settingsSSE.get("/", async (c) => {
         cognitiveAttentionShowOverlay: false,
       },
     });
+
+    // Note: Initial jobs are scheduled in POST /users/sync on user registration
+    // No need to schedule here as this endpoint is called after user creation
 
     // Send initial connection with current settings
     await stream.writeSSE({

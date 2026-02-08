@@ -13,9 +13,6 @@ export { getBoss, startBoss, stopBoss, isBossRunning } from "./boss.js";
 // Handlers
 export { registerHandlers } from "./handlers.js";
 
-// Scheduler
-export { startScheduler, stopScheduler } from "./scheduler.js";
-
 // Service
 export {
   sendFocusCalculation,
@@ -23,4 +20,7 @@ export {
   sendVisitSummarization,
   getJob,
   getUserJobsStatus,
+  scheduleInitialJobs,
+  rescheduleUserJobs,
+  scheduleAllUserJobs,
 } from "./service.js";

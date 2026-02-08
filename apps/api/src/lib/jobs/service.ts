@@ -7,6 +7,7 @@
 
 import type { Job } from "pg-boss";
 import { getBoss, isBossRunning } from "./boss.js";
+import { db } from "../db.js";
 import {
   JOB_NAMES,
   type JobName,
@@ -80,6 +81,68 @@ export async function cancelJob(jobId: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Schedule initial recurring jobs for a user
+ * Called when a new user is created or settings are first accessed
+ */
+export async function scheduleInitialJobs(
+  userId: string,
+  settings: {
+    focusCalculationIntervalMs?: number | null;
+    attentionSummarizationIntervalMs?: number | null;
+  }
+): Promise<void> {
+  const boss = await getBoss();
+
+  // Always schedule focus calculation
+  const focusInterval = settings.focusCalculationIntervalMs || 30000;
+  await boss.send(JOB_NAMES.FOCUS_CALCULATION, { userId }, {
+    singletonKey: `focus-${userId}`,
+    startAfter: Math.floor(focusInterval / 1000), // Convert ms to seconds
+    singletonSeconds: Math.floor(focusInterval / 1000),
+  });
+
+  // Always schedule visit summarization
+  const summarizationInterval = settings.attentionSummarizationIntervalMs || 60000;
+  await boss.send(JOB_NAMES.VISIT_SUMMARIZATION, { userId }, {
+    singletonKey: `visit-summarize-${userId}`,
+    startAfter: Math.floor(summarizationInterval / 1000), // Convert ms to seconds
+    singletonSeconds: Math.floor(summarizationInterval / 1000),
+  });
+}
+
+/**
+ * Reschedule jobs immediately when settings change
+ * Triggers immediate jobs that will self-schedule with new intervals
+ */
+export async function rescheduleUserJobs(
+  userId: string,
+  settings: {
+    focusCalculationIntervalMs?: number | null;
+    attentionSummarizationIntervalMs?: number | null;
+  }
+): Promise<void> {
+  const boss = await getBoss();
+
+  // Always reschedule focus calculation
+  const focusInterval = settings.focusCalculationIntervalMs || 30000;
+  // Send immediate job - will self-schedule next run with new interval
+  await boss.send(JOB_NAMES.FOCUS_CALCULATION, { userId, force: false }, {
+    singletonKey: `focus-${userId}`,
+    startAfter: 1, // Run in 1 second (0 may cause issues)
+    singletonSeconds: Math.floor(focusInterval / 1000),
+  });
+
+  // Always reschedule visit summarization
+  const summarizationInterval = settings.attentionSummarizationIntervalMs || 60000;
+  // Send immediate job - will self-schedule next run with new interval
+  await boss.send(JOB_NAMES.VISIT_SUMMARIZATION, { userId }, {
+    singletonKey: `visit-summarize-${userId}`,
+    startAfter: 1, // Run in 1 second (0 may cause issues)
+    singletonSeconds: Math.floor(summarizationInterval / 1000),
+  });
 }
 
 /**
@@ -233,6 +296,55 @@ export async function getQueueStats(): Promise<{
     failed: 0,
     all: total,
   };
+}
+
+/**
+ * Schedule jobs for all users on server startup
+ * Ensures recurring jobs are running for all users after server restart
+ */
+export async function scheduleAllUserJobs(): Promise<void> {
+  console.log("[Jobs] Scheduling jobs for all users...");
+
+  // Get all users
+  const users = await db.userSettings.findMany({
+    select: {
+      userId: true,
+      focusCalculationIntervalMs: true,
+      attentionSummarizationIntervalMs: true,
+    },
+  });
+
+  console.log(`[Jobs] Found ${users.length} users to schedule`);
+
+  const boss = await getBoss();
+  let scheduled = 0;
+
+  for (const user of users) {
+    try {
+      const focusInterval = user.focusCalculationIntervalMs || 30000;
+      const summarizationInterval = user.attentionSummarizationIntervalMs || 60000;
+
+      // Schedule focus calculation
+      await boss.send(JOB_NAMES.FOCUS_CALCULATION, { userId: user.userId }, {
+        singletonKey: `focus-${user.userId}`,
+        startAfter: Math.floor(focusInterval / 1000), // Convert ms to seconds
+        singletonSeconds: Math.floor(focusInterval / 1000),
+      });
+
+      // Schedule visit summarization
+      await boss.send(JOB_NAMES.VISIT_SUMMARIZATION, { userId: user.userId }, {
+        singletonKey: `visit-summarize-${user.userId}`,
+        startAfter: Math.floor(summarizationInterval / 1000), // Convert ms to seconds
+        singletonSeconds: Math.floor(summarizationInterval / 1000),
+      });
+
+      scheduled++;
+    } catch (error) {
+      console.error(`[Jobs] Failed to schedule jobs for user ${user.userId}:`, error);
+    }
+  }
+
+  console.log(`[Jobs] Scheduled jobs for ${scheduled}/${users.length} users`);
 }
 
 // Re-export for convenience

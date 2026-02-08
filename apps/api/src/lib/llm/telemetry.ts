@@ -108,13 +108,11 @@ export function startTrace(options: TraceOptions): TraceContext | null {
           try {
             // Don't anonymize outputs - we want to see LLM responses
             const processedOutput = output ? anonymizeOutput(output) : undefined;
-            console.log(`[Telemetry] Ending span ${spanOptions.name} with output:`, processedOutput);
             // Set output and endTime together in one update call
             span.update({
               output: processedOutput,
               endTime: new Date(),
             });
-            console.log(`[Telemetry] Span ${spanOptions.name} ended successfully`);
           } catch (error) {
             console.error(`[Telemetry] Error ending span ${spanOptions.name}:`, error);
             throw error;
@@ -127,14 +125,12 @@ export function startTrace(options: TraceOptions): TraceContext | null {
       try {
         // Don't anonymize outputs - we want to see LLM responses and metrics
         const processedOutput = output ? anonymizeOutput(output) : undefined;
-        console.log(`[Telemetry] Ending trace ${options.name} with output:`, processedOutput);
         // Set output and endTime together in one update call
         trace.update({
           output: processedOutput,
           endTime: new Date(),
         });
         await client.flush();
-        console.log(`[Telemetry] Trace ${options.name} ended successfully`);
       } catch (error) {
         console.error(`[Telemetry] Error ending trace ${options.name}:`, error);
         throw error;
@@ -190,15 +186,11 @@ export async function traceOperation<T>(
  */
 export async function initTelemetry(): Promise<void> {
   if (!env.opikApiKey) {
-    console.log("[Telemetry] OPIK_API_KEY not set, tracing disabled");
     return;
   }
 
   // Verify we can create the client
-  const client = getOpikClient();
-  if (client) {
-    console.log("[Telemetry] Opik tracing initialized");
-  }
+  getOpikClient();
 }
 
 /**

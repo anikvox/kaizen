@@ -763,8 +763,6 @@ function SidePanel() {
           settings={settings}
           savingSettings={savingSettings}
           onToggleSetting={handleToggleSetting}
-          onUpdateIgnoreList={handleUpdateIgnoreList}
-          onUpdateSetting={handleUpdateSetting}
         />
       )}
     </div>
@@ -942,36 +940,12 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 function SettingsTab({
   settings,
   savingSettings,
-  onToggleSetting,
-  onUpdateIgnoreList,
-  onUpdateSetting
+  onToggleSetting
 }: {
   settings: UserSettings | null
   savingSettings: boolean
   onToggleSetting: (key: keyof UserSettings) => void
-  onUpdateIgnoreList: (value: string | null) => void
-  onUpdateSetting: (updates: Partial<UserSettings>) => void
-}) {
-  const [ignoreListValue, setIgnoreListValue] = useState("")
-  const [ignoreListDirty, setIgnoreListDirty] = useState(false)
-
-  // Sync local state with settings when they change
-  useEffect(() => {
-    if (settings?.attentionTrackingIgnoreList !== undefined) {
-      setIgnoreListValue(settings.attentionTrackingIgnoreList || "")
-      setIgnoreListDirty(false)
-    }
-  }, [settings?.attentionTrackingIgnoreList])
-
-  const handleIgnoreListChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setIgnoreListValue(e.target.value)
-    setIgnoreListDirty(true)
-  }
-
-  const handleSaveIgnoreList = () => {
-    onUpdateIgnoreList(ignoreListValue.trim() || null)
-    setIgnoreListDirty(false)
-  }
+})
 
   return (
     <div style={styles.settingsContainer}>
@@ -1015,146 +989,11 @@ function SettingsTab({
                 {settings.cognitiveAttentionShowOverlay ? "ON" : "OFF"}
               </button>
             </div>
-
-            {/* Ignore List */}
-            <div style={styles.ignoreListSection}>
-              <div style={styles.settingInfo}>
-                <span style={styles.settingName}>Ignore List</span>
-                <span style={styles.settingDesc}>
-                  URLs to skip tracking (one per line, supports regex)
-                </span>
-              </div>
-              <textarea
-                value={ignoreListValue}
-                onChange={handleIgnoreListChange}
-                placeholder={"Example:\nexample.com\n/^https:\\/\\/mail\\.google\\.com/\n*.internal.company.com"}
-                disabled={savingSettings}
-                style={styles.ignoreListTextarea}
-                rows={5}
-              />
-              {ignoreListDirty && (
-                <button
-                  onClick={handleSaveIgnoreList}
-                  disabled={savingSettings}
-                  style={{
-                    ...styles.saveButton,
-                    opacity: savingSettings ? 0.6 : 1,
-                    cursor: savingSettings ? "not-allowed" : "pointer"
-                  }}
-                >
-                  {savingSettings ? "Saving..." : "Save"}
-                </button>
-              )}
-            </div>
           </div>
         ) : (
           <p style={styles.text}>Loading settings...</p>
         )}
       </div>
-
-      {/* Focus Calculation Settings */}
-      <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Focus Detection</h3>
-        {settings ? (
-          <div style={styles.settingsList}>
-            <div style={styles.settingItem}>
-              <div style={styles.settingInfo}>
-                <span style={styles.settingName}>Focus Detection</span>
-                <span style={styles.settingDesc}>Auto-detect what you&apos;re focused on</span>
-              </div>
-              <button
-                onClick={() => onUpdateSetting({ focusCalculationEnabled: !(settings.focusCalculationEnabled ?? true) })}
-                disabled={savingSettings}
-                style={{
-                  ...styles.toggleButton,
-                  background: (settings.focusCalculationEnabled ?? true) ? "#28a745" : "#6c757d",
-                  opacity: savingSettings ? 0.6 : 1,
-                  cursor: savingSettings ? "not-allowed" : "pointer"
-                }}
-              >
-                {(settings.focusCalculationEnabled ?? true) ? "ON" : "OFF"}
-              </button>
-            </div>
-
-            {(settings.focusCalculationEnabled ?? true) && (
-              <>
-                {/* Calculation Interval */}
-                <div style={styles.selectSection}>
-                  <div style={styles.settingInfo}>
-                    <span style={styles.settingName}>Calculation Interval</span>
-                    <span style={styles.settingDesc}>How often to analyze activity</span>
-                  </div>
-                  <select
-                    value={settings.focusCalculationIntervalMs ?? 30000}
-                    onChange={(e) => onUpdateSetting({ focusCalculationIntervalMs: Number(e.target.value) })}
-                    disabled={savingSettings}
-                    style={{
-                      ...styles.selectInput,
-                      opacity: savingSettings ? 0.6 : 1,
-                      cursor: savingSettings ? "not-allowed" : "pointer"
-                    }}
-                  >
-                    <option value={30000}>30 seconds</option>
-                    <option value={60000}>1 minute</option>
-                    <option value={120000}>2 minutes</option>
-                    <option value={300000}>5 minutes</option>
-                  </select>
-                </div>
-
-                {/* Inactivity Threshold */}
-                <div style={styles.selectSection}>
-                  <div style={styles.settingInfo}>
-                    <span style={styles.settingName}>Inactivity Threshold</span>
-                    <span style={styles.settingDesc}>End focus after inactivity</span>
-                  </div>
-                  <select
-                    value={settings.focusInactivityThresholdMs ?? 60000}
-                    onChange={(e) => onUpdateSetting({ focusInactivityThresholdMs: Number(e.target.value) })}
-                    disabled={savingSettings}
-                    style={{
-                      ...styles.selectInput,
-                      opacity: savingSettings ? 0.6 : 1,
-                      cursor: savingSettings ? "not-allowed" : "pointer"
-                    }}
-                  >
-                    <option value={60000}>1 minute</option>
-                    <option value={120000}>2 minutes</option>
-                    <option value={300000}>5 minutes</option>
-                    <option value={600000}>10 minutes</option>
-                    <option value={900000}>15 minutes</option>
-                  </select>
-                </div>
-
-                {/* Minimum Duration */}
-                <div style={styles.selectSection}>
-                  <div style={styles.settingInfo}>
-                    <span style={styles.settingName}>Minimum Focus Duration</span>
-                    <span style={styles.settingDesc}>Time before detecting new focus</span>
-                  </div>
-                  <select
-                    value={settings.focusMinDurationMs ?? 30000}
-                    onChange={(e) => onUpdateSetting({ focusMinDurationMs: Number(e.target.value) })}
-                    disabled={savingSettings}
-                    style={{
-                      ...styles.selectInput,
-                      opacity: savingSettings ? 0.6 : 1,
-                      cursor: savingSettings ? "not-allowed" : "pointer"
-                    }}
-                  >
-                    <option value={30000}>30 seconds</option>
-                    <option value={60000}>1 minute</option>
-                    <option value={120000}>2 minutes</option>
-                    <option value={300000}>5 minutes</option>
-                  </select>
-                </div>
-              </>
-            )}
-          </div>
-        ) : (
-          <p style={styles.text}>Loading settings...</p>
-        )}
-      </div>
-
     </div>
   )
 }

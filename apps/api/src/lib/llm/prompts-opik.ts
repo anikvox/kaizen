@@ -79,7 +79,6 @@ export async function getPromptFromOpik(name: PromptName): Promise<OpikPromptRes
       return null;
     }
 
-    console.log(`[Opik] Loaded prompt: ${promptName} (${commit})`);
     return {
       content,
       name: promptName,

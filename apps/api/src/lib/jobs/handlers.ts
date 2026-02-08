@@ -19,6 +19,7 @@ import {
 import { MAX_ATTENTION_WINDOW_MS, NO_FOCUS_ATTENTION_WINDOW_MS } from "../focus/types.js";
 import { processUserSummarization } from "../summarization.js";
 import { generateQuiz } from "../quiz/service.js";
+import { getBoss } from "./boss.js";
 import {
   JOB_NAMES,
   type FocusCalculationPayload,
@@ -56,104 +57,121 @@ async function handleFocusCalculation(
     focusEnded: false,
   };
 
-  cleanHashCache();
+  try {
+    cleanHashCache();
 
-  // Get user settings
-  const settings = await db.userSettings.findUnique({
-    where: { userId },
-  });
-
-  const focusSettings = extractFocusSettings(settings);
-
-  // Check if focus calculation is enabled (unless forced)
-  if (!focusSettings.focusCalculationEnabled && !force) {
-    return result;
-  }
-
-  const now = new Date();
-
-  // Check and end inactive focuses
-  const endedCount = await checkAndEndInactiveFocuses(userId, focusSettings.focusInactivityThresholdMs);
-  if (endedCount > 0) {
-    result.focusEnded = true;
-    result.focusesEnded = endedCount;
-  }
-
-  // Determine attention window based on active focus status
-  const activeFocuses = await getActiveFocuses(userId);
-  const hasActiveFocus = activeFocuses.length > 0;
-
-  let attentionFrom: Date;
-
-  if (hasActiveFocus) {
-    attentionFrom = settings?.lastFocusCalculatedAt || new Date(now.getTime() - MAX_ATTENTION_WINDOW_MS);
-  } else {
-    const lastEndedFocus = await db.focus.findFirst({
-      where: { userId, isActive: false, endedAt: { not: null } },
-      orderBy: { endedAt: "desc" },
-      select: { endedAt: true },
-    });
-
-    attentionFrom = lastEndedFocus?.endedAt || new Date(now.getTime() - NO_FOCUS_ATTENTION_WINDOW_MS);
-  }
-
-  // Fetch attention data
-  const attentionData = await fetchRawAttentionData(userId, {
-    from: attentionFrom,
-    to: now,
-  });
-
-  // Skip if no attention data
-  if (!hasMinimalContent(attentionData)) {
-    await db.userSettings.update({
+    // Get user settings
+    const settings = await db.userSettings.findUnique({
       where: { userId },
-      data: { lastFocusCalculatedAt: now },
     });
-    return result;
-  }
 
-  // Check if already processed (unless forced)
-  if (!force) {
-    const attentionHash = hashAttentionData(attentionData);
-    if (processedHashes.has(attentionHash)) {
+    const focusSettings = extractFocusSettings(settings);
+
+    const now = new Date();
+
+    // Check and end inactive focuses
+    const endedCount = await checkAndEndInactiveFocuses(userId, focusSettings.focusInactivityThresholdMs);
+    if (endedCount > 0) {
+      result.focusEnded = true;
+      result.focusesEnded = endedCount;
+    }
+
+    // Determine attention window based on active focus status
+    const activeFocuses = await getActiveFocuses(userId);
+    const hasActiveFocus = activeFocuses.length > 0;
+
+    let attentionFrom: Date;
+
+    if (hasActiveFocus) {
+      attentionFrom = settings?.lastFocusCalculatedAt || new Date(now.getTime() - MAX_ATTENTION_WINDOW_MS);
+    } else {
+      const lastEndedFocus = await db.focus.findFirst({
+        where: { userId, isActive: false, endedAt: { not: null } },
+        orderBy: { endedAt: "desc" },
+        select: { endedAt: true },
+      });
+
+      attentionFrom = lastEndedFocus?.endedAt || new Date(now.getTime() - NO_FOCUS_ATTENTION_WINDOW_MS);
+    }
+
+    // Fetch attention data
+    const attentionData = await fetchRawAttentionData(userId, {
+      from: attentionFrom,
+      to: now,
+    });
+
+    // Skip if no attention data
+    if (!hasMinimalContent(attentionData)) {
       await db.userSettings.update({
         where: { userId },
         data: { lastFocusCalculatedAt: now },
       });
       return result;
     }
-    processedHashes.set(attentionHash, Date.now());
+
+    // Check if already processed (unless forced)
+    if (!force) {
+      const attentionHash = hashAttentionData(attentionData);
+      if (processedHashes.has(attentionHash)) {
+        await db.userSettings.update({
+          where: { userId },
+          data: { lastFocusCalculatedAt: now },
+        });
+        return result;
+      }
+      processedHashes.set(attentionHash, Date.now());
+    }
+
+    // Run focus agent
+    const earliestAttentionTime = getEarliestTimestamp(attentionData);
+    const latestAttentionTime = getLatestTimestamp(attentionData);
+
+    const agentResult = await runFocusAgent(userId, attentionData, settings, earliestAttentionTime, latestAttentionTime);
+
+    if (agentResult.success) {
+      if (agentResult.focusesCreated > 0) {
+        result.focusCreated = true;
+        result.focusesCreated = agentResult.focusesCreated;
+      }
+      if (agentResult.focusesUpdated > 0 || agentResult.focusesMerged > 0 || agentResult.focusesResumed > 0) {
+        result.focusUpdated = true;
+        result.focusesUpdated = (agentResult.focusesUpdated || 0) + (agentResult.focusesMerged || 0) + (agentResult.focusesResumed || 0);
+      }
+      if (agentResult.focusesEnded > 0) {
+        result.focusEnded = true;
+        result.focusesEnded = (result.focusesEnded || 0) + agentResult.focusesEnded;
+      }
+    } else if (agentResult.error) {
+      throw new Error(agentResult.error);
+    }
+
+    await db.userSettings.update({
+      where: { userId },
+      data: { lastFocusCalculatedAt: now },
+    });
+
+    return result;
+  } finally {
+    // Self-schedule next run (unless this was a forced run)
+    // Use finally to ensure this always runs, even if the job returns early
+    if (!force) {
+      try {
+        const settings = await db.userSettings.findUnique({
+          where: { userId },
+        });
+        const boss = await getBoss();
+        const interval = settings?.focusCalculationIntervalMs || 30000;
+
+        await boss.send(JOB_NAMES.FOCUS_CALCULATION, { userId }, {
+          singletonKey: `focus-${userId}`,
+          startAfter: Math.floor(interval / 1000), // Convert ms to seconds
+          singletonSeconds: Math.floor(interval / 1000), // Prevent duplicates within interval window
+        });
+      } catch (error) {
+        console.error(`[Jobs] Failed to schedule next focus calculation for user ${userId}:`, error);
+      }
+    }
   }
-
-  // Run focus agent
-  const earliestAttentionTime = getEarliestTimestamp(attentionData);
-  const latestAttentionTime = getLatestTimestamp(attentionData);
-
-  const agentResult = await runFocusAgent(userId, attentionData, settings, earliestAttentionTime, latestAttentionTime);
-
-  if (agentResult.success) {
-    if (agentResult.focusesCreated > 0) {
-      result.focusCreated = true;
-      result.focusesCreated = agentResult.focusesCreated;
-    }
-    if (agentResult.focusesUpdated > 0 || agentResult.focusesMerged > 0 || agentResult.focusesResumed > 0) {
-      result.focusUpdated = true;
-      result.focusesUpdated = (agentResult.focusesUpdated || 0) + (agentResult.focusesMerged || 0) + (agentResult.focusesResumed || 0);
-    }
-    if (agentResult.focusesEnded > 0) {
-      result.focusEnded = true;
-      result.focusesEnded = (result.focusesEnded || 0) + agentResult.focusesEnded;
-    }
-  } else if (agentResult.error) {
-    throw new Error(agentResult.error);
-  }
-
-  await db.userSettings.update({
-    where: { userId },
-    data: { lastFocusCalculatedAt: now },
-  });
-
-  return result;
 }
 
 /**
@@ -182,15 +200,11 @@ async function handleQuizGeneration(
 async function handleVisitSummarization(
   job: Job<VisitSummarizationPayload>
 ): Promise<VisitSummarizationResult> {
-  const { userId } = job.data;
+  const { userId, visitIds } = job.data;
 
   const settings = await db.userSettings.findUnique({
     where: { userId },
   });
-
-  if (!settings?.attentionSummarizationEnabled) {
-    return { visitsSummarized: 0 };
-  }
 
   const visitsSummarized = await processUserSummarization(userId);
 
@@ -198,6 +212,18 @@ async function handleVisitSummarization(
     where: { userId },
     data: { lastSummarizationCalculatedAt: new Date() },
   });
+
+  // Self-schedule next run (unless this was a specific visit job)
+  if (!visitIds) {
+    const boss = await getBoss();
+    const interval = settings?.attentionSummarizationIntervalMs || 60000;
+
+    await boss.send(JOB_NAMES.VISIT_SUMMARIZATION, { userId }, {
+      singletonKey: `visit-summarize-${userId}`,
+      startAfter: Math.floor(interval / 1000), // Convert ms to seconds
+      singletonSeconds: Math.floor(interval / 1000), // Prevent duplicates within interval window
+    });
+  }
 
   return { visitsSummarized };
 }
