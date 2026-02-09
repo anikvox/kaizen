@@ -17,6 +17,7 @@ import {
   journeyRoutes,
   agentRoutes,
   cognitiveHealthRoutes,
+  extensionRoutes,
 } from "./routes/index.js";
 
 const app = new Hono();
@@ -54,5 +55,6 @@ app.route("/pomodoro", pomodoroRoutes);
 app.route("/journey", journeyRoutes);
 app.route("/agent", agentRoutes);
 app.route("/cognitive-health", cognitiveHealthRoutes);
+app.route("/extension", extensionRoutes);
 
 export default app;
