@@ -244,14 +244,22 @@ function NudgeOverlay() {
             justifyContent: "center",
             flexShrink: 0,
           }}>
-          <span style={{ fontSize: "18px" }}>
-            {nudge.type === "doomscroll" && "🌀"}
-            {nudge.type === "distraction" && "📱"}
-            {nudge.type === "break" && "☕"}
-            {nudge.type === "focus_drift" && "🎯"}
-            {nudge.type === "encouragement" && "🌟"}
-            {nudge.type === "all_clear" && "✅"}
-          </span>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 512 512"
+            style={{ width: "22px", height: "22px" }}>
+            <rect width="512" height="512" rx="64" fill={colors.icon} />
+            <text
+              x="256"
+              y="340"
+              fontFamily="system-ui, sans-serif"
+              fontSize="280"
+              fontWeight="bold"
+              fill="white"
+              textAnchor="middle">
+              K
+            </text>
+          </svg>
         </div>
         <div style={{ flex: 1 }}>
           <div
