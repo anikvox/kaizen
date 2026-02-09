@@ -1,0 +1,171 @@
+/* ============================================
+   Kaizen Landing — Scoped under .landing-page
+   ============================================ */
+
+/* --- Typography --- */
+.landing-page {
+  font-family: var(--font-landing-sans), "Manrope", sans-serif;
+}
+.landing-page .font-heading {
+  font-family: var(--font-landing-heading), "Poppins", sans-serif;
+}
+
+/* One gradient text class, used sparingly */
+.landing-page .text-gradient {
+  background-image: linear-gradient(135deg, #2563eb, #3b82f6, #60a5fa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* --- Glass surface --- */
+.landing-page .glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+:is(.dark) .landing-page .glass {
+  background: rgba(15, 23, 42, 0.72);
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+/* --- Card surface (less intense than glass) --- */
+.landing-page .card-surface {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.landing-page .card-surface:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.1);
+}
+:is(.dark) .landing-page .card-surface {
+  background: rgba(30, 41, 59, 0.6);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+:is(.dark) .landing-page .card-surface:hover {
+  box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.3);
+}
+
+/* --- Hero entrance --- */
+@keyframes landing-enter {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.landing-page .hero-enter {
+  opacity: 0;
+  animation: landing-enter 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.landing-page .hero-enter-1 { animation-delay: 0.06s; }
+.landing-page .hero-enter-2 { animation-delay: 0.16s; }
+.landing-page .hero-enter-3 { animation-delay: 0.26s; }
+.landing-page .hero-enter-4 { animation-delay: 0.38s; }
+.landing-page .hero-enter-5 { animation-delay: 0.52s; }
+
+/* --- CTA shimmer --- */
+@keyframes landing-shimmer {
+  0% { transform: translateX(-100%) skewX(-12deg); }
+  100% { transform: translateX(100%) skewX(-12deg); }
+}
+.landing-page .btn-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.landing-page .btn-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.18) 50%,
+    transparent 100%
+  );
+  animation: landing-shimmer 3.5s ease-in-out infinite;
+  pointer-events: none;
+}
+.landing-page .btn-shimmer:active {
+  transform: scale(0.97);
+}
+
+/* --- Bento hover interactions (CSS only) --- */
+.landing-page .bento-card .bento-shift-right {
+  transition: transform 0.25s ease;
+}
+.landing-page .bento-card:hover .bento-shift-right {
+  transform: translateX(8px) rotate(3deg);
+}
+.landing-page .bento-card .bento-shift-left {
+  transition: transform 0.25s ease;
+}
+.landing-page .bento-card:hover .bento-shift-left {
+  transform: translateX(-8px) rotate(-3deg);
+}
+
+/* --- Bento gradient background animation --- */
+@keyframes landing-gradient {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* --- Dot grid background --- */
+.landing-page .dot-grid {
+  background-image: radial-gradient(circle, currentColor 1px, transparent 1px);
+  background-size: 16px 16px;
+  color: rgba(0, 0, 0, 0.07);
+}
+:is(.dark) .landing-page .dot-grid {
+  color: rgba(255, 255, 255, 0.05);
+}
+
+/* --- Play button pulse --- */
+@keyframes landing-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.3); }
+  50% { box-shadow: 0 0 0 14px rgba(59, 130, 246, 0); }
+}
+.landing-page .play-pulse {
+  animation: landing-pulse 2.5s ease-in-out infinite;
+}
+
+/* --- Section divider --- */
+.landing-page .divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(148, 163, 184, 0.25),
+    transparent
+  );
+}
+
+/* --- Announcement shine --- */
+.landing-page .shine-sweep {
+  position: relative;
+  overflow: hidden;
+}
+.landing-page .shine-sweep::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    120deg,
+    transparent,
+    rgba(255, 255, 255, 0.25),
+    transparent
+  );
+  transition: left 0.6s ease;
+  pointer-events: none;
+}
+.landing-page .shine-sweep:hover::before {
+  left: 100%;
+}
