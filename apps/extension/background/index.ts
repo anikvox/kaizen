@@ -7,7 +7,7 @@ const storage = new Storage()
 // API client for active tab syncing
 const getApiClient = () => {
   // @ts-expect-error - PLASMO_PUBLIC_ env vars are injected at build time
-  const baseUrl = (typeof PLASMO_PUBLIC_KAIZEN_API_URL !== "undefined" ? PLASMO_PUBLIC_KAIZEN_API_URL : "http://localhost:60092") as string
+  const baseUrl = (typeof PLASMO_PUBLIC_KAIZEN_API_URL !== "undefined" ? PLASMO_PUBLIC_KAIZEN_API_URL : "https://api.kaizen.apps.sandipan.dev") as string
   return createApiClient(baseUrl, async () => {
     return (await storage.get<string>("deviceToken")) ?? null
   })

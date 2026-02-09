@@ -4,7 +4,8 @@ import { createApiClient } from "@kaizen/api-client"
 
 const storage = new Storage()
 
-const apiUrl = process.env.PLASMO_PUBLIC_KAIZEN_API_URL || "http://localhost:60092"
+// @ts-expect-error - PLASMO_PUBLIC_ env vars are injected at build time
+const apiUrl = (typeof PLASMO_PUBLIC_KAIZEN_API_URL !== "undefined" ? PLASMO_PUBLIC_KAIZEN_API_URL : "https://api.kaizen.apps.sandipan.dev") as string
 
 export type NudgeResponseRequest = {
   nudgeId: string

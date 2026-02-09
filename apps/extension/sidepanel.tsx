@@ -51,8 +51,10 @@ import { COGNITIVE_ATTENTION_DEBUG_MODE, COGNITIVE_ATTENTION_SHOW_OVERLAY } from
 import { TreeAnimationSection } from "./sidepanel-components/TreeAnimationSection"
 import "./styles.css"
 
-const apiUrl = process.env.PLASMO_PUBLIC_KAIZEN_API_URL || "http://localhost:60092"
-const webUrl = process.env.PLASMO_PUBLIC_KAIZEN_WEB_URL || "http://localhost:3000"
+// @ts-expect-error - PLASMO_PUBLIC_ env vars are injected at build time
+const apiUrl = (typeof PLASMO_PUBLIC_KAIZEN_API_URL !== "undefined" ? PLASMO_PUBLIC_KAIZEN_API_URL : "https://api.kaizen.apps.sandipan.dev") as string
+// @ts-expect-error - PLASMO_PUBLIC_ env vars are injected at build time
+const webUrl = (typeof PLASMO_PUBLIC_KAIZEN_WEB_URL !== "undefined" ? PLASMO_PUBLIC_KAIZEN_WEB_URL : "https://kaizen.apps.sandipan.dev") as string
 
 const storage = new Storage()
 

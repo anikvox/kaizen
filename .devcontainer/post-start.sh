@@ -15,6 +15,9 @@ pnpm --filter @kaizen/api db:generate
 echo "==> Pushing database schema..."
 pnpm --filter @kaizen/api db:push
 
+echo "==> Cleaning extension build artifacts..."
+rm -rf /workspace/apps/extension/build
+
 echo "==> Building all packages..."
 pnpm build
 
