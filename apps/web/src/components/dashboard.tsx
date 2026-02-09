@@ -26,6 +26,7 @@ import {
 } from "@kaizen/api-client";
 import { Button, Logo, Card, ThemeToggle, ToggleSwitch } from "@kaizen/ui";
 import { HealthTab } from "./health-tab";
+import { JourneyGraph } from "./journey-graph";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
@@ -1941,6 +1942,14 @@ export function Dashboard({ initialTab }: DashboardProps) {
                     <div className="flex items-center justify-center py-16">
                       <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                     </div>
+                  )}
+
+                  {/* Force-directed Journey Graph */}
+                  {journeyData && journeyData.sites.length > 0 && (
+                    <JourneyGraph
+                      sites={journeyData.sites}
+                      referrerFlows={journeyData.referrerFlows}
+                    />
                   )}
 
                   {/* Journey Cards Grid */}
