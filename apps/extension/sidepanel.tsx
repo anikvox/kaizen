@@ -40,7 +40,9 @@ import {
   User,
   Award,
   Flame,
-  Trophy
+  Trophy,
+  Sun,
+  Moon
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import rehypeRaw from "rehype-raw"
@@ -277,6 +279,17 @@ function SidePanel() {
     const newValue = !trackingEnabled
     await storage.set("trackingEnabled", newValue)
     setTrackingEnabled(newValue)
+  }
+
+  const handleToggleTheme = async () => {
+    const newTheme = isDark ? "light" : "dark"
+    await storage.set("themeMode", newTheme)
+    setIsDark(!isDark)
+    if (newTheme === "dark") {
+      document.documentElement.classList.add("dark")
+    } else {
+      document.documentElement.classList.remove("dark")
+    }
   }
 
   const handleToggleDisplaySetting = async (settingsKey: keyof UserSettings, storageKey: string) => {
@@ -689,7 +702,7 @@ function SidePanel() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => window.open(webUrl, '_blank')}
-                  className="group/dash flex items-center justify-center w-8 h-8 rounded-xl border border-gray-200/60 dark:border-white/10 bg-white/40 dark:bg-white/[0.06] text-gray-700 dark:text-gray-700 hover:text-gray-700 dark:hover:text-gray-700 hover:border-gray-300/80 dark:hover:border-white/20 hover:bg-white/60 dark:hover:bg-white/[0.1] transition-all duration-200 active:scale-95"
+                  className="group/dash flex items-center justify-center w-8 h-8 rounded-xl border border-gray-200/60 dark:border-white/10 bg-white/40 dark:bg-white/[0.06] text-gray-700 dark:text-gray-300 hover:border-gray-300/80 dark:hover:border-white/20 hover:bg-white/60 dark:hover:bg-white/[0.1] transition-all duration-200 active:scale-95"
                   style={{ backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }}
                   title="Go to Dashboard"
                 >
@@ -699,6 +712,18 @@ function SidePanel() {
                     <rect x="1" y="9.5" width="5.5" height="5.5" rx="1.5" className="fill-teal-600" opacity="0.85" />
                     <rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1.5" className="fill-blue-600" opacity="0.85" />
                   </svg>
+                </button>
+                <button
+                  onClick={handleToggleTheme}
+                  className="flex items-center justify-center w-8 h-8 rounded-xl border border-gray-200/60 dark:border-white/10 bg-white/40 dark:bg-white/[0.06] text-gray-700 dark:text-gray-300 hover:border-gray-300/80 dark:hover:border-white/20 hover:bg-white/60 dark:hover:bg-white/[0.1] transition-all duration-200 active:scale-95"
+                  style={{ backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }}
+                  title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                >
+                  {isDark ? (
+                    <Sun className="w-[14px] h-[14px] text-amber-400" />
+                  ) : (
+                    <Moon className="w-[14px] h-[14px] text-slate-600" />
+                  )}
                 </button>
                 <PomodoroTimer
                   status={pomodoroStatus}
