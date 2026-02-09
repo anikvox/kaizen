@@ -24,10 +24,11 @@ import {
   type JourneyResponse,
   type JourneySite,
 } from "@kaizen/api-client";
-import { Button, Logo, Card, ThemeToggle } from "@kaizen/ui";
+import { Button, Logo, Card, ThemeToggle, ToggleSwitch } from "@kaizen/ui";
 import { HealthTab } from "./health-tab";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
+import rehypeRaw from "rehype-raw";
 import {
   MessageSquare,
   Brain,
@@ -62,6 +63,7 @@ import {
   Image as ImageIcon,
   RefreshCw,
   Heart,
+  User as UserIcon,
 } from "lucide-react";
 
 const PROVIDER_LABELS: Record<LLMProviderType, string> = {
@@ -209,6 +211,7 @@ export function Dashboard({ initialTab }: DashboardProps) {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const activeChatSessionIdRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const chatTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Settings editing state
   const [settingsSaving, setSettingsSaving] = useState(false);
@@ -980,6 +983,10 @@ export function Dashboard({ initialTab }: DashboardProps) {
 
       setChatInput("");
       setSelectedFiles([]);
+      // Reset textarea height
+      if (chatTextareaRef.current) {
+        chatTextareaRef.current.style.height = "44px";
+      }
 
       if (result.isNewSession) {
         setActiveChatSessionId(result.sessionId);
@@ -1093,14 +1100,14 @@ export function Dashboard({ initialTab }: DashboardProps) {
 
       {/* Main content */}
       {activeTab === "chat" ? (
-        <div className="flex-1 min-h-0 max-w-6xl mx-auto w-full px-6 pt-6 pb-10 flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0 max-w-6xl mx-auto w-full px-6 pt-6 pb-14 flex flex-col overflow-hidden">
           <div className="flex flex-1 min-h-0 rounded-2xl border border-border bg-card overflow-hidden">
             {/* Chat Sidebar */}
             <aside
-              className={`border-r border-white/5 flex flex-col bg-muted/20 backdrop-blur-xl flex-shrink-0 transition-all duration-300 ${chatSidebarCollapsed ? "w-14" : "w-72"
+              className={`border-r border-white/4 flex flex-col bg-muted/20 backdrop-blur-xl flex-shrink-0 transition-all duration-300 ${chatSidebarCollapsed ? "w-14" : "w-72"
                 }`}
             >
-              <div className="p-3 border-b border-white/5 flex items-center gap-2">
+              <div className="p-3 border-b border-white/5 flex items-center gap-2 -ml-1 mt-1">
                 {!chatSidebarCollapsed && (
                   <Button
                     onClick={handleNewChat}
@@ -1116,10 +1123,13 @@ export function Dashboard({ initialTab }: DashboardProps) {
                   onClick={() => setChatSidebarCollapsed(!chatSidebarCollapsed)}
                   variant="ghost"
                   size="sm"
-                  className="w-10 h-10 p-0 flex-shrink-0 rounded-xl hover:bg-white/5"
+                  className={`w-10 h-10 p-0 flex-shrink-0 rounded-xl transition-all ${chatSidebarCollapsed
+                    ? "bg-black dark:bg-white rounded-full hover:bg-black/80 dark:hover:bg-white/80"
+                    : "hover:bg-white/5"
+                    }`}
                 >
                   {chatSidebarCollapsed ? (
-                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                    <ChevronRight className="w-5 h-5 text-white dark:text-black" />
                   ) : (
                     <ChevronLeft className="w-5 h-5 text-muted-foreground" />
                   )}
@@ -1127,7 +1137,7 @@ export function Dashboard({ initialTab }: DashboardProps) {
               </div>
 
               {chatSidebarCollapsed ? (
-                <div className="flex-1 flex flex-col items-center pt-4 gap-4">
+                <div className="flex-1 flex flex-col items-center pt-4 gap-4 -mt-2">
                   <Button
                     onClick={handleNewChat}
                     variant="premium"
@@ -1175,6 +1185,8 @@ export function Dashboard({ initialTab }: DashboardProps) {
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/60">
                             {session.messageCount} messages
+                            <br />
+                            {new Date(session.createdAt).toLocaleDateString([], { day: "2-digit", month: "short", year: "numeric" })} - {new Date(session.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                           </span>
                         </div>
                       </div>
@@ -1232,7 +1244,7 @@ export function Dashboard({ initialTab }: DashboardProps) {
                 ) : (
                   <>
                     {chatMessages.map((message) => (
-                      <MessageBubble key={message.id} message={message} />
+                      <MessageBubble key={message.id} message={message} userImageUrl={clerkUser?.imageUrl} />
                     ))}
                     {pendingToolCalls.map((tool) => (
                       <PendingToolLine
@@ -1300,17 +1312,27 @@ export function Dashboard({ initialTab }: DashboardProps) {
                   </Button>
 
                   <textarea
+                    ref={chatTextareaRef}
                     value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
+                    onChange={(e) => {
+                      setChatInput(e.target.value);
+                      // Auto-resize textarea
+                      const textarea = chatTextareaRef.current;
+                      if (textarea) {
+                        textarea.style.height = "auto";
+                        textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
+                      }
+                    }}
                     onKeyDown={handleChatKeyDown}
                     placeholder="Type a message..."
                     disabled={chatSending}
-                    className="flex-1 p-3 rounded-lg border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+                    className="flex-1 p-3 rounded-lg border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring overflow-y-auto"
                     rows={1}
+                    style={{ minHeight: "50px", maxHeight: "120px" }}
                   />
                   <Button
                     onClick={handleChatSend}
-                    className="mt-[1/2]"
+                    className="mt-1"
                     disabled={
                       (!chatInput.trim() && selectedFiles.length === 0) ||
                       chatSending
@@ -2261,20 +2283,14 @@ export function Dashboard({ initialTab }: DashboardProps) {
                             Show attention tracking overlay
                           </p>
                         </div>
-                        <Button
-                          onClick={() =>
+                        <ToggleSwitch
+                          checked={settings.cognitiveAttentionDebugMode ?? false}
+                          onCheckedChange={() =>
                             handleSettingsToggle("cognitiveAttentionDebugMode")
                           }
                           disabled={settingsSaving}
-                          variant={
-                            settings.cognitiveAttentionDebugMode
-                              ? "default"
-                              : "outline"
-                          }
                           size="sm"
-                        >
-                          {settings.cognitiveAttentionDebugMode ? "ON" : "OFF"}
-                        </Button>
+                        />
                       </div>
 
                       {/* Show Overlay */}
@@ -2285,20 +2301,14 @@ export function Dashboard({ initialTab }: DashboardProps) {
                             Visual attention indicators
                           </p>
                         </div>
-                        <Button
-                          onClick={() =>
+                        <ToggleSwitch
+                          checked={settings.cognitiveAttentionShowOverlay ?? false}
+                          onCheckedChange={() =>
                             handleSettingsToggle("cognitiveAttentionShowOverlay")
                           }
                           disabled={settingsSaving}
-                          variant={
-                            settings.cognitiveAttentionShowOverlay
-                              ? "default"
-                              : "outline"
-                          }
                           size="sm"
-                        >
-                          {settings.cognitiveAttentionShowOverlay ? "ON" : "OFF"}
-                        </Button>
+                        />
                       </div>
 
                       {/* AI Provider */}
@@ -2322,7 +2332,7 @@ export function Dashboard({ initialTab }: DashboardProps) {
                 </div>
 
                 {/* Linked Extensions */}
-                <div className="rounded-2xl border bg-card border-border p-6">
+                <div className="rounded-2xl border bg-card border-border p-6 border-teal-300">
                   <div className="flex items-center justify-between">
                     <div>
                       <h2 className="text-lg font-semibold mb-1">
@@ -2384,7 +2394,25 @@ function PendingToolLine({ toolName }: { toolName: string }) {
   );
 }
 
-function MessageBubble({ message }: { message: ChatMessage }) {
+function formatRelativeTime(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 10) return "just now";
+  if (diffSec < 60) return "a few seconds ago";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin === 1) return "1 min ago";
+  if (diffMin < 60) return `${diffMin} mins ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr === 1) return "1 hour ago";
+  if (diffHr < 24) return `${diffHr} hours ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay === 1) return "yesterday";
+  return `${diffDay} days ago`;
+}
+
+function MessageBubble({ message, userImageUrl }: { message: ChatMessage; userImageUrl?: string }) {
   const isAssistant = message.role === "assistant";
   const isTool = message.role === "tool";
   const isUser = message.role === "user";
@@ -2417,147 +2445,183 @@ function MessageBubble({ message }: { message: ChatMessage }) {
     link.click();
   };
 
+  const timestamp = message.createdAt ? formatRelativeTime(message.createdAt) : null;
+
   return (
     <div
-      className={`max-w-[80%] px-4 py-3 rounded-xl relative overflow-hidden flex-shrink-0 ${isUser
-        ? "self-end bg-primary text-primary-foreground"
-        : "self-start bg-muted"
-        }`}
+      className={`flex gap-2.5 max-w-[85%] flex-shrink-0 min-w-0 ${isUser ? "self-end flex-row-reverse" : "self-start"}`}
     >
-      {message.status === "typing" ? (
-        <span className="flex gap-1 py-1">
-          <span
-            className="w-2 h-2 bg-current rounded-full animate-bounce"
-            style={{ animationDelay: "0ms" }}
+      {/* Avatar */}
+      {isUser ? (
+        userImageUrl ? (
+          <img
+            src={userImageUrl}
+            alt="You"
+            className="w-7 h-7 rounded-full flex-shrink-0 mt-1 object-cover"
           />
-          <span
-            className="w-2 h-2 bg-current rounded-full animate-bounce"
-            style={{ animationDelay: "150ms" }}
-          />
-          <span
-            className="w-2 h-2 bg-current rounded-full animate-bounce"
-            style={{ animationDelay: "300ms" }}
-          />
-        </span>
-      ) : (
-        <>
-          {/* Image attachments */}
-          {imageAttachments.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-2">
-              {imageAttachments.map((img, idx) => (
-                <div key={idx} className="relative group">
-                  <img
-                    src={`data:${img.mimeType};base64,${img.data}`}
-                    alt={img.filename}
-                    className="max-w-[200px] max-h-[200px] rounded-lg object-cover"
-                  />
-                  <button
-                    onClick={() => handleDownload(img)}
-                    className="absolute bottom-1 right-1 p-1 rounded bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Download"
-                  >
-                    <Download className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Other file attachments */}
-          {otherAttachments.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-2">
-              {otherAttachments.map((file, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleDownload(file)}
-                  className={`flex items-center gap-2 px-2 py-1 rounded text-xs ${isUser
-                    ? "bg-white/20 hover:bg-white/30"
-                    : "bg-background hover:bg-background/80"
-                    } transition-colors`}
-                >
-                  <FileIcon className="w-3 h-3" />
-                  <span className="max-w-[100px] truncate">{file.filename}</span>
-                  <Download className="w-3 h-3" />
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="text-sm leading-relaxed break-words">
-            {isAssistant ? (
-              <ReactMarkdown
-                urlTransform={(url) => {
-                  if (url.startsWith("data:")) return url;
-                  if (url.startsWith("http://") || url.startsWith("https://"))
-                    return url;
-                  return "";
-                }}
-                components={{
-                  img: ({ src, alt }) => (
-                    <img
-                      src={src}
-                      alt={alt || "Generated image"}
-                      className="max-w-full rounded-lg mt-2"
-                    />
-                  ),
-                  pre: ({ children }) => (
-                    <pre className="bg-slate-900 text-slate-200 p-4 rounded-lg overflow-auto text-xs my-2">
-                      {children}
-                    </pre>
-                  ),
-                  code: ({ children, className }) => {
-                    const isBlock = className?.includes("language-");
-                    if (isBlock)
-                      return <code className="font-mono">{children}</code>;
-                    return (
-                      <code className="bg-black/10 px-1.5 py-0.5 rounded text-[0.9em] font-mono">
-                        {children}
-                      </code>
-                    );
-                  },
-                  a: ({ href, children }) => (
-                    <a
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-secondary underline hover:no-underline"
-                    >
-                      {children}
-                    </a>
-                  ),
-                  p: ({ children }) => (
-                    <p className="my-2 first:mt-0 last:mb-0">{children}</p>
-                  ),
-                  ul: ({ children }) => (
-                    <ul className="my-2 pl-6 list-disc">{children}</ul>
-                  ),
-                  ol: ({ children }) => (
-                    <ol className="my-2 pl-6 list-decimal">{children}</ol>
-                  ),
-                  blockquote: ({ children }) => (
-                    <blockquote className="border-l-3 border-border my-2 pl-4 text-muted-foreground">
-                      {children}
-                    </blockquote>
-                  ),
-                }}
-              >
-                {message.content}
-              </ReactMarkdown>
-            ) : (
-              <p className="whitespace-pre-wrap break-words">
-                {message.content}
-              </p>
-            )}
-            {isStreaming && <span className="animate-pulse ml-0.5">▊</span>}
+        ) : (
+          <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-1 bg-primary/20 text-primary dark:bg-primary/30">
+            <UserIcon className="w-3.5 h-3.5" />
           </div>
-          {isError && message.errorMessage && (
-            <p className="mt-2 text-xs text-destructive">
-              Error: {message.errorMessage}
-            </p>
-          )}
-        </>
+        )
+      ) : (
+        <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-3 bg-gradient-to-br from-violet-500/20 to-blue-500/20 text-violet-600 dark:from-violet-400/20 dark:to-blue-400/20 dark:text-violet-300">
+          <Sparkles className="w-3.5 h-3.5" />
+        </div>
       )}
-      <StatusIndicator status={message.status} isAssistant={isAssistant} />
+
+      {/* Bubble + timestamp */}
+      <div className={`flex flex-col min-w-0 ${isUser ? "items-end" : "items-start"}`}>
+        <div
+          className={`px-4 py-3 rounded-2xl relative backdrop-blur-md border min-w-0 ${isUser
+            ? "bg-primary/85 text-primary-foreground border-primary/30 dark:bg-primary/75 dark:border-primary/40"
+            : "bg-white/50 border-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.6),0_4px_20px_rgba(0,0,0,0.04)] dark:bg-white/[0.06] dark:border-white/[0.1] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_4px_20px_rgba(0,0,0,0.2)]"
+            }`}
+          style={{ backdropFilter: "blur(16px) saturate(1.8)", WebkitBackdropFilter: "blur(16px) saturate(1.8)" }}
+        >
+          {message.status === "typing" ? (
+            <span className="flex gap-1 py-1">
+              <span
+                className="w-2 h-2 bg-current rounded-full animate-bounce"
+                style={{ animationDelay: "0ms" }}
+              />
+              <span
+                className="w-2 h-2 bg-current rounded-full animate-bounce"
+                style={{ animationDelay: "150ms" }}
+              />
+              <span
+                className="w-2 h-2 bg-current rounded-full animate-bounce"
+                style={{ animationDelay: "300ms" }}
+              />
+            </span>
+          ) : (
+            <>
+              {/* Image attachments */}
+              {imageAttachments.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {imageAttachments.map((img, idx) => (
+                    <div key={idx} className="relative group">
+                      <img
+                        src={`data:${img.mimeType};base64,${img.data}`}
+                        alt={img.filename}
+                        className="max-w-[200px] max-h-[200px] rounded-lg object-cover"
+                      />
+                      <button
+                        onClick={() => handleDownload(img)}
+                        className="absolute bottom-1 right-1 p-1 rounded bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Download"
+                      >
+                        <Download className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Other file attachments */}
+              {otherAttachments.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {otherAttachments.map((file, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleDownload(file)}
+                      className={`flex items-center gap-2 px-2 py-1 rounded text-xs ${isUser
+                        ? "bg-white/20 hover:bg-white/30"
+                        : "bg-background hover:bg-background/80"
+                        } transition-colors`}
+                    >
+                      <FileIcon className="w-3 h-3" />
+                      <span className="max-w-[100px] truncate">{file.filename}</span>
+                      <Download className="w-3 h-3" />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="text-sm leading-relaxed break-words overflow-hidden" style={{ overflowWrap: "anywhere" }}>
+                {isAssistant ? (
+                  <ReactMarkdown
+                    rehypePlugins={[rehypeRaw]}
+                    urlTransform={(url) => {
+                      if (url.startsWith("data:")) return url;
+                      if (url.startsWith("http://") || url.startsWith("https://"))
+                        return url;
+                      return "";
+                    }}
+                    components={{
+                      img: ({ src, alt }) => (
+                        <img
+                          src={src}
+                          alt={alt || "Generated image"}
+                          className="max-w-full rounded-lg mt-2"
+                        />
+                      ),
+                      pre: ({ children }) => (
+                        <pre className="bg-slate-900/80 text-slate-200 p-4 rounded-lg overflow-x-auto text-xs my-2 max-w-full">
+                          {children}
+                        </pre>
+                      ),
+                      code: ({ children, className }) => {
+                        const isBlock = className?.includes("language-");
+                        if (isBlock)
+                          return <code className="font-mono">{children}</code>;
+                        return (
+                          <code className="bg-black/10 dark:bg-white/10 px-1.5 py-0.5 rounded text-[0.9em] font-mono break-all">
+                            {children}
+                          </code>
+                        );
+                      },
+                      a: ({ href, children }) => (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-secondary underline hover:no-underline break-all"
+                        >
+                          {children}
+                        </a>
+                      ),
+                      p: ({ children }) => (
+                        <p className="my-2 first:mt-0 last:mb-0">{children}</p>
+                      ),
+                      ul: ({ children }) => (
+                        <ul className="my-2 pl-6 list-disc">{children}</ul>
+                      ),
+                      ol: ({ children }) => (
+                        <ol className="my-2 pl-6 list-decimal">{children}</ol>
+                      ),
+                      blockquote: ({ children }) => (
+                        <blockquote className="border-l-3 border-border my-2 pl-4 text-muted-foreground">
+                          {children}
+                        </blockquote>
+                      ),
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                ) : (
+                  <p className="whitespace-pre-wrap break-words">
+                    {message.content}
+                  </p>
+                )}
+                {isStreaming && <span className="animate-pulse ml-0.5">▊</span>}
+              </div>
+              {isError && message.errorMessage && (
+                <p className="mt-2 text-xs text-destructive">
+                  Error: {message.errorMessage}
+                </p>
+              )}
+            </>
+          )}
+          <StatusIndicator status={message.status} isAssistant={isAssistant} />
+        </div>
+        {/* Timestamp */}
+        {timestamp && (
+          <span className="text-[10px] text-muted-foreground/70 mt-1 px-1 ml-3">
+            {timestamp}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

@@ -41,3 +41,4 @@ export {
 } from "./components/pomodoro-timer";
 export { PulseCard, type Pulse } from "./components/pulse-card";
 export { ThemeToggle, STORAGE_KEY as THEME_STORAGE_KEY, type ThemeToggleProps } from "./components/theme-toggle";
+export { ToggleSwitch, type ToggleSwitchProps } from "./components/toggle-switch";

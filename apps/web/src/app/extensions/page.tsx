@@ -225,7 +225,7 @@ export default function Extensions() {
                         <span>Linked: {formatDate(token.createdAt)}</span>
                       </div>
                       {token.lastUsedAt && (
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground mt-0.5">
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground mt-0.5 mb-2">
                           <Clock className="w-3 h-3" />
                           <span>Last used: {formatDate(token.lastUsedAt)}</span>
                         </div>
@@ -237,7 +237,7 @@ export default function Extensions() {
                     disabled={deleting === token.id}
                     variant="destructive"
                     size="sm"
-                    className="gap-2"
+                    className="gap-2 -mt-2"
                   >
                     {deleting === token.id ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
