@@ -35,9 +35,14 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Brain
+  Brain,
+  Sparkles,
+  User
 } from "lucide-react"
+import ReactMarkdown from "react-markdown"
+import rehypeRaw from "rehype-raw"
 
+import { COGNITIVE_ATTENTION_DEBUG_MODE, COGNITIVE_ATTENTION_SHOW_OVERLAY } from "./cognitive-attention/default-settings"
 import { TreeAnimationSection } from "./sidepanel-components/TreeAnimationSection"
 import "./styles.css"
 
@@ -54,6 +59,7 @@ interface UserInfo {
   id: string
   email: string
   name: string | null
+  imageUrl: string | null
 }
 
 type Tab = "focus" | "insights" | "health" | "explore"
@@ -113,7 +119,10 @@ function SidePanel() {
   }, [activeSessionId])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    const container = messagesEndRef.current?.parentElement
+    if (container) {
+      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" })
+    }
   }, [messages])
 
   // Theme sync: apply dark class based on storage
@@ -267,6 +276,25 @@ function SidePanel() {
     setTrackingEnabled(newValue)
   }
 
+  const handleToggleDisplaySetting = async (settingsKey: keyof UserSettings, storageKey: string) => {
+    if (!settings) return
+    const newValue = !settings[settingsKey]
+    // Update local state immediately
+    setSettings((prev) => prev ? { ...prev, [settingsKey]: newValue } : null)
+    // Update extension storage so content scripts pick it up
+    await storage.set(storageKey, String(newValue))
+    // Push to server so dashboard and SSE stay in sync
+    const token = await storage.get<string>("deviceToken")
+    if (token) {
+      const api = createApiClient(apiUrl)
+      try {
+        await api.settings.update({ [settingsKey]: newValue } as any, token)
+      } catch (error) {
+        console.error("Failed to sync setting to server:", error)
+      }
+    }
+  }
+
   const fetchMessages = async (sessionId: string) => {
     const token = await storage.get<string>("deviceToken")
     if (!token) return
@@ -399,6 +427,13 @@ function SidePanel() {
 
             case "settings-changed":
               setSettings((prev) => prev ? { ...prev, ...data.settings } : null)
+              // Also sync debug/overlay to extension storage for content scripts
+              if (data.settings.cognitiveAttentionDebugMode !== undefined) {
+                storage.set(COGNITIVE_ATTENTION_DEBUG_MODE.key, String(data.settings.cognitiveAttentionDebugMode))
+              }
+              if (data.settings.cognitiveAttentionShowOverlay !== undefined) {
+                storage.set(COGNITIVE_ATTENTION_SHOW_OVERLAY.key, String(data.settings.cognitiveAttentionShowOverlay))
+              }
               break
 
             case "focus-changed":
@@ -746,6 +781,7 @@ function SidePanel() {
                 onSend={handleSend}
                 onNewChat={handleNewChat}
                 onAttachmentsChange={setAttachments}
+                userImageUrl={user?.imageUrl}
               />
             )}
             {activeTab === "insights" && <InsightsTab insights={insights} />}
@@ -764,6 +800,10 @@ function SidePanel() {
                 user={user}
                 trackingEnabled={trackingEnabled}
                 onToggleTracking={handleToggleTracking}
+                debugMode={settings?.cognitiveAttentionDebugMode ?? false}
+                showOverlay={settings?.cognitiveAttentionShowOverlay ?? false}
+                onToggleDebugMode={() => handleToggleDisplaySetting("cognitiveAttentionDebugMode", COGNITIVE_ATTENTION_DEBUG_MODE.key)}
+                onToggleShowOverlay={() => handleToggleDisplaySetting("cognitiveAttentionShowOverlay", COGNITIVE_ATTENTION_SHOW_OVERLAY.key)}
               />
             )}
           </div>
@@ -784,7 +824,8 @@ function FocusTab({
   onKeyDown,
   onSend,
   onNewChat,
-  onAttachmentsChange
+  onAttachmentsChange,
+  userImageUrl
 }: {
   messages: ChatMessage[]
   inputValue: string
@@ -796,6 +837,7 @@ function FocusTab({
   onSend: () => void
   onNewChat: () => void
   onAttachmentsChange: (files: File[]) => void
+  userImageUrl?: string | null
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -834,7 +876,7 @@ function FocusTab({
           </div>
         ) : (
           messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
+            <MessageBubble key={message.id} message={message} userImageUrl={userImageUrl} />
           ))
         )}
         <div ref={messagesEndRef} />
@@ -933,8 +975,26 @@ function FocusTab({
   )
 }
 
+// Relative time formatting
+function formatRelativeTime(dateStr: string): string {
+  const now = Date.now()
+  const then = new Date(dateStr).getTime()
+  const diffSec = Math.floor((now - then) / 1000)
+  if (diffSec < 10) return "just now"
+  if (diffSec < 60) return "a few seconds ago"
+  const diffMin = Math.floor(diffSec / 60)
+  if (diffMin === 1) return "1 min ago"
+  if (diffMin < 60) return `${diffMin} mins ago`
+  const diffHr = Math.floor(diffMin / 60)
+  if (diffHr === 1) return "1 hour ago"
+  if (diffHr < 24) return `${diffHr} hours ago`
+  const diffDay = Math.floor(diffHr / 24)
+  if (diffDay === 1) return "yesterday"
+  return `${diffDay} days ago`
+}
+
 // Message Bubble
-function MessageBubble({ message }: { message: ChatMessage }) {
+function MessageBubble({ message, userImageUrl }: { message: ChatMessage; userImageUrl?: string | null }) {
   const isBot = message.role === "assistant"
   const isTool = message.role === "tool"
   const isUser = message.role === "user"
@@ -946,66 +1006,154 @@ function MessageBubble({ message }: { message: ChatMessage }) {
     return (
       <div className="flex items-center gap-1.5 py-1">
         <span className="text-[8px] text-gray-400 dark:text-gray-500">●</span>
-        <span className="text-[11px] text-gray-500 dark:text-gray-400">{text}</span>
+        <span className="text-[11px] text-gray-500 dark:text-gray-400 max-w-[calc(75%)]">{text}</span>
       </div>
     )
   }
 
+  const timestamp = message.createdAt ? formatRelativeTime(message.createdAt) : null
+
   return (
     <div
       className={cn(
-        "max-w-[85%] px-3 py-2 rounded-xl text-sm backdrop-blur-sm",
-        isUser
-          ? "self-end bg-blue-600 text-white"
-          : "self-start bg-white/60 dark:bg-white/10 text-gray-900 dark:text-gray-100 border border-gray-200/50 dark:border-white/10"
+        "flex gap-2 max-w-[88%] min-w-0 flex-shrink-0",
+        isUser ? "self-end flex-row-reverse" : "self-start"
       )}
     >
-      {message.status === "typing" ? (
-        <span className="tracking-wider">● ● ●</span>
+      {/* Avatar */}
+      {isUser ? (
+        userImageUrl ? (
+          <img
+            src={userImageUrl}
+            alt="User"
+            className="w-6 h-6 rounded-full flex-shrink-0 mt-2 object-cover border border-blue-500/20 shadow-sm"
+          />
+        ) : (
+          <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-2 bg-blue-500/20 text-blue-600 dark:bg-blue-400/20 dark:text-blue-300">
+            <User className="w-3 h-3" />
+          </div>
+        )
       ) : (
-        <>
-          {/* Attachments */}
-          {hasAttachments && (
-            <div className="flex flex-wrap gap-2 mb-2">
-              {message.attachments!.map((attachment, index) => {
-                const isImage = attachment.mimeType.startsWith("image/")
-                if (isImage) {
-                  return (
-                    <img
-                      key={index}
-                      src={`data:${attachment.mimeType};base64,${attachment.data}`}
-                      alt={attachment.filename}
-                      className="max-w-full rounded-lg max-h-48 object-contain"
-                    />
-                  )
-                }
-                return (
-                  <div
-                    key={index}
-                    className={cn(
-                      "flex items-center gap-2 px-2 py-1 rounded-lg text-xs",
-                      isUser ? "bg-blue-500/50" : "bg-gray-200/50 dark:bg-gray-700/50"
-                    )}
-                  >
-                    <FileText className="w-4 h-4" />
-                    <span className="truncate max-w-[120px]">{attachment.filename}</span>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-          {/* Text content - hide placeholder text for attachment-only messages */}
-          {message.content && message.content !== "[Attached files]" && (
-            <p className="whitespace-pre-wrap break-words">
-              {message.content}
-              {isStreaming && <span className="ml-0.5 animate-blink">▊</span>}
-            </p>
-          )}
-          {message.status === "error" && message.errorMessage && (
-            <p className="text-xs text-red-300 mt-1">Error: {message.errorMessage}</p>
-          )}
-        </>
+        <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-2 bg-gradient-to-br from-violet-500/20 to-blue-500/20 text-violet-600 dark:from-violet-400/20 dark:to-blue-400/20 dark:text-violet-300">
+          <Sparkles className="w-3 h-3" />
+        </div>
       )}
+
+      {/* Bubble + timestamp */}
+      <div className={cn("flex flex-col min-w-0", isUser ? "items-end" : "items-start")}>
+        <div
+          className={cn(
+            "px-3 py-2 rounded-2xl text-sm min-w-0",
+            isUser
+              ? "bg-blue-600/90 text-white border border-blue-500/30 dark:bg-blue-600/80 dark:border-blue-400/30"
+              : "bg-white/50 border border-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.6),0_4px_16px_rgba(0,0,0,0.04)] dark:bg-white/[0.06] dark:border-white/[0.1] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_4px_16px_rgba(0,0,0,0.2)] text-gray-900 dark:text-gray-100"
+          )}
+          style={{ backdropFilter: "blur(16px) saturate(1.8)", WebkitBackdropFilter: "blur(16px) saturate(1.8)" }}
+        >
+          {message.status === "typing" ? (
+            <span className="flex gap-1 py-0.5">
+              <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+              <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+              <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+            </span>
+          ) : (
+            <>
+              {/* Attachments */}
+              {hasAttachments && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {message.attachments!.map((attachment, index) => {
+                    const isImage = attachment.mimeType.startsWith("image/")
+                    if (isImage) {
+                      return (
+                        <img
+                          key={index}
+                          src={`data:${attachment.mimeType};base64,${attachment.data}`}
+                          alt={attachment.filename}
+                          className="max-w-full rounded-lg max-h-48 object-contain"
+                        />
+                      )
+                    }
+                    return (
+                      <div
+                        key={index}
+                        className={cn(
+                          "flex items-center gap-2 px-2 py-1 rounded-lg text-xs",
+                          isUser ? "bg-blue-500/50" : "bg-gray-200/50 dark:bg-gray-700/50"
+                        )}
+                      >
+                        <FileText className="w-4 h-4" />
+                        <span className="truncate max-w-[120px]">{attachment.filename}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+              {/* Text content */}
+              {message.content && message.content !== "[Attached files]" && (
+                <div className="break-words overflow-hidden" style={{ overflowWrap: "anywhere" }}>
+                  {isBot ? (
+                    <ReactMarkdown
+                      rehypePlugins={[rehypeRaw]}
+                      components={{
+                        img: ({ src, alt }) => (
+                          <img src={src} alt={alt || "Image"} className="max-w-full rounded-lg mt-2" />
+                        ),
+                        pre: ({ children }) => (
+                          <pre className="bg-slate-900/80 text-slate-200 p-3 rounded-lg overflow-x-auto text-xs my-2 max-w-full">
+                            {children}
+                          </pre>
+                        ),
+                        code: ({ children, className }) => {
+                          const isBlock = className?.includes("language-")
+                          if (isBlock) return <code className="font-mono">{children}</code>
+                          return (
+                            <code className="bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded text-[0.9em] font-mono break-all">
+                              {children}
+                            </code>
+                          )
+                        },
+                        a: ({ href, children }) => (
+                          <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 underline hover:no-underline break-all">
+                            {children}
+                          </a>
+                        ),
+                        p: ({ children }) => (
+                          <p className="my-1.5 first:mt-0 last:mb-0">{children}</p>
+                        ),
+                        ul: ({ children }) => (
+                          <ul className="my-1.5 pl-5 list-disc">{children}</ul>
+                        ),
+                        ol: ({ children }) => (
+                          <ol className="my-1.5 pl-5 list-decimal">{children}</ol>
+                        ),
+                        blockquote: ({ children }) => (
+                          <blockquote className="border-l-2 border-gray-300 dark:border-gray-600 my-1.5 pl-3 text-gray-600 dark:text-gray-400">
+                            {children}
+                          </blockquote>
+                        ),
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                  ) : (
+                    <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                  )}
+                  {isStreaming && <span className="ml-0.5 animate-blink">▊</span>}
+                </div>
+              )}
+              {message.status === "error" && message.errorMessage && (
+                <p className="text-xs text-red-300 mt-1">Error: {message.errorMessage}</p>
+              )}
+            </>
+          )}
+        </div>
+        {/* Timestamp */}
+        {timestamp && (
+          <span className="text-[9px] text-gray-400 dark:text-gray-500 mt-0.5 px-1">
+            {timestamp}
+          </span>
+        )}
+      </div>
     </div>
   )
 }
@@ -1057,7 +1205,7 @@ function HealthTab({
   const getNudgeIcon = (type: string) => {
     switch (type) {
       case "doomscroll": return "🌀"
-      case "distraction": return "📱"
+      case "distraction": return "😵‍💫"
       case "break": return "☕"
       case "focus_drift": return "🎯"
       case "encouragement": return "🌟"
@@ -1134,7 +1282,7 @@ function HealthTab({
               {settings?.focusAgentEnabled ? "Active & Monitoring" : "Disabled"}
             </p>
           </div>
-          <Brain className="w-5 h-5 text-purple-400" />
+          <Brain className="w-5 h-5 text-purple-400 mr-2" />
         </div>
 
         {settings?.focusAgentEnabled && (
@@ -1253,7 +1401,11 @@ function ExploreTab({
   onUnlink,
   user,
   trackingEnabled,
-  onToggleTracking
+  onToggleTracking,
+  debugMode,
+  showOverlay,
+  onToggleDebugMode,
+  onToggleShowOverlay
 }: {
   settings: UserSettings | null
   onUpdateNumericSetting: (key: keyof UserSettings, value: number) => void
@@ -1261,6 +1413,10 @@ function ExploreTab({
   user: UserInfo
   trackingEnabled: boolean
   onToggleTracking: () => void
+  debugMode: boolean
+  showOverlay: boolean
+  onToggleDebugMode: () => void
+  onToggleShowOverlay: () => void
 }) {
   return (
     <div className="flex-1 overflow-auto p-3">
@@ -1274,7 +1430,7 @@ function ExploreTab({
             </div>
             <button
               onClick={onUnlink}
-              className="text-xs text-red-500 hover:text-red-700 dark:hover:text-red-400 font-medium px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+              className="text-xs text-red-500 hover:text-red-700 dark:hover:text-red-400 font-medium px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-70 dark:hover:bg-red-500/10 transition-colors"
             >
               Unlink
             </button>
@@ -1346,6 +1502,44 @@ function ExploreTab({
                   <span className="text-[9px] text-gray-400 dark:text-gray-500">3 min</span>
                   <span className="text-[9px] text-gray-400 dark:text-gray-500">2 hrs</span>
                 </div>
+              </div>
+
+              {/* Debug Mode Toggle */}
+              <div className="p-3 bg-white/50 dark:bg-white/[0.08] rounded-lg flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-gray-900 dark:text-gray-100">Debug Mode</p>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400">Show attention tracking overlay</p>
+                </div>
+                <button
+                  onClick={onToggleDebugMode}
+                  className={cn(
+                    "text-[10px] h-6 px-3 rounded-lg font-medium transition-all",
+                    debugMode
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                  )}
+                >
+                  {debugMode ? "ON" : "OFF"}
+                </button>
+              </div>
+
+              {/* Show Overlay Toggle */}
+              <div className="p-3 bg-white/50 dark:bg-white/[0.08] rounded-lg flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-gray-900 dark:text-gray-100">Show Overlay</p>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400">Visual attention indicators</p>
+                </div>
+                <button
+                  onClick={onToggleShowOverlay}
+                  className={cn(
+                    "text-[10px] h-6 px-3 rounded-lg font-medium transition-all",
+                    showOverlay
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                  )}
+                >
+                  {showOverlay ? "ON" : "OFF"}
+                </button>
               </div>
             </div>
           </div>

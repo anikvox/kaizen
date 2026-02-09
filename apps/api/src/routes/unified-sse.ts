@@ -33,9 +33,21 @@ const app = new Hono();
 // Helper to authenticate and get user info
 async function authenticateToken(token: string): Promise<{
   userId: string;
-  user: { id: string; email: string; name: string | null };
+  user: { id: string; email: string; name: string | null; imageUrl: string | null };
   deviceToken?: string;
 } | null> {
+  // Helper function to get Clerk user imageUrl
+  async function getClerkUserImageUrl(clerkId: string): Promise<string | null> {
+    try {
+      const { createClerkClient } = await import("@clerk/backend");
+      const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+      const clerkUser = await clerkClient.users.getUser(clerkId);
+      return clerkUser.imageUrl || null;
+    } catch {
+      return null;
+    }
+  }
+
   // First try device token auth
   const deviceToken = await db.deviceToken.findUnique({
     where: { token },
@@ -43,12 +55,14 @@ async function authenticateToken(token: string): Promise<{
   });
 
   if (deviceToken) {
+    const imageUrl = await getClerkUserImageUrl(deviceToken.user.clerkId);
     return {
       userId: deviceToken.user.id,
       user: {
         id: deviceToken.user.id,
         email: deviceToken.user.email,
         name: deviceToken.user.name,
+        imageUrl,
       },
       deviceToken: token,
     };
@@ -66,12 +80,14 @@ async function authenticateToken(token: string): Promise<{
     });
 
     if (user) {
+      const imageUrl = await getClerkUserImageUrl(user.clerkId);
       return {
         userId: user.id,
         user: {
           id: user.id,
           email: user.email,
           name: user.name,
+          imageUrl,
         },
       };
     }
@@ -132,6 +148,7 @@ app.get("/", async (c) => {
           id: user.id,
           email: user.email,
           name: user.name,
+          imageUrl: user.imageUrl,
         },
         settings: {
           cognitiveAttentionDebugMode: settings.cognitiveAttentionDebugMode,

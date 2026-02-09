@@ -796,6 +796,7 @@ export interface UnifiedSSEConnectedData {
     id: string;
     email: string;
     name: string | null;
+    imageUrl: string | null;
   };
   settings: UserSettings;
   focuses: Focus[];
