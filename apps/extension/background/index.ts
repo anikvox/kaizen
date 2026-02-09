@@ -168,6 +168,8 @@ chrome.action.onClicked.addListener(async (tab) => {
   } else {
     // Sidepanel is closed - open it
     await chrome.sidePanel.open({ tabId: tab.id })
+    // Notify the active tab's content scripts so glow overlay can play
+    chrome.tabs.sendMessage(tab.id, { type: "SIDEPANEL_OPENED" }).catch(() => {})
   }
 })
 

@@ -155,14 +155,29 @@ export default function LinkExtension() {
               </div>
             ) : (
               <>
-                <div className="p-3 rounded-lg bg-secondary/10 mb-6">
-                  <p className="text-xs text-muted-foreground mb-1">
-                    Signed in as
-                  </p>
-                  <p className="font-medium text-sm">
-                    {clerkUser?.fullName ||
-                      clerkUser?.emailAddresses[0]?.emailAddress}
-                  </p>
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/10 mb-6">
+                  {clerkUser?.imageUrl ? (
+                    <img
+                      src={clerkUser.imageUrl}
+                      alt=""
+                      className="w-8 h-8 rounded-full shrink-0"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {(clerkUser?.fullName?.[0] || clerkUser?.emailAddresses[0]?.emailAddress?.[0] || "?").toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground leading-none mb-1">
+                      Signed in as
+                    </p>
+                    <p className="font-medium text-sm truncate">
+                      {clerkUser?.fullName ||
+                        clerkUser?.emailAddresses[0]?.emailAddress}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="mb-6">

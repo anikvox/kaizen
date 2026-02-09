@@ -37,7 +37,10 @@ import {
   Clock,
   Brain,
   Sparkles,
-  User
+  User,
+  Award,
+  Flame,
+  Trophy
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import rehypeRaw from "rehype-raw"
@@ -683,12 +686,27 @@ function SidePanel() {
                 className="h-8 cursor-pointer hover:opacity-80 transition-opacity"
                 onClick={() => window.open(webUrl, '_blank')}
               />
-              <PomodoroTimer
-                status={pomodoroStatus}
-                onToggle={handlePomodoroToggle}
-                compact
-                className="bg-white/40 dark:bg-white/10 backdrop-blur-sm border-gray-300/50 dark:border-white/10 dark:text-gray-100"
-              />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.open(webUrl, '_blank')}
+                  className="group/dash flex items-center justify-center w-8 h-8 rounded-xl border border-gray-200/60 dark:border-white/10 bg-white/40 dark:bg-white/[0.06] text-gray-700 dark:text-gray-700 hover:text-gray-700 dark:hover:text-gray-700 hover:border-gray-300/80 dark:hover:border-white/20 hover:bg-white/60 dark:hover:bg-white/[0.1] transition-all duration-200 active:scale-95"
+                  style={{ backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }}
+                  title="Go to Dashboard"
+                >
+                  <svg viewBox="0 0 16 16" className="w-[14px] h-[14px] transition-transform duration-500 group-hover/dash:rotate-90">
+                    <rect x="1" y="1" width="5.5" height="5.5" rx="1.5" className="fill-blue-600" opacity="0.85" />
+                    <rect x="9.5" y="1" width="5.5" height="5.5" rx="1.5" className="fill-teal-600" opacity="0.85" />
+                    <rect x="1" y="9.5" width="5.5" height="5.5" rx="1.5" className="fill-teal-600" opacity="0.85" />
+                    <rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1.5" className="fill-blue-600" opacity="0.85" />
+                  </svg>
+                </button>
+                <PomodoroTimer
+                  status={pomodoroStatus}
+                  onToggle={handlePomodoroToggle}
+                  compact
+                  className="bg-white/40 dark:bg-white/10 backdrop-blur-sm border-gray-300/50 dark:border-white/10 dark:text-gray-100"
+                />
+              </div>
             </div>
 
             {/* Current Focus Display */}
@@ -784,7 +802,13 @@ function SidePanel() {
                 userImageUrl={user?.imageUrl}
               />
             )}
-            {activeTab === "insights" && <InsightsTab insights={insights} />}
+            {activeTab === "insights" && (
+              <InsightsTab
+                insights={insights}
+                pomodoroStatus={pomodoroStatus}
+                focuses={focuses}
+              />
+            )}
             {activeTab === "health" && (
               <HealthTab
                 settings={settings}
@@ -1159,35 +1183,264 @@ function MessageBubble({ message, userImageUrl }: { message: ChatMessage; userIm
 }
 
 // Insights Tab
-function InsightsTab({ insights }: { insights: AttentionInsight[] }) {
+function InsightsTab({
+  insights,
+  pomodoroStatus,
+  focuses
+}: {
+  insights: AttentionInsight[]
+  pomodoroStatus: PomodoroStatus | null
+  focuses: Focus[]
+}) {
+  const elapsed = pomodoroStatus?.elapsedSeconds ?? 0
+
+  // Milestones based on longest single focus session duration
+  const longestFocusMs = focuses.length > 0
+    ? Math.max(...focuses.map((f) => {
+      const start = new Date(f.startedAt).getTime()
+      const end = f.endedAt ? new Date(f.endedAt).getTime() : Date.now()
+      return end - start
+    }))
+    : elapsed * 1000
+
+  const milestones = [
+    { label: "First Focus", time: 7, icon: "🌱", color: "emerald" as const },
+    { label: "Deep Work", time: 25, icon: "🎯", color: "blue" as const },
+    { label: "Flow State", time: 60, icon: "🧘", color: "purple" as const },
+    { label: "Master", time: 120, icon: "⚡", color: "amber" as const },
+  ]
+
+  const colorMap = {
+    emerald: {
+      bg: "bg-emerald-100/70 dark:bg-emerald-900/30",
+      border: "border-emerald-200/60 dark:border-emerald-800/40",
+      text: "text-emerald-700 dark:text-emerald-400",
+      bar: "bg-emerald-500",
+      icon: "bg-emerald-100/80 dark:bg-emerald-900/40 border-emerald-200/50 dark:border-emerald-800/50",
+    },
+    blue: {
+      bg: "bg-blue-100/70 dark:bg-blue-900/30",
+      border: "border-blue-200/60 dark:border-blue-800/40",
+      text: "text-blue-700 dark:text-blue-400",
+      bar: "bg-blue-500",
+      icon: "bg-blue-100/80 dark:bg-blue-900/40 border-blue-200/50 dark:border-blue-800/50",
+    },
+    purple: {
+      bg: "bg-purple-100/70 dark:bg-purple-900/30",
+      border: "border-purple-200/60 dark:border-purple-800/40",
+      text: "text-purple-700 dark:text-purple-400",
+      bar: "bg-purple-500",
+      icon: "bg-purple-100/80 dark:bg-purple-900/40 border-purple-200/50 dark:border-purple-800/50",
+    },
+    amber: {
+      bg: "bg-amber-100/70 dark:bg-amber-900/30",
+      border: "border-amber-200/60 dark:border-amber-800/40",
+      text: "text-amber-700 dark:text-amber-400",
+      bar: "bg-amber-500",
+      icon: "bg-amber-100/80 dark:bg-amber-900/40 border-amber-200/50 dark:border-amber-800/50",
+    },
+  }
+
+  const achievedCount = milestones.filter((m) => longestFocusMs >= m.time * 60 * 1000).length
+
+  // Build wins list from focus sessions
+  const wins = focuses
+    .filter((f) => {
+      const start = new Date(f.startedAt).getTime()
+      const end = f.endedAt ? new Date(f.endedAt).getTime() : Date.now()
+      return (end - start) >= 5 * 60 * 1000 // Only sessions >= 5 min
+    })
+    .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
+    .slice(0, 10)
+    .map((f) => {
+      const start = new Date(f.startedAt).getTime()
+      const end = f.endedAt ? new Date(f.endedAt).getTime() : Date.now()
+      const durationMs = end - start
+      const mins = Math.floor(durationMs / 60000)
+      let type: "streak" | "milestone" | "achievement" = "streak"
+      if (mins >= 60) type = "milestone"
+      else if (mins >= 25) type = "achievement"
+      return { id: f.id, focusItem: f.item, durationMs, type, startedAt: f.startedAt }
+    })
+
+  const getWinIcon = (type: "streak" | "milestone" | "achievement") => {
+    switch (type) {
+      case "streak": return <Flame className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+      case "milestone": return <Trophy className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+      case "achievement": return <Award className="w-4 h-4 text-green-600 dark:text-green-400" />
+    }
+  }
+
+  const getWinBadge = (type: "streak" | "milestone" | "achievement") => {
+    switch (type) {
+      case "streak": return { bg: "bg-orange-100/80 dark:bg-orange-900/30", text: "text-orange-700 dark:text-orange-400", label: "Streak" }
+      case "milestone": return { bg: "bg-yellow-100/80 dark:bg-yellow-900/30", text: "text-yellow-700 dark:text-yellow-400", label: "Milestone" }
+      case "achievement": return { bg: "bg-green-100/80 dark:bg-green-900/30", text: "text-green-700 dark:text-green-400", label: "Achievement" }
+    }
+  }
+
+  const formatDuration = (ms: number) => {
+    const mins = Math.floor(ms / 60000)
+    const secs = Math.floor((ms % 60000) / 1000)
+    return `${mins}:${secs.toString().padStart(2, "0")}`
+  }
+
   return (
     <div className="flex-1 overflow-auto p-3">
-      {insights.length === 0 ? (
-        <div className="h-full flex flex-col items-center justify-center text-center p-4">
-          <div className="bg-white/40 dark:bg-white/[0.06] backdrop-blur-sm rounded-xl p-6 border border-gray-300/50 dark:border-white/10">
-            <Lightbulb className="w-8 h-8 text-purple-500 dark:text-purple-400 mx-auto mb-3 opacity-50" />
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">No insights yet</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Insights will appear as you browse the web</p>
+      <div className="space-y-3">
+
+        {/* Activity Insights */}
+        <div className="bg-white/50 dark:bg-white/[0.06] backdrop-blur-sm rounded-xl border border-gray-200/60 dark:border-white/[0.1] p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="p-1.5 bg-purple-100/70 dark:bg-purple-900/30 rounded-lg">
+              <Lightbulb className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            </div>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Activity Insights</h3>
+          </div>
+
+          {insights.length === 0 ? (
+            <div className="text-center py-4">
+              <p className="text-xs text-gray-500 dark:text-gray-400">No insights yet</p>
+              <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">Insights will appear as you browse the web</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {insights.map((insight) => (
+                <div
+                  key={insight.id}
+                  className="flex items-start gap-2.5 bg-white/50 dark:bg-white/[0.04] backdrop-blur-sm px-3 py-2.5 rounded-lg border border-gray-200/50 dark:border-white/[0.08]"
+                >
+                  <Lightbulb className="w-3.5 h-3.5 text-purple-400 shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">{insight.message}</p>
+                    <p className="text-[9px] text-gray-400 dark:text-gray-500 mt-1">
+                      {new Date(insight.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Milestones */}
+        <div className="bg-white/50 dark:bg-white/[0.06] backdrop-blur-sm rounded-xl border border-gray-200/60 dark:border-white/[0.1] p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-purple-100/70 dark:bg-purple-900/30 rounded-lg">
+                <Award className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Milestones</h3>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400">{achievedCount} of {milestones.length} achieved</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            {milestones.map((m) => {
+              const achieved = longestFocusMs >= m.time * 60 * 1000
+              const progress = Math.min(1, longestFocusMs / (m.time * 60 * 1000))
+              const colors = colorMap[m.color]
+              return (
+                <div
+                  key={m.label}
+                  className={cn(
+                    "relative rounded-xl p-3 border transition-all duration-300",
+                    achieved
+                      ? `${colors.bg} ${colors.border}`
+                      : "bg-gray-50/50 dark:bg-white/[0.03] border-gray-200/40 dark:border-white/[0.06]"
+                  )}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={cn("text-lg", !achieved && "grayscale opacity-40")}>{m.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className={cn("text-xs font-semibold truncate", achieved ? colors.text : "text-gray-400 dark:text-gray-600")}>{m.label}</p>
+                      <p className="text-[9px] text-gray-400 dark:text-gray-500">{m.time} min</p>
+                    </div>
+                    {achieved && (
+                      <CheckCircle className={cn("w-3.5 h-3.5 shrink-0", colors.text)} />
+                    )}
+                  </div>
+                  {/* Progress bar */}
+                  <div className="h-1 bg-gray-200/60 dark:bg-white/[0.06] rounded-full overflow-hidden">
+                    <div
+                      className={cn("h-full rounded-full transition-all duration-700", achieved ? colors.bar : "bg-gray-300 dark:bg-gray-600")}
+                      style={{ width: `${Math.round(progress * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Progress dots */}
+          <div className="mt-3 pt-2.5 border-t border-gray-200/40 dark:border-white/[0.06]">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-gray-500 dark:text-gray-400">Continue focusing to unlock more</span>
+              <div className="flex gap-1">
+                {milestones.map((m, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "w-1.5 h-1.5 rounded-full transition-colors duration-300",
+                      longestFocusMs >= m.time * 60 * 1000 ? "bg-purple-500" : "bg-gray-300 dark:bg-gray-600"
+                    )}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {insights.map((insight) => (
-            <div
-              key={insight.id}
-              className="bg-white/40 dark:bg-white/[0.06] backdrop-blur-sm p-3 rounded-xl border-l-2 border-purple-500 border border-gray-300/50 dark:border-white/10 flex items-center justify-between gap-2"
-            >
-              <span className="text-sm text-gray-700 dark:text-gray-300">{insight.message}</span>
-              <span className="text-[10px] text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                {new Date(insight.createdAt).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit"
-                })}
-              </span>
+
+        {/* Wins / Streaks */}
+        <div className="bg-white/50 dark:bg-white/[0.06] backdrop-blur-sm rounded-xl border border-gray-200/60 dark:border-white/[0.1] p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="p-1.5 bg-orange-100/70 dark:bg-orange-900/30 rounded-lg">
+              <Flame className="w-4 h-4 text-orange-600 dark:text-orange-400" />
             </div>
-          ))}
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Wins</h3>
+          </div>
+
+          {wins.length === 0 ? (
+            <div className="text-center py-4">
+              <p className="text-xs text-gray-500 dark:text-gray-400">No wins yet</p>
+              <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">Focus for 5+ minutes to earn wins</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {wins.map((win) => {
+                const badge = getWinBadge(win.type)
+                return (
+                  <div
+                    key={win.id}
+                    className="flex items-center gap-3 bg-white/50 dark:bg-white/[0.04] backdrop-blur-sm px-3 py-2.5 rounded-lg border border-gray-200/50 dark:border-white/[0.08] hover:border-gray-300/60 dark:hover:border-white/[0.14] transition-all"
+                  >
+                    <div className={cn("p-1.5 rounded-full shrink-0", badge.bg)}>
+                      {getWinIcon(win.type)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{win.focusItem}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium", badge.bg, badge.text)}>
+                          {badge.label}
+                        </span>
+                        <span className="text-[9px] text-gray-400 dark:text-gray-500">
+                          {formatRelativeTime(win.startedAt)}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-xs font-mono text-gray-500 dark:text-gray-400 shrink-0">
+                      {formatDuration(win.durationMs)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
-      )}
+
+      </div>
     </div>
   )
 }
@@ -1282,7 +1535,7 @@ function HealthTab({
               {settings?.focusAgentEnabled ? "Active & Monitoring" : "Disabled"}
             </p>
           </div>
-          <Brain className="w-5 h-5 text-purple-400 mr-2" />
+          {/* <Brain className="w-5 h-5 text-purple-400 mr-2" /> */}
         </div>
 
         {settings?.focusAgentEnabled && (
@@ -1424,9 +1677,20 @@ function ExploreTab({
         {/* User Info */}
         <div className="bg-white/40 dark:bg-white/[0.06] backdrop-blur-sm rounded-xl p-4 border border-gray-300/50 dark:border-white/10">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{user.name || user.email}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">{user.email}</p>
+            <div className="flex items-center gap-2.5 min-w-0">
+              {user.imageUrl ? (
+                <img src={user.imageUrl} alt="" className="w-8 h-8 rounded-full shrink-0" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-white/10 flex items-center justify-center shrink-0">
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    {(user.name?.[0] || user.email[0] || "?").toUpperCase()}
+                  </span>
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{user.name || user.email}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
+              </div>
             </div>
             <button
               onClick={onUnlink}

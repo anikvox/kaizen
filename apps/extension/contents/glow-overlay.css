@@ -1,0 +1,246 @@
+:root {
+  --glow-sens: 30;
+  --viewport-bg: transparent;
+  --blend: soft-light;
+  --glow-blend: plus-lighter;
+  --glow-color: 160deg 84% 60%;
+  --glow-boost: 20%;
+}
+
+#kaizen-glow-overlay {
+  --color-sens: calc(var(--glow-sens) + 20);
+  --pointer-deg: 45deg;
+  --pointer-d: 100;
+
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  isolation: isolate;
+  transform: translate3d(0, 0, 0.01px);
+  background: var(--viewport-bg);
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 2147483647;
+}
+
+#kaizen-glow-overlay::before,
+#kaizen-glow-overlay::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  transition: opacity 0.25s ease-out;
+  pointer-events: none;
+}
+
+#kaizen-glow-overlay > .glow {
+  content: "";
+  position: fixed;
+  inset: 0;
+  transition: opacity 0.25s ease-out;
+  pointer-events: none;
+}
+
+#kaizen-glow-overlay:not(.animating)::before,
+#kaizen-glow-overlay:not(.animating)::after,
+#kaizen-glow-overlay:not(.animating) > .glow {
+  opacity: 0;
+  transition: opacity 0.75s ease-in-out;
+}
+
+/* Disable ::before and ::after — glow child handles the effect */
+#kaizen-glow-overlay::before,
+#kaizen-glow-overlay::after {
+  display: none !important;
+}
+
+#kaizen-glow-overlay::before {
+  border: 1px solid transparent;
+
+  background: linear-gradient(var(--viewport-bg) 0 100%) padding-box,
+    linear-gradient(rgb(255 255 255 / 0%) 0% 100%) border-box,
+    radial-gradient(
+        at 80% 55%,
+        hsla(160, 84%, 60%, 1) 0px,
+        transparent 50%
+      )
+      border-box,
+    radial-gradient(
+        at 69% 34%,
+        hsla(217, 91%, 60%, 1) 0px,
+        transparent 50%
+      )
+      border-box,
+    radial-gradient(at 8% 6%, hsla(160, 100%, 78%, 1) 0px, transparent 50%)
+      border-box,
+    radial-gradient(
+        at 41% 38%,
+        hsla(192, 100%, 64%, 1) 0px,
+        transparent 50%
+      )
+      border-box,
+    radial-gradient(
+        at 86% 85%,
+        hsla(160, 84%, 50%, 1) 0px,
+        transparent 50%
+      )
+      border-box,
+    radial-gradient(
+        at 82% 18%,
+        hsla(263, 70%, 65%, 1) 0px,
+        transparent 50%
+      )
+      border-box,
+    radial-gradient(at 51% 4%, hsla(38, 92%, 60%, 1) 0px, transparent 50%)
+      border-box,
+    linear-gradient(hsl(160, 84%, 60%) 0 100%) border-box;
+
+  opacity: calc(
+    (var(--pointer-d) - var(--color-sens)) / (100 - var(--color-sens))
+  );
+
+  -webkit-mask-image: conic-gradient(
+    from var(--pointer-deg) at center,
+    black 25%,
+    transparent 40%,
+    transparent 60%,
+    black 75%
+  );
+  mask-image: conic-gradient(
+    from var(--pointer-deg) at center,
+    black 25%,
+    transparent 40%,
+    transparent 60%,
+    black 75%
+  );
+}
+
+#kaizen-glow-overlay::after {
+  border: 1px solid transparent;
+
+  background: radial-gradient(
+        at 80% 55%,
+        hsla(160, 84%, 60%, 1) 0px,
+        transparent 50%
+      )
+      padding-box,
+    radial-gradient(
+        at 69% 34%,
+        hsla(217, 91%, 60%, 1) 0px,
+        transparent 50%
+      )
+      padding-box,
+    radial-gradient(at 8% 6%, hsla(160, 100%, 78%, 1) 0px, transparent 50%)
+      padding-box,
+    radial-gradient(
+        at 41% 38%,
+        hsla(192, 100%, 64%, 1) 0px,
+        transparent 50%
+      )
+      padding-box,
+    radial-gradient(
+        at 86% 85%,
+        hsla(160, 84%, 50%, 1) 0px,
+        transparent 50%
+      )
+      padding-box,
+    radial-gradient(
+        at 82% 18%,
+        hsla(263, 70%, 65%, 1) 0px,
+        transparent 50%
+      )
+      padding-box,
+    radial-gradient(at 51% 4%, hsla(38, 92%, 60%, 1) 0px, transparent 50%)
+      padding-box,
+    linear-gradient(hsl(160, 84%, 60%) 0 100%) padding-box;
+
+  -webkit-mask-image: linear-gradient(to bottom, black, black),
+    radial-gradient(ellipse at 50% 50%, black 40%, transparent 65%),
+    radial-gradient(ellipse at 66% 66%, black 5%, transparent 40%),
+    radial-gradient(ellipse at 33% 33%, black 5%, transparent 40%),
+    radial-gradient(ellipse at 66% 33%, black 5%, transparent 40%),
+    radial-gradient(ellipse at 33% 66%, black 5%, transparent 40%),
+    conic-gradient(
+      from var(--pointer-deg) at center,
+      transparent 5%,
+      black 15%,
+      black 85%,
+      transparent 95%
+    );
+  mask-image: linear-gradient(to bottom, black, black),
+    radial-gradient(ellipse at 50% 50%, black 40%, transparent 65%),
+    radial-gradient(ellipse at 66% 66%, black 5%, transparent 40%),
+    radial-gradient(ellipse at 33% 33%, black 5%, transparent 40%),
+    radial-gradient(ellipse at 66% 33%, black 5%, transparent 40%),
+    radial-gradient(ellipse at 33% 66%, black 5%, transparent 40%),
+    conic-gradient(
+      from var(--pointer-deg) at center,
+      transparent 5%,
+      black 15%,
+      black 85%,
+      transparent 95%
+    );
+
+  -webkit-mask-composite: source-out, source-over, source-over, source-over, source-over, source-over;
+  mask-composite: subtract, add, add, add, add, add;
+
+  opacity: calc(
+    (var(--pointer-d) - var(--color-sens)) / (100 - var(--color-sens))
+  );
+  mix-blend-mode: var(--blend);
+}
+
+#kaizen-glow-overlay > .glow {
+  --outset: 80px;
+
+  position: fixed;
+  inset: calc(var(--outset) * -1);
+  pointer-events: none;
+  z-index: 1;
+
+  -webkit-mask-image: conic-gradient(
+    from var(--pointer-deg) at center,
+    black 2.5%,
+    transparent 10%,
+    transparent 90%,
+    black 97.5%
+  );
+  mask-image: conic-gradient(
+    from var(--pointer-deg) at center,
+    black 2.5%,
+    transparent 10%,
+    transparent 90%,
+    black 97.5%
+  );
+
+  opacity: calc(
+    (var(--pointer-d) - var(--glow-sens)) / (100 - var(--glow-sens))
+  );
+  mix-blend-mode: var(--glow-blend);
+}
+
+#kaizen-glow-overlay > .glow::before {
+  content: "";
+  position: absolute;
+  inset: var(--outset);
+  box-shadow: inset 0 0 0 1px hsl(var(--glow-color) / 100%),
+    inset 0 0 1px 0 hsl(var(--glow-color) / calc(var(--glow-boost) + 60%)),
+    inset 0 0 3px 0 hsl(var(--glow-color) / calc(var(--glow-boost) + 50%)),
+    inset 0 0 6px 0 hsl(var(--glow-color) / calc(var(--glow-boost) + 40%)),
+    inset 0 0 15px 0 hsl(var(--glow-color) / calc(var(--glow-boost) + 30%)),
+    inset 0 0 25px 2px hsl(var(--glow-color) / calc(var(--glow-boost) + 20%)),
+    inset 0 0 50px 2px hsl(var(--glow-color) / calc(var(--glow-boost) + 10%)),
+    0 0 1px 0 hsl(var(--glow-color) / calc(var(--glow-boost) + 60%)),
+    0 0 3px 0 hsl(var(--glow-color) / calc(var(--glow-boost) + 50%)),
+    0 0 6px 0 hsl(var(--glow-color) / calc(var(--glow-boost) + 40%)),
+    0 0 15px 0 hsl(var(--glow-color) / calc(var(--glow-boost) + 30%)),
+    0 0 25px 2px hsl(var(--glow-color) / calc(var(--glow-boost) + 20%)),
+    0 0 50px 2px hsl(var(--glow-color) / calc(var(--glow-boost) + 10%));
+}
+
+#kaizen-glow-overlay.finished::before,
+#kaizen-glow-overlay.finished::after,
+#kaizen-glow-overlay.finished > .glow {
+  opacity: 0 !important;
+  transition: opacity 0.5s ease-out;
+}

@@ -48,6 +48,7 @@ import {
   RotateCcw,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Send,
   LayoutDashboard,
   History,
@@ -1913,22 +1914,25 @@ export function Dashboard({ initialTab }: DashboardProps) {
                           <RotateCcw className="w-4 h-4" />
                         )}
                       </Button>
-                      <select
-                        value={journeyDays}
-                        onChange={(e) => {
-                          const days = Number(e.target.value);
-                          setJourneyDays(days);
-                          setJourneyData(null);
-                          fetchJourneyData(days);
-                        }}
-                        className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                      >
-                        <option value={1}>Last 24 hours</option>
-                        <option value={3}>Last 3 days</option>
-                        <option value={7}>Last 7 days</option>
-                        <option value={14}>Last 14 days</option>
-                        <option value={30}>Last 30 days</option>
-                      </select>
+                      <div className="relative">
+                        <select
+                          value={journeyDays}
+                          onChange={(e) => {
+                            const days = Number(e.target.value);
+                            setJourneyDays(days);
+                            setJourneyData(null);
+                            fetchJourneyData(days);
+                          }}
+                          className="appearance-none pl-3 pr-8 py-1.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer transition-all hover:bg-muted/50"
+                        >
+                          <option value={1}>Last 24 hours</option>
+                          <option value={3}>Last 3 days</option>
+                          <option value={7}>Last 7 days</option>
+                          <option value={14}>Last 14 days</option>
+                          <option value={30}>Last 30 days</option>
+                        </select>
+                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                      </div>
                     </div>
                   </div>
 
