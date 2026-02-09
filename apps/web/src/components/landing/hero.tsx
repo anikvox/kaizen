@@ -1,16 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { Play, ArrowRight } from "lucide-react";
+import { Play, Download } from "lucide-react";
 import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
-import { Button } from "@kaizen/ui";
 import Link from "next/link";
 import AnnouncementBar from "./announcement-bar";
 
 /** Set a YouTube video ID to enable the embed. Leave empty for placeholder. */
 const YOUTUBE_VIDEO_ID = "";
 
-export function Hero() {
+interface HeroProps {
+  onDownloadExtension?: () => void;
+}
+
+export function Hero({ onDownloadExtension }: HeroProps) {
   const [showVideo, setShowVideo] = useState(false);
 
   return (
@@ -51,16 +54,13 @@ export function Hero() {
             </button>
           </SignInButton>
         </SignedOut>
-        <Button
-          variant="outline"
-          className="hidden sm:flex h-10 px-5 rounded-lg font-semibold gap-1.5 border-border/60 hover:border-blue-500/30 hover:bg-blue-500/5 transition-all group"
+        <button
+          onClick={onDownloadExtension}
+          className="hidden sm:flex items-center h-10 px-5 rounded-lg font-semibold gap-1.5 border border-border/60 bg-transparent text-foreground hover:border-blue-500/40 hover:bg-blue-500/10 transition-all"
         >
-          Learn More
-          <ArrowRight
-            size={14}
-            className="group-hover:translate-x-0.5 transition-transform"
-          />
-        </Button>
+          <Download size={14} />
+          Download Extension
+        </button>
       </div>
 
       {/* Video embed */}
