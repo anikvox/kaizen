@@ -446,7 +446,7 @@ Please:
         systemPrompt,
       });
 
-      // If no tool calls, we have the final response
+      // If no tool calls, this is the final response
       if (!response.toolCalls || response.toolCalls.length === 0) {
         reportContent = response.content;
         emitProgress("complete", "Report generation complete");
@@ -456,10 +456,10 @@ Please:
       // Process tool calls
       emitProgress("tools", `Processing ${response.toolCalls.length} tool calls...`);
 
-      // Add assistant message with tool calls info
+      // Add assistant message — use model text if present, otherwise a brief system note
       messages.push({
         role: "assistant",
-        content: response.content || `[Calling tools: ${response.toolCalls.map(t => t.toolName).join(", ")}]`,
+        content: response.content || `I will use the following tools to gather more data: ${response.toolCalls.map(t => t.toolName).join(", ")}.`,
       });
 
       // Execute each tool call and build results
@@ -500,26 +500,36 @@ Please:
     }
   }
 
-  // If we hit max iterations without a final response
-  if (!reportContent && iterations >= maxIterations) {
-    emitProgress("timeout", "Report generation reached maximum iterations, finalizing...");
+  // Check if report content looks like actual report vs garbage (e.g. model mimicking tool-call text)
+  const looksLikeReport = reportContent.trim().length > 100 && !reportContent.trim().startsWith("[Calling tools:");
 
-    // Make one final call to get the report
+  // If report content is empty or invalid after the loop, make a final explicit call without tools
+  if (!reportContent.trim() || !looksLikeReport) {
+    const reason = iterations >= maxIterations ? "maximum iterations reached" : "empty response from model";
+    emitProgress("finalizing", `Finalizing report (${reason})...`);
+
     try {
+      // Ask the LLM to generate the report without tools, using accumulated context
       messages.push({
         role: "user",
-        content: "Please finalize your report now based on all the analysis you've done. Output the complete report following the structure in your instructions.",
+        content: "Please generate the complete cognitive wellness report now based on the health metrics provided above. Output ONLY the formatted markdown report following the structure in your instructions. Do not call any tools.",
       });
 
       const finalResponse = await provider.generate({
         messages,
         systemPrompt,
+        // No tools - force text-only response
       });
 
       reportContent = finalResponse.content;
-      emitProgress("complete", "Report generation complete (after finalization)");
+      if (reportContent.trim()) {
+        emitProgress("complete", "Report generation complete (after finalization)");
+      } else {
+        reportContent = "";
+        emitProgress("empty", "Report generation produced no content. There may be insufficient browsing data for the selected time range.");
+      }
     } catch (error) {
-      reportContent = "Unable to generate report due to an error. Please try again.";
+      reportContent = "";
       emitProgress("error", `Final generation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }

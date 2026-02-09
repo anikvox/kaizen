@@ -712,47 +712,86 @@ function SidePanel() {
             {/* Current Focus Display */}
             <div className="bg-white/30 dark:bg-white/[0.06] backdrop-blur-md rounded-xl p-3 border border-gray-300/50 dark:border-white/10 shadow-sm">
               {sortedFocuses.length > 0 ? (
-                <div>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 font-medium mb-1">
-                    {sortedFocuses.length > 1 ? "Current Focuses" : "Current Focus"}
-                  </p>
+                <div className="space-y-2">
+                  {/* Section Label */}
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-semibold">
+                      {sortedFocuses.length > 1 ? "Current Focuses" : "Current Focus"}
+                    </span>
+                    <div className="flex-1 h-px bg-gradient-to-r from-gray-300/60 dark:from-white/10 to-transparent" />
+                  </div>
+
                   {sortedFocuses.map((focus, index) => (
-                    <div
-                      key={focus.id}
-                      className={cn(
-                        "flex items-center justify-between",
-                        index > 0 && "pt-1.5 mt-1.5 border-t border-gray-200/50 dark:border-white/10"
-                      )}
-                    >
-                      <p className={cn(
-                        "font-bold text-gray-900 dark:text-gray-100 truncate flex-1 min-w-0",
-                        index === 0 ? "text-base" : "text-sm"
-                      )}>
-                        {focus.item}
-                      </p>
-                      <p className={cn(
-                        "font-mono font-bold text-gray-900 dark:text-gray-100 ml-3 shrink-0",
-                        index === 0 ? "text-sm" : "text-xs"
-                      )}>
-                        {focusElapsedTimes[focus.id] || "00:00:00"}
-                      </p>
-                    </div>
+                    index === 0 ? (
+                      /* Active/Primary Focus - Hero Style */
+                      <div
+                        key={focus.id}
+                        className="relative bg-gradient-to-br from-white/60 via-white/40 to-emerald-50/30 dark:from-white/[0.08] dark:via-white/[0.04] dark:to-emerald-900/10 rounded-lg p-3 border border-emerald-200/50 dark:border-emerald-500/20 shadow-sm"
+                      >
+                        {/* Subtle accent glow */}
+                        <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-emerald-400/5 to-teal-400/5 dark:from-emerald-400/5 dark:to-teal-400/5 pointer-events-none" />
+
+                        <div className="relative flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            {/* Live indicator */}
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                              </span>
+                              <span className="text-[9px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-semibold">Active</span>
+                            </div>
+                            {/* Focus Title */}
+                            <p className="text-lg font-bold text-gray-900 dark:text-gray-50 leading-tight truncate">
+                              {focus.item}
+                            </p>
+                          </div>
+                          {/* Timer */}
+                          <div className="shrink-0 text-right">
+                            <p className="font-mono text-base font-bold text-gray-900 dark:text-gray-100 tabular-nums tracking-tight">
+                              {focusElapsedTimes[focus.id] || "00:00:00"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Secondary Focuses - Compact Style */
+                      <div
+                        key={focus.id}
+                        className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-md bg-white/20 dark:bg-white/[0.03] border border-gray-200/40 dark:border-white/5 transition-colors hover:bg-white/30 dark:hover:bg-white/[0.05]"
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="w-1 h-1 rounded-full bg-gray-400/60 dark:bg-gray-500/50 shrink-0" />
+                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+                            {focus.item}
+                          </p>
+                        </div>
+                        <p className="font-mono text-xs text-gray-500 dark:text-gray-400 tabular-nums shrink-0">
+                          {focusElapsedTimes[focus.id] || "00:00:00"}
+                        </p>
+                      </div>
+                    )
                   ))}
                 </div>
               ) : (
-                <div className="py-2">
-                  <p className="text-sm text-gray-700 dark:text-gray-300 mb-1 text-center font-medium">
-                    No active focus session
-                  </p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 italic text-center">
-                    Start browsing to track your focus
-                  </p>
+                <div className="py-3">
+                  <div className="flex flex-col items-center gap-1.5">
+                    <div className="w-8 h-8 rounded-full bg-gray-100/60 dark:bg-white/[0.06] flex items-center justify-center mb-1">
+                      <Target className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                    </div>
+                    <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">
+                      No active focus session
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Start browsing to track your focus
+                    </p>
+                  </div>
                 </div>
               )}
 
-              <div className="border-t border-gray-300/50 dark:border-white/10 my-2" />
-              <p className="text-green-900 dark:text-green-300 text-center text-[10px]">
-                Your focus grows with every moment of attention!
+              <div className="border-t border-gray-300/50 dark:border-white/10 my-2.5" />
+              <p className="text-emerald-700/80 dark:text-emerald-300/70 text-center text-[10px] font-medium">
+                ✨ Your focus grows with every moment of attention
               </p>
             </div>
           </div>

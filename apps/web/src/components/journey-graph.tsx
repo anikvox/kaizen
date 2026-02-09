@@ -8,11 +8,10 @@ import {
   forceManyBody,
   forceCenter,
   forceCollide,
-  forceY,
 } from "d3-force";
 import type { SimulationNodeDatum, SimulationLinkDatum } from "d3-force";
 import { select } from "d3-selection";
-import { zoom, zoomIdentity } from "d3-zoom";
+import { zoom } from "d3-zoom";
 import { drag } from "d3-drag";
 import { scaleSqrt, scaleLinear } from "d3-scale";
 import { cn } from "@kaizen/ui";
@@ -33,6 +32,8 @@ interface GraphNode extends SimulationNodeDatum {
   radius: number;
   color: string;
   colorDark: string;
+  chronoIndex: number;
+  firstVisitedAt: number;
 }
 
 interface GraphLink extends SimulationLinkDatum<GraphNode> {
@@ -40,6 +41,7 @@ interface GraphLink extends SimulationLinkDatum<GraphNode> {
   target: string | GraphNode;
   count: number;
   width: number;
+  type: "referrer" | "chrono";
 }
 
 function formatDuration(ms: number): string {
@@ -95,17 +97,22 @@ export function JourneyGraph({
     const width = svgRef.current.clientWidth;
     const height = 200;
 
-    // Cap at top 20 nodes by visit count
+    // Cap at top 20 nodes by visit count, then sort chronologically
     const cappedSites = [...sites]
       .sort((a, b) => b.totalVisits - a.totalVisits)
-      .slice(0, 20);
+      .slice(0, 20)
+      .sort(
+        (a, b) =>
+          new Date(a.firstVisitedAt).getTime() -
+          new Date(b.firstVisitedAt).getTime(),
+      );
     const domainSet = new Set(cappedSites.map((s) => s.domain));
 
-    // Build nodes
+    // Build nodes (chronologically ordered)
     const maxVisits = Math.max(...cappedSites.map((s) => s.totalVisits), 1);
     const radiusScale = scaleSqrt().domain([1, maxVisits]).range([8, 22]);
 
-    const nodes: GraphNode[] = cappedSites.map((site) => {
+    const nodes: GraphNode[] = cappedSites.map((site, idx) => {
       const colors = getTimeColor(site.totalActiveTimeMs);
       return {
         id: site.domain,
@@ -117,35 +124,78 @@ export function JourneyGraph({
         radius: radiusScale(site.totalVisits),
         color: colors.light,
         colorDark: colors.dark,
+        chronoIndex: idx,
+        firstVisitedAt: new Date(site.firstVisitedAt).getTime(),
       };
     });
 
-    // Build links (filter to existing domains, exclude self-references)
+    // Chronological links (primary): sequential arrows based on visit time
+    const chronoLinks: GraphLink[] = [];
+    for (let i = 0; i < nodes.length - 1; i++) {
+      chronoLinks.push({
+        source: nodes[i].id,
+        target: nodes[i + 1].id,
+        count: 1,
+        width: 2,
+        type: "chrono",
+      });
+    }
+
+    // Referrer links (secondary): from actual navigation flows
     const filteredFlows = referrerFlows.filter(
       (f) => f.from !== f.to && domainSet.has(f.from) && domainSet.has(f.to),
     );
     const maxCount = Math.max(...filteredFlows.map((f) => f.count), 1);
-    const linkWidthScale = scaleLinear().domain([1, maxCount]).range([1, 3.5]);
+    const linkWidthScale = scaleLinear().domain([1, maxCount]).range([0.8, 2.5]);
 
-    const links: GraphLink[] = filteredFlows.map((f) => ({
-      source: f.from,
-      target: f.to,
-      count: f.count,
-      width: linkWidthScale(f.count),
+    // Avoid duplicate referrer links that overlap with chrono links
+    const chronoSet = new Set(
+      chronoLinks.map((l) => `${l.source}->${l.target}`),
+    );
+    const referrerLinks: GraphLink[] = filteredFlows
+      .filter((f) => !chronoSet.has(`${f.from}->${f.to}`))
+      .map((f) => ({
+        source: f.from,
+        target: f.to,
+        count: f.count,
+        width: linkWidthScale(f.count),
+        type: "referrer" as const,
+      }));
+
+    const links: GraphLink[] = [...chronoLinks, ...referrerLinks];
+
+    // Bidirectional lookup (for curving)
+    const allLinkKeys = new Set(links.map((l) => {
+      const sId = typeof l.source === "string" ? l.source : l.source.id;
+      const tId = typeof l.target === "string" ? l.target : l.target.id;
+      return `${sId}->${tId}`;
     }));
-
-    // Bidirectional lookup
-    const linkSet = new Set(filteredFlows.map((f) => `${f.from}->${f.to}`));
 
     // Defs (arrow markers, clip paths)
     const defs = svg.append("defs");
 
-    const arrowColor = dark
-      ? "rgba(148,163,184,0.5)"
-      : "rgba(100,116,139,0.45)";
+    // Blue arrow for chronological links
+    const chronoArrowColor = dark ? "#60a5fa" : "#3b82f6";
     defs
       .append("marker")
-      .attr("id", "journey-arrow")
+      .attr("id", "journey-arrow-chrono")
+      .attr("viewBox", "0 -4 8 8")
+      .attr("refX", 8)
+      .attr("refY", 0)
+      .attr("markerWidth", 6)
+      .attr("markerHeight", 6)
+      .attr("orient", "auto")
+      .append("path")
+      .attr("d", "M0,-3L8,0L0,3")
+      .attr("fill", chronoArrowColor);
+
+    // Gray arrow for referrer links
+    const refArrowColor = dark
+      ? "rgba(148,163,184,0.4)"
+      : "rgba(100,116,139,0.35)";
+    defs
+      .append("marker")
+      .attr("id", "journey-arrow-ref")
       .attr("viewBox", "0 -4 8 8")
       .attr("refX", 8)
       .attr("refY", 0)
@@ -153,8 +203,8 @@ export function JourneyGraph({
       .attr("markerHeight", 5)
       .attr("orient", "auto")
       .append("path")
-      .attr("d", "M0,-3.5L8,0L0,3.5")
-      .attr("fill", arrowColor);
+      .attr("d", "M0,-3L8,0L0,3")
+      .attr("fill", refArrowColor);
 
     // Clip paths for favicons
     nodes.forEach((node, i) => {
@@ -168,19 +218,28 @@ export function JourneyGraph({
     // Main container (for pan/zoom)
     const container = svg.append("g");
 
-    // Links
-    const linkColor = dark
-      ? "rgba(148,163,184,0.25)"
-      : "rgba(100,116,139,0.2)";
+    // Links — referrer (background, subtle) then chrono (foreground, blue)
+    const chronoColor = dark
+      ? "rgba(96,165,250,0.55)"
+      : "rgba(59,130,246,0.5)";
+    const refLinkColor = dark
+      ? "rgba(148,163,184,0.15)"
+      : "rgba(100,116,139,0.12)";
+
     const linkElements = container
       .append("g")
       .selectAll<SVGPathElement, GraphLink>("path")
       .data(links)
       .join("path")
       .attr("fill", "none")
-      .attr("stroke", linkColor)
+      .attr("stroke", (d) => (d.type === "chrono" ? chronoColor : refLinkColor))
       .attr("stroke-width", (d) => d.width)
-      .attr("marker-end", "url(#journey-arrow)");
+      .attr("stroke-dasharray", (d) => (d.type === "referrer" ? "4,3" : "none"))
+      .attr("marker-end", (d) =>
+        d.type === "chrono"
+          ? "url(#journey-arrow-chrono)"
+          : "url(#journey-arrow-ref)",
+      );
 
     // Nodes
     const nodeGroups = container
@@ -238,22 +297,21 @@ export function JourneyGraph({
       )
       .attr("pointer-events", "none");
 
-    // Force simulation
+    // Force simulation — scattered layout, no linear ordering
     const simulation = forceSimulation(nodes)
       .force(
         "link",
         forceLink<GraphNode, GraphLink>(links)
           .id((d) => d.id)
-          .distance(55)
-          .strength(0.5),
+          .distance(65)
+          .strength(0.4),
       )
-      .force("charge", forceManyBody().strength(-100))
+      .force("charge", forceManyBody().strength(-120))
       .force("center", forceCenter(width / 2, height / 2))
       .force(
         "collide",
-        forceCollide<GraphNode>().radius((d) => d.radius + 6),
+        forceCollide<GraphNode>().radius((d) => d.radius + 8),
       )
-      .force("y", forceY(height / 2).strength(0.08))
       .on("tick", () => {
         // Constrain within bounds
         nodes.forEach((d) => {
@@ -268,7 +326,7 @@ export function JourneyGraph({
           const dy = (t.y ?? 0) - (s.y ?? 0);
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
 
-          const isBidi = linkSet.has(`${t.id}->${s.id}`);
+          const isBidi = allLinkKeys.has(`${t.id}->${s.id}`);
           const curvature = isBidi ? 25 : 0;
 
           const sourceR = s.radius + 2;

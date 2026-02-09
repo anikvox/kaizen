@@ -671,9 +671,30 @@ export function HealthTab({ apiUrl, getToken }: HealthTabProps) {
                 </details>
 
                 {/* Report Content */}
-                <div className="prose prose-sm dark:prose-invert max-w-none p-6 rounded-lg bg-card border border-border">
-                  <ReactMarkdown>{report.content}</ReactMarkdown>
-                </div>
+                {report.content && report.content.trim() ? (
+                  <div className="prose prose-sm dark:prose-invert max-w-none p-6 rounded-lg bg-card border border-border">
+                    <ReactMarkdown>{report.content}</ReactMarkdown>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center p-8 rounded-lg bg-muted/30 border border-border text-center">
+                    <AlertTriangle className="w-10 h-10 text-amber-500/70 mb-3" />
+                    <p className="text-sm font-medium text-foreground mb-1">
+                      Unable to generate report
+                    </p>
+                    <p className="text-xs text-muted-foreground max-w-sm">
+                      There may not be enough browsing data for the selected time range, or the AI model returned an empty response. Try selecting a longer time range or browsing more before generating a report.
+                    </p>
+                    <Button
+                      onClick={handleGenerateReport}
+                      className="mt-4"
+                      variant="outline"
+                      size="sm"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+                      Try Again
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>

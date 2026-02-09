@@ -262,6 +262,6 @@ Remember: Your goal is to help the user understand their patterns and make infor
 // =============================================================================
 
 export const SYSTEM_PROMPTS = {
-  chat: CHAT_SYSTEM_PROMPT,
-  titleGeneration: TITLE_GENERATION_SYSTEM_PROMPT,
+   chat: CHAT_SYSTEM_PROMPT,
+   titleGeneration: TITLE_GENERATION_SYSTEM_PROMPT,
 } as const;
