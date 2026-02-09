@@ -5,6 +5,8 @@ import { Storage } from "@plasmohq/storage";
 import { sendToBackground } from "@plasmohq/messaging";
 import type { AgentNudge } from "@kaizen/api-client";
 
+import kaizenIcon from "data-base64:~assets/icon.png";
+
 import { ATTENTION_TRACKING_IGNORE_LIST } from "../cognitive-attention/default-settings";
 import { shouldIgnoreUrlSync } from "../cognitive-attention/url-ignore-list";
 import { AGENT_NUDGE_KEY } from "../background/settings-sync";
@@ -233,34 +235,16 @@ function NudgeOverlay() {
       </style>
 
       <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-        <div
+        <img
+          src={kaizenIcon}
+          alt="Kaizen"
           style={{
             width: "36px",
             height: "36px",
             borderRadius: "10px",
-            backgroundColor: colors.icon + "15",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
             flexShrink: 0,
-          }}>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 512 512"
-            style={{ width: "22px", height: "22px" }}>
-            <rect width="512" height="512" rx="64" fill={colors.icon} />
-            <text
-              x="256"
-              y="340"
-              fontFamily="system-ui, sans-serif"
-              fontSize="280"
-              fontWeight="bold"
-              fill="white"
-              textAnchor="middle">
-              K
-            </text>
-          </svg>
-        </div>
+          }}
+        />
         <div style={{ flex: 1 }}>
           <div
             style={{
