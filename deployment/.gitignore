@@ -1,0 +1,12 @@
+# Ignore secrets file (should be vault-encrypted before committing if needed)
+secrets.yml
+
+# Deployment config (host/user)
+config.env
+
+# Ansible retry files
+*.retry
+
+# Temporary files
+*.tmp
+*.bak

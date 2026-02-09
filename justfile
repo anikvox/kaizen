@@ -52,3 +52,56 @@ prompts-sync:
 # Seed fake activity data for testing focus agent
 seed-activity:
     pnpm --filter @kaizen/api seed:activity
+
+# ============================================
+# Deployment Commands
+# ============================================
+
+# Helper to load deploy config
+_deploy-config := "source deployment/config.env"
+
+# Deploy to production server
+deploy:
+    cd deployment && source config.env && ansible-playbook deploy.yml
+
+# Deploy with setup (first-time only - installs Docker)
+deploy-setup:
+    cd deployment && source config.env && ansible-playbook deploy.yml --tags setup,deploy
+
+# Deploy only (skip system setup)
+deploy-only:
+    cd deployment && source config.env && ansible-playbook deploy.yml --tags deploy
+
+# Update config files only
+deploy-config:
+    cd deployment && source config.env && ansible-playbook deploy.yml --tags config
+
+# View production logs
+deploy-logs:
+    #!/usr/bin/env bash
+    source deployment/config.env
+    ssh ${DEPLOY_USER}@${DEPLOY_HOST} "cd /opt/kaizen && docker compose -f docker-compose.prod.yml logs -f"
+
+# SSH into production server
+deploy-ssh:
+    #!/usr/bin/env bash
+    source deployment/config.env
+    ssh ${DEPLOY_USER}@${DEPLOY_HOST}
+
+# Check production service status
+deploy-status:
+    #!/usr/bin/env bash
+    source deployment/config.env
+    ssh ${DEPLOY_USER}@${DEPLOY_HOST} "cd /opt/kaizen && docker compose -f docker-compose.prod.yml ps"
+
+# Encrypt secrets file
+deploy-vault-encrypt:
+    cd deployment && ansible-vault encrypt secrets.yml
+
+# Edit encrypted secrets
+deploy-vault-edit:
+    cd deployment && ansible-vault edit secrets.yml
+
+# View encrypted secrets
+deploy-vault-view:
+    cd deployment && ansible-vault view secrets.yml

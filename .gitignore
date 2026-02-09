@@ -42,3 +42,7 @@ coverage
 # prisma
 *.db
 *.db-journal
+
+# deployment
+deployment/config.env
+deployment/secrets.yml

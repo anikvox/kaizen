@@ -1,0 +1,166 @@
+---
+- name: Deploy Kaizen to Production
+  hosts: kaizen-prod
+  become: yes
+  vars_files:
+    - secrets.yml
+  vars:
+    app_dir: /opt/kaizen
+    repo_url: https://github.com/anikvox/kaizen.git
+    repo_branch: main
+    # Domain configuration
+    web_domain: kaizen.apps.sandipan.dev
+    api_domain: api.kaizen.apps.sandipan.dev
+    # Ports (must match reverse proxy config)
+    web_port: 60091
+    api_port: 60092
+    db_port: 60093
+    # Database
+    db_user: kaizen
+    db_password: "{{ vault_db_password }}"
+    db_name: kaizen
+
+  tasks:
+    # ============================================
+    # PHASE 1: System Setup (first-time only)
+    # ============================================
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      tags: [setup]
+
+    - name: Install required packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - git
+          - python3-pip
+        state: present
+      tags: [setup]
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+      tags: [setup]
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+      tags: [setup]
+
+    - name: Install Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+      tags: [setup]
+
+    - name: Start and enable Docker
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+      tags: [setup]
+
+    - name: Add user to docker group
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+      tags: [setup]
+
+    # ============================================
+    # PHASE 2: Application Deployment
+    # ============================================
+    - name: Create application directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      tags: [deploy]
+
+    - name: Clone or update repository
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ app_dir }}"
+        version: "{{ repo_branch }}"
+        force: yes
+      become_user: "{{ ansible_user }}"
+      tags: [deploy]
+
+    - name: Create .env.production file
+      template:
+        src: templates/.env.production.j2
+        dest: "{{ app_dir }}/.env.production"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0600'
+      tags: [deploy, config]
+
+    - name: Create production docker-compose file
+      template:
+        src: templates/docker-compose.prod.yml.j2
+        dest: "{{ app_dir }}/docker-compose.prod.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      tags: [deploy, config]
+
+    # ============================================
+    # PHASE 3: Build and Start Services
+    # ============================================
+    - name: Stop existing containers (if any)
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}"
+        files:
+          - docker-compose.prod.yml
+        state: absent
+      become_user: "{{ ansible_user }}"
+      ignore_errors: yes
+      tags: [deploy]
+
+    - name: Build and start containers
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}"
+        files:
+          - docker-compose.prod.yml
+        state: present
+        build: always
+        pull: always
+      become_user: "{{ ansible_user }}"
+      tags: [deploy]
+
+    - name: Wait for services to be healthy
+      uri:
+        url: "http://localhost:{{ api_port }}/health"
+        status_code: 200
+      register: health_check
+      until: health_check.status == 200
+      retries: 30
+      delay: 5
+      tags: [deploy]
+
+    - name: Display deployment info
+      debug:
+        msg: |
+          Deployment complete!
+
+          Web UI: https://{{ web_domain }}
+          API:    https://{{ api_domain }}
+
+          To view logs: just deploy-logs
+          To SSH:       just deploy-ssh
+      tags: [deploy]
