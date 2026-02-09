@@ -177,6 +177,8 @@ export function Dashboard({ initialTab }: DashboardProps) {
     (initialTab as TabType) || "dashboard",
   );
   const [time, setTime] = useState("");
+  const [lastTimeUpdate, setLastTimeUpdate] = useState<number | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [focuses, setFocuses] = useState<Focus[]>([]);
   const [pulses, setPulses] = useState<Pulse[]>([]);
@@ -255,6 +257,16 @@ export function Dashboard({ initialTab }: DashboardProps) {
   useEffect(() => {
     activeChatSessionIdRef.current = activeChatSessionId;
   }, [activeChatSessionId]);
+
+  // Check connection status based on last time update
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (lastTimeUpdate && Date.now() - lastTimeUpdate > 5000) {
+        setIsConnected(false);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lastTimeUpdate]);
 
   const getTokenFn = useCallback(async () => {
     return getToken();
@@ -462,6 +474,8 @@ export function Dashboard({ initialTab }: DashboardProps) {
 
             case "ping":
               setTime(data.time);
+              setLastTimeUpdate(Date.now());
+              setIsConnected(true);
               break;
 
             // Chat events
@@ -2384,9 +2398,9 @@ export function Dashboard({ initialTab }: DashboardProps) {
         <div className="max-w-6xl mx-auto px-6 h-full flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <div
-              className={`w-1.5 h-1.5 rounded-full ${time ? "bg-accent" : "bg-muted-foreground"}`}
+              className={`w-1.5 h-1.5 rounded-full ${isConnected ? "bg-accent" : time ? "bg-destructive" : "bg-muted-foreground"}`}
             />
-            <span>{time ? "Connected" : "Connecting..."}</span>
+            <span>{isConnected ? "Connected" : time ? "Disconnected" : "Connecting..."}</span>
             <span className="text-muted-foreground/50">·</span>
             <span className="font-medium">
               {time
@@ -2451,7 +2465,7 @@ export function Dashboard({ initialTab }: DashboardProps) {
                   </div>
                   <h3 className="font-semibold mb-2 text-sm">Open Extensions</h3>
                   <p className="text-xs text-muted-foreground mb-2">
-                    Go to <code className="px-1 py-0.5 bg-muted rounded text-[10px]">chrome://extensions</code>
+                    Go to <a href="chrome://extensions" target="_blank" rel="noopener noreferrer" className="px-1 py-0.5 bg-muted rounded text-[10px] text-blue-500 hover:text-blue-600 hover:underline">chrome://extensions</a>
                   </p>
                 </div>
                 <div className="p-4 bg-muted/30 rounded-xl border border-border/50">

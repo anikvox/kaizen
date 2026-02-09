@@ -83,7 +83,7 @@ function InstallModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
               </div>
               <h3 className="font-semibold mb-2 text-sm">Open Extensions</h3>
               <p className="text-xs text-muted-foreground mb-2">
-                Go to <code className="px-1 py-0.5 bg-muted rounded text-[10px]">chrome://extensions</code>
+                Go to <a href="chrome://extensions" target="_blank" rel="noopener noreferrer" className="px-1 py-0.5 bg-muted rounded text-[10px] text-blue-500 hover:text-blue-600 hover:underline">chrome://extensions</a>
               </p>
             </div>
 
