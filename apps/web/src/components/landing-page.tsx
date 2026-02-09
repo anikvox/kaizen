@@ -161,7 +161,7 @@ export function LandingPage() {
 
       {/* Content */}
       <main className="relative z-10 overflow-x-hidden">
-        <Hero />
+        <Hero onDownloadExtension={handleDownloadExtension} />
 
         <div className="flex flex-col items-center gap-24 md:gap-32 mt-24 md:mt-32">
           <div className="divider w-full max-w-sm mx-auto" />
