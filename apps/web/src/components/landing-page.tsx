@@ -182,12 +182,11 @@ export function LandingPage() {
 
             <div className="relative">
               <h2 className="text-2xl md:text-3xl font-bold font-heading tracking-tight mb-3">
-                Take Control of{" "}
-                <span className="text-gradient">Your Digital Wellness</span>
+                Ready to{" "}
+                <span className="text-gradient">Understand Your Focus</span>?
               </h2>
               <p className="text-muted-foreground max-w-md mx-auto mb-7 text-sm leading-relaxed">
-                Stop doomscrolling. Start retaining what you read. Understand your
-                attention patterns with AI that respects your privacy.
+                Stop doomscrolling. Start retaining what you read. Get gentle nudges when you drift&mdash;from AI that respects your privacy.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <SignedOut>
