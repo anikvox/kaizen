@@ -66,6 +66,8 @@ import {
   RefreshCw,
   Heart,
   User as UserIcon,
+  FolderOpen,
+  CheckCircle,
 } from "lucide-react";
 
 const PROVIDER_LABELS: Record<LLMProviderType, string> = {
@@ -242,6 +244,9 @@ export function Dashboard({ initialTab }: DashboardProps) {
   // Focus history state
   const [focusHistory, setFocusHistory] = useState<Focus[] | null>(null);
   const [focusHistoryLoading, setFocusHistoryLoading] = useState(false);
+
+  // Extension install modal state
+  const [showInstallModal, setShowInstallModal] = useState(false);
 
   // Chat sidebar state
   const [chatSidebarCollapsed, setChatSidebarCollapsed] = useState(false);
@@ -589,6 +594,11 @@ export function Dashboard({ initialTab }: DashboardProps) {
     } catch (err) {
       console.error("Update theme error:", err);
     }
+  };
+
+  const handleDownloadExtension = () => {
+    window.location.href = `${apiUrl}/extension/download`;
+    setShowInstallModal(true);
   };
 
   const handleSettingsToggle = async (key: keyof UserSettings) => {
@@ -2371,7 +2381,7 @@ export function Dashboard({ initialTab }: DashboardProps) {
 
       {/* Status Bar */}
       <footer className="fixed bottom-0 left-0 right-0 h-8 bg-muted/50 border-t border-border/40 z-40">
-        <div className="max-w-6xl mx-auto px-6 h-full flex items-center">
+        <div className="max-w-6xl mx-auto px-6 h-full flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <div
               className={`w-1.5 h-1.5 rounded-full ${time ? "bg-accent" : "bg-muted-foreground"}`}
@@ -2389,8 +2399,104 @@ export function Dashboard({ initialTab }: DashboardProps) {
             </span>
             <span className="text-muted-foreground/50">Server Time</span>
           </div>
+          <button
+            onClick={handleDownloadExtension}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Download className="w-3 h-3" />
+            <span>Download Extension</span>
+          </button>
         </div>
       </footer>
+
+      {/* Extension Install Modal */}
+      {showInstallModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowInstallModal(false)}
+          />
+          <div className="relative bg-background border border-border rounded-2xl shadow-2xl max-w-4xl w-full">
+            <div className="flex items-center justify-between p-6 border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                  <Puzzle className="w-5 h-5 text-blue-500" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">Install Kaizen Extension</h2>
+                  <p className="text-sm text-muted-foreground">Follow these steps to get started</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowInstallModal(false)}
+                className="p-2 rounded-lg hover:bg-muted transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-4 bg-muted/30 rounded-xl border border-border/50">
+                  <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm mb-3">
+                    1
+                  </div>
+                  <h3 className="font-semibold mb-2 text-sm">Unzip the file</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Extract <code className="px-1 py-0.5 bg-muted rounded text-[10px]">kaizen-extension.zip</code> to a folder.
+                  </p>
+                </div>
+                <div className="p-4 bg-muted/30 rounded-xl border border-border/50">
+                  <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm mb-3">
+                    2
+                  </div>
+                  <h3 className="font-semibold mb-2 text-sm">Open Extensions</h3>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Go to <code className="px-1 py-0.5 bg-muted rounded text-[10px]">chrome://extensions</code>
+                  </p>
+                </div>
+                <div className="p-4 bg-muted/30 rounded-xl border border-border/50">
+                  <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm mb-3">
+                    3
+                  </div>
+                  <h3 className="font-semibold mb-2 text-sm">Developer Mode</h3>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Enable the toggle in the top-right corner.
+                  </p>
+                  <div className="flex items-center gap-1.5 p-2 bg-background rounded-lg text-xs">
+                    <Settings className="w-3 h-3 text-muted-foreground" />
+                    <span>Dev mode</span>
+                    <div className="ml-auto w-8 h-4 bg-blue-600 rounded-full relative">
+                      <div className="absolute right-0.5 top-0.5 w-3 h-3 bg-white rounded-full" />
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4 bg-muted/30 rounded-xl border border-border/50">
+                  <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm mb-3">
+                    4
+                  </div>
+                  <h3 className="font-semibold mb-2 text-sm">Load Unpacked</h3>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Click the button and select the extracted folder.
+                  </p>
+                  <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-background rounded-lg text-xs">
+                    <FolderOpen className="w-3 h-3" />
+                    Load unpacked
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-4 bg-green-500/10 border border-green-500/20 rounded-xl mt-4">
+                <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                <p className="text-sm text-green-700 dark:text-green-400">
+                  <span className="font-medium">You&apos;re all set!</span> The extension will appear in your toolbar. Click it to open the side panel!
+                </p>
+                <Button onClick={() => setShowInstallModal(false)} size="sm" className="ml-auto">
+                  Got it!
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div >
   );
 }

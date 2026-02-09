@@ -7,6 +7,8 @@ export const metadata: Metadata = {
   description: "Kaizen Web App",
   icons: {
     icon: [
+      { url: "/favicon-light.svg", type: "image/svg+xml", media: "(prefers-color-scheme: light)" },
+      { url: "/favicon-dark.svg", type: "image/svg+xml", media: "(prefers-color-scheme: dark)" },
       { url: "/favicon.png", sizes: "32x32", type: "image/png" },
       { url: "/favicon-192.png", sizes: "192x192", type: "image/png" },
       { url: "/favicon-512.png", sizes: "512x512", type: "image/png" },
