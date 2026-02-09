@@ -8,15 +8,16 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default:
-          "border-transparent bg-primary text-primary-foreground hover:bg-primary/80",
+          "border-transparent bg-primary text-primary-foreground shadow-sm",
         secondary:
-          "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          "border-transparent bg-secondary/80 text-secondary-foreground shadow-sm",
         destructive:
-          "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
+          "border-transparent bg-destructive text-destructive-foreground shadow-sm",
         outline: "text-foreground",
-        focus: "border-transparent bg-focus text-focus-foreground",
-        pomodoro: "border-transparent bg-pomodoro text-pomodoro-foreground",
-        pulse: "border-transparent bg-pulse text-pulse-foreground",
+        focus: "border-transparent bg-focus/20 text-focus border-focus/20 font-bold",
+        pomodoro: "border-transparent bg-pomodoro/20 text-pomodoro border-pomodoro/20 font-bold",
+        pulse: "border-transparent bg-pulse/20 text-pulse border-pulse/20 font-bold",
+        glass: "bg-white/10 dark:bg-slate-900/20 backdrop-blur-md border-white/20 dark:border-white/10 text-foreground shadow-sm",
       },
     },
     defaultVariants: {
@@ -27,8 +28,8 @@ const badgeVariants = cva(
 
 export interface BadgeProps
   extends
-    React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof badgeVariants> {}
+  React.HTMLAttributes<HTMLDivElement>,
+  VariantProps<typeof badgeVariants> { }
 
 function Badge({ className, variant, ...props }: BadgeProps) {
   return (

@@ -350,6 +350,8 @@ export interface UserSettings {
   focusAgentSensitivity?: number; // 0-1, Default 0.5
   focusAgentCooldownMs?: number; // Default 300000 (5 minutes)
   focusAgentIntervalMs?: number; // Default 60000 (1 minute)
+  // Theme settings
+  themeMode?: "light" | "dark"; // Default "light"
 }
 
 export interface UserSettingsUpdateRequest {
@@ -380,6 +382,8 @@ export interface UserSettingsUpdateRequest {
   focusAgentSensitivity?: number;
   focusAgentCooldownMs?: number;
   focusAgentIntervalMs?: number;
+  // Theme settings
+  themeMode?: "light" | "dark";
 }
 
 export interface SSESettingsConnectedData {

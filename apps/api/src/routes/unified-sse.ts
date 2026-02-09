@@ -155,6 +155,7 @@ app.get("/", async (c) => {
           focusAgentEnabled: settings.focusAgentEnabled,
           focusAgentSensitivity: settings.focusAgentSensitivity,
           focusAgentCooldownMs: settings.focusAgentCooldownMs,
+          themeMode: settings.themeMode as "light" | "dark",
         },
         focuses: focuses.map((f) => ({
           id: f.id,

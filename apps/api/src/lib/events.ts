@@ -29,6 +29,18 @@ export interface SettingsChangedEvent {
     hasGeminiApiKey?: boolean;
     hasAnthropicApiKey?: boolean;
     hasOpenaiApiKey?: boolean;
+    // Quiz settings
+    quizAnswerOptionsCount?: number;
+    quizActivityDays?: number;
+    // Pomodoro settings
+    pomodoroCooldownMs?: number;
+    // Focus agent settings
+    focusAgentEnabled?: boolean;
+    focusAgentSensitivity?: number;
+    focusAgentCooldownMs?: number;
+    focusAgentIntervalMs?: number;
+    // Theme settings
+    themeMode?: "light" | "dark";
   };
 }
 

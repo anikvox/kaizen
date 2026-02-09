@@ -7,10 +7,14 @@ const glassCardVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-white/40 dark:bg-slate-700/40 backdrop-blur-sm border-gray-300/50 dark:border-slate-600/50",
-        solid: "bg-white/60 dark:bg-slate-700/60 backdrop-blur-md border-gray-300/50 dark:border-slate-600/50",
-        subtle: "bg-white/30 dark:bg-slate-800/30 backdrop-blur-md border-gray-300/50 dark:border-slate-600/50",
-        active: "bg-white/80 dark:bg-slate-700/80 backdrop-blur-xl border-white/40 dark:border-slate-600/40 shadow-lg",
+        default:
+          "bg-white/20 dark:bg-slate-900/40 backdrop-blur-md border-white/20 dark:border-white/10 shadow-premium",
+        solid:
+          "bg-white/40 dark:bg-slate-900/60 backdrop-blur-xl border-white/30 dark:border-white/20 shadow-premium",
+        subtle:
+          "bg-white/10 dark:bg-slate-950/20 backdrop-blur-sm border-white/10 dark:border-white/5 shadow-smooth",
+        active:
+          "bg-white/60 dark:bg-slate-800/80 backdrop-blur-2xl border-white/40 dark:border-slate-400/40 shadow-premium-lg translate-y-[-2px]",
       },
     },
     defaultVariants: {
@@ -21,7 +25,7 @@ const glassCardVariants = cva(
 
 export interface GlassCardProps
   extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof glassCardVariants> {}
+  VariantProps<typeof glassCardVariants> { }
 
 const GlassCard = React.forwardRef<HTMLDivElement, GlassCardProps>(
   ({ className, variant, ...props }, ref) => (

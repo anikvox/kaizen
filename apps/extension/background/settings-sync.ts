@@ -69,11 +69,13 @@ async function syncSettingsToStorage(settings: {
   cognitiveAttentionDebugMode: boolean
   cognitiveAttentionShowOverlay: boolean
   attentionTrackingIgnoreList?: string | null
+  themeMode?: "light" | "dark"
 }) {
   // Get current values to avoid unnecessary writes
   const currentDebugMode = await storage.get(COGNITIVE_ATTENTION_DEBUG_MODE.key)
   const currentShowOverlay = await storage.get(COGNITIVE_ATTENTION_SHOW_OVERLAY.key)
   const currentIgnoreList = await storage.get(ATTENTION_TRACKING_IGNORE_LIST.key)
+  const currentTheme = await storage.get<string>("themeMode")
 
   // Only write if values actually changed
   if (String(currentDebugMode) !== String(settings.cognitiveAttentionDebugMode)) {
@@ -87,6 +89,11 @@ async function syncSettingsToStorage(settings: {
   if (settings.attentionTrackingIgnoreList !== undefined &&
       String(currentIgnoreList ?? "") !== String(settings.attentionTrackingIgnoreList ?? "")) {
     await storage.set(ATTENTION_TRACKING_IGNORE_LIST.key, settings.attentionTrackingIgnoreList)
+  }
+
+  // Sync theme mode
+  if (settings.themeMode !== undefined && currentTheme !== settings.themeMode) {
+    await storage.set("themeMode", settings.themeMode)
   }
 }
 

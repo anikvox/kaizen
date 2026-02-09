@@ -116,6 +116,29 @@ function SidePanel() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
+  // Theme sync: apply dark class based on storage
+  useEffect(() => {
+    const applyTheme = async () => {
+      const theme = await storage.get<string>("themeMode")
+      if (theme === "dark") {
+        document.documentElement.classList.add("dark")
+      } else {
+        document.documentElement.classList.remove("dark")
+      }
+    }
+    applyTheme()
+
+    storage.watch({
+      themeMode: (change) => {
+        if (change.newValue === "dark") {
+          document.documentElement.classList.add("dark")
+        } else {
+          document.documentElement.classList.remove("dark")
+        }
+      }
+    })
+  }, [])
+
   // Calculate elapsed time for all focuses
   useEffect(() => {
     if (focuses.length === 0) {

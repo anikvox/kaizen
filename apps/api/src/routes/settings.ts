@@ -138,6 +138,7 @@ app.get("/", dualAuthMiddleware, async (c) => {
     focusAgentSensitivity: settings.focusAgentSensitivity,
     focusAgentCooldownMs: settings.focusAgentCooldownMs,
     focusAgentIntervalMs: settings.focusAgentIntervalMs,
+    themeMode: settings.themeMode as "light" | "dark",
   });
 });
 
@@ -236,6 +237,8 @@ app.post("/", dualAuthMiddleware, async (c) => {
     focusAgentSensitivity?: number;
     focusAgentCooldownMs?: number;
     focusAgentIntervalMs?: number;
+    // Theme settings
+    themeMode?: "light" | "dark";
   }>();
 
   // Build update data - using Prisma's unchecked types for direct field assignment
@@ -392,6 +395,12 @@ app.post("/", dualAuthMiddleware, async (c) => {
     updateData.focusAgentIntervalMs = interval;
   }
 
+  // Theme settings
+  if (body.themeMode !== undefined) {
+    const mode = body.themeMode === "dark" ? "dark" : "light";
+    updateData.themeMode = mode;
+  }
+
   const settings = await db.userSettings.upsert({
     where: { userId },
     update: updateData,
@@ -439,6 +448,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
       focusAgentSensitivity: settings.focusAgentSensitivity,
       focusAgentCooldownMs: settings.focusAgentCooldownMs,
       focusAgentIntervalMs: settings.focusAgentIntervalMs,
+      themeMode: settings.themeMode as "light" | "dark",
     },
   });
 
@@ -464,6 +474,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
     focusAgentSensitivity: settings.focusAgentSensitivity,
     focusAgentCooldownMs: settings.focusAgentCooldownMs,
     focusAgentIntervalMs: settings.focusAgentIntervalMs,
+    themeMode: settings.themeMode as "light" | "dark",
   });
 });
 

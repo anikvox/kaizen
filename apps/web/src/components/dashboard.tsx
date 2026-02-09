@@ -24,7 +24,7 @@ import {
   type JourneyResponse,
   type JourneySite,
 } from "@kaizen/api-client";
-import { Button, Logo } from "@kaizen/ui";
+import { Button, Logo, Card, ThemeToggle } from "@kaizen/ui";
 import { HealthTab } from "./health-tab";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
@@ -402,6 +402,15 @@ export function Dashboard({ initialTab }: DashboardProps) {
               setPomodoroStatus(data.pomodoro);
               setPulses(data.pulses);
               setSettings(data.settings);
+              // Sync server theme preference to local
+              if (data.settings.themeMode) {
+                const serverTheme = data.settings.themeMode;
+                const localTheme = localStorage.getItem("kaizen-theme");
+                if (!localTheme && serverTheme === "dark") {
+                  document.documentElement.classList.add("dark");
+                  localStorage.setItem("kaizen-theme", "dark");
+                }
+              }
               break;
 
             case "focus-changed":
@@ -501,10 +510,10 @@ export function Dashboard({ initialTab }: DashboardProps) {
                   prev.map((s) =>
                     s.id === data.sessionId
                       ? {
-                          ...s,
-                          messageCount: s.messageCount + 1,
-                          updatedAt: new Date().toISOString(),
-                        }
+                        ...s,
+                        messageCount: s.messageCount + 1,
+                        updatedAt: new Date().toISOString(),
+                      }
                       : s,
                   ),
                 ),
@@ -518,10 +527,10 @@ export function Dashboard({ initialTab }: DashboardProps) {
                     prev.map((m) =>
                       m.id === data.messageId
                         ? {
-                            ...m,
-                            ...data.updates,
-                            updatedAt: new Date().toISOString(),
-                          }
+                          ...m,
+                          ...data.updates,
+                          updatedAt: new Date().toISOString(),
+                        }
                         : m,
                     ),
                   ),
@@ -568,6 +577,15 @@ export function Dashboard({ initialTab }: DashboardProps) {
   };
 
   // Settings handlers
+  const handleThemeChange = async (theme: "light" | "dark") => {
+    const api = createApiClient(apiUrl, getTokenFn);
+    try {
+      await api.settings.update({ themeMode: theme });
+    } catch (err) {
+      console.error("Update theme error:", err);
+    }
+  };
+
   const handleSettingsToggle = async (key: keyof UserSettings) => {
     if (!settings) return;
     setSettingsSaving(true);
@@ -799,7 +817,7 @@ export function Dashboard({ initialTab }: DashboardProps) {
         } else {
           setQuizError(
             (generateResult as any).error ||
-              "Failed to generate quiz. Please try again.",
+            "Failed to generate quiz. Please try again.",
           );
         }
         return;
@@ -1038,36 +1056,38 @@ export function Dashboard({ initialTab }: DashboardProps) {
 
   return (
     <div
-      className={`bg-background flex flex-col ${activeTab === "chat" ? "h-screen overflow-hidden" : "min-h-screen"}`}
+      className={`bg-background flex flex-col ${activeTab === "chat" || activeTab === "dashboard" ? "h-screen overflow-hidden" : "min-h-screen"}`}
     >
       {/* Header */}
-      <header className="border-b border-border/40 bg-background flex-shrink-0 z-50">
+      <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-background/60 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-6">
-          <div className="h-14 flex items-center justify-between">
-            <Logo size="md" />
-            <SignOutButton>
-              <Button variant="ghost" size="sm" className="w-9 h-9 p-0">
-                <LogOut className="w-4 h-4" />
-              </Button>
-            </SignOutButton>
+          <div className="h-16 flex items-center justify-between">
+            <div className="flex items-center gap-8">
+              <Logo size="md" />
+              <nav className="hidden md:flex items-center gap-1">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-full transition-all duration-200 ${activeTab === tab.id
+                      ? "bg-secondary/10 text-secondary"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </nav>
+            </div>
+            <div className="flex items-center gap-1">
+              <ThemeToggle onChange={handleThemeChange} />
+              <SignOutButton>
+                <Button variant="ghost" size="sm" className="w-10 h-10 p-0 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors">
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              </SignOutButton>
+            </div>
           </div>
-
-          {/* Tabs */}
-          <nav className="flex gap-6 -mb-px">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === tab.id
-                    ? "border-secondary text-secondary"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
         </div>
       </header>
 
@@ -1077,16 +1097,16 @@ export function Dashboard({ initialTab }: DashboardProps) {
           <div className="flex flex-1 min-h-0 rounded-2xl border border-border bg-card overflow-hidden">
             {/* Chat Sidebar */}
             <aside
-              className={`border-r border-border flex flex-col bg-muted/30 flex-shrink-0 transition-all duration-200 ${
-                chatSidebarCollapsed ? "w-12" : "w-64"
-              }`}
+              className={`border-r border-white/5 flex flex-col bg-muted/20 backdrop-blur-xl flex-shrink-0 transition-all duration-300 ${chatSidebarCollapsed ? "w-14" : "w-72"
+                }`}
             >
-              <div className="p-2 border-b border-border flex items-center gap-2">
+              <div className="p-3 border-b border-white/5 flex items-center gap-2">
                 {!chatSidebarCollapsed && (
                   <Button
                     onClick={handleNewChat}
-                    className="flex-1 gap-2"
+                    className="flex-1 gap-2 rounded-xl shadow-premium"
                     size="sm"
+                    variant="premium"
                   >
                     <Plus className="w-4 h-4" />
                     New Chat
@@ -1096,60 +1116,67 @@ export function Dashboard({ initialTab }: DashboardProps) {
                   onClick={() => setChatSidebarCollapsed(!chatSidebarCollapsed)}
                   variant="ghost"
                   size="sm"
-                  className="w-8 h-8 p-0 flex-shrink-0"
+                  className="w-10 h-10 p-0 flex-shrink-0 rounded-xl hover:bg-white/5"
                 >
                   {chatSidebarCollapsed ? (
-                    <ChevronRight className="w-4 h-4" />
+                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
                   ) : (
-                    <ChevronLeft className="w-4 h-4" />
+                    <ChevronLeft className="w-5 h-5 text-muted-foreground" />
                   )}
                 </Button>
               </div>
 
               {chatSidebarCollapsed ? (
-                <div className="flex-1 flex flex-col items-center pt-2">
+                <div className="flex-1 flex flex-col items-center pt-4 gap-4">
                   <Button
                     onClick={handleNewChat}
-                    variant="ghost"
+                    variant="premium"
                     size="sm"
-                    className="w-8 h-8 p-0"
+                    className="w-10 h-10 p-0 rounded-xl shadow-premium"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-5 h-5" />
                   </Button>
                 </div>
               ) : (
-                <div className="flex-1 overflow-auto">
+                <div className="flex-1 overflow-auto p-2 space-y-1">
                   {chatSessions.length === 0 ? (
-                    <p className="p-4 text-sm text-muted-foreground text-center">
-                      No chats yet
-                    </p>
+                    <div className="flex flex-col items-center justify-center h-40 text-center px-4">
+                      <div className="w-12 h-12 rounded-2xl bg-muted/30 flex items-center justify-center mb-3">
+                        <MessageSquare className="w-6 h-6 text-muted-foreground/40" />
+                      </div>
+                      <p className="text-xs text-muted-foreground font-medium">
+                        No conversations yet
+                      </p>
+                    </div>
                   ) : (
                     chatSessions.map((session) => (
                       <div
                         key={session.id}
                         onClick={() => setActiveChatSessionId(session.id)}
-                        className={`p-3 cursor-pointer flex items-center justify-between border-b border-border/50 hover:bg-muted/50 transition-colors ${
-                          activeChatSessionId === session.id
-                            ? "bg-secondary/10"
-                            : ""
-                        }`}
+                        className={`group p-3 cursor-pointer flex flex-col gap-1 rounded-xl transition-all duration-200 ${activeChatSessionId === session.id
+                          ? "bg-secondary/10 shadow-sm border border-secondary/20"
+                          : "hover:bg-white/5 border border-transparent"
+                          }`}
                       >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {session.title || "New Chat"}
+                        <div className="flex items-center justify-between gap-2">
+                          <p className={`text-sm font-semibold truncate ${activeChatSessionId === session.id ? "text-secondary" : "text-foreground/80"
+                            }`}>
+                            {session.title || "Untitled Chat"}
                           </p>
-                          <p className="text-xs text-muted-foreground">
-                            {session.messageCount} msgs
-                          </p>
+                          <button
+                            onClick={(e) =>
+                              handleDeleteChatSession(session.id, e)
+                            }
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-                        <button
-                          onClick={(e) =>
-                            handleDeleteChatSession(session.id, e)
-                          }
-                          className="p-1 text-muted-foreground hover:text-destructive transition-colors"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/60">
+                            {session.messageCount} messages
+                          </span>
+                        </div>
                       </div>
                     ))
                   )}
@@ -1267,7 +1294,7 @@ export function Dashboard({ initialTab }: DashboardProps) {
                     size="sm"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={chatSending || selectedFiles.length >= MAX_FILES}
-                    className="w-9 h-9 p-0 flex-shrink-0"
+                    className="w-9 h-9 p-0 flex-shrink-0 mt-1"
                   >
                     <Paperclip className="w-4 h-4" />
                   </Button>
@@ -1283,6 +1310,7 @@ export function Dashboard({ initialTab }: DashboardProps) {
                   />
                   <Button
                     onClick={handleChatSend}
+                    className="mt-[1/2]"
                     disabled={
                       (!chatInput.trim() && selectedFiles.length === 0) ||
                       chatSending
@@ -1300,7 +1328,7 @@ export function Dashboard({ initialTab }: DashboardProps) {
           </div>
         </div>
       ) : (
-        <div className="flex-1 min-h-0 max-w-6xl mx-auto w-full px-6 py-6 pb-12">
+        <div className={`flex-1 min-h-0 max-w-6xl mx-auto w-full px-6 ${activeTab === "dashboard" ? "pt-3 pb-10 overflow-auto" : "py-6 pb-12"}`}>
           {error && (
             <div className="mb-4 p-4 rounded-xl bg-destructive/10 text-destructive text-sm flex items-center justify-between">
               <span>{error}</span>
@@ -1317,176 +1345,181 @@ export function Dashboard({ initialTab }: DashboardProps) {
           )}
 
           {activeTab === "dashboard" && (
-            <div className="space-y-6">
+            <div className="space-y-3">
               {/* Greeting */}
               <div>
-                <h1 className="text-2xl font-semibold">
-                  Good {getTimeOfDay()}, {firstName || "there"}
+                <h1 className="text-2xl font-semibold font-grotesk">
+                  Good {getTimeOfDay()}, {firstName + " 👋" || "there" + " 👋"}
                 </h1>
                 <p className="text-sm text-muted-foreground">{formatDate()}</p>
               </div>
 
-              <div className="grid lg:grid-cols-2 gap-4">
+              <div className="grid lg:grid-cols-2 gap-3">
                 {/* Left Column */}
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {/* Focus Card */}
-                  <div
-                    className={`rounded-2xl border p-6 ${
-                      hasFocus
-                        ? "bg-focus/5 border-focus/20"
-                        : "bg-card border-border"
-                    }`}
+                  <Card
+                    className={`p-4 overflow-hidden ${hasFocus
+                      ? "bg-focus/5 border-focus/20"
+                      : ""
+                      }`}
                   >
                     {hasFocus ? (
                       <>
-                        <div className="flex items-center gap-2 mb-4">
-                          <Target className="w-4 h-4 text-focus" />
-                          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-7 h-7 rounded-lg bg-focus/10 flex items-center justify-center">
+                            <Target className="w-3.5 h-3.5 text-focus" />
+                          </div>
+                          <span className="text-xs font-semibold font-grotesk uppercase tracking-wider text-muted-foreground">
                             Active Focus
                           </span>
                         </div>
                         {focuses.slice(0, 2).map((focus) => (
-                          <div key={focus.id} className="mb-3 last:mb-0">
-                            <p className="font-semibold text-lg">
+                          <div key={focus.id} className="mb-3 last:mb-0 relative pl-4">
+                            <div className="absolute left-0 top-1 bottom-1 w-1 bg-focus rounded-full" />
+                            <p className="font-bold font-grotesk text-lg tracking-tight">
                               {focus.item}
                             </p>
-                            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                              <Clock className="w-3 h-3" />
-                              <span>
-                                Since{" "}
-                                {new Date(focus.startedAt).toLocaleTimeString(
-                                  [],
-                                  { hour: "2-digit", minute: "2-digit" },
-                                )}
-                              </span>
+                            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                              <div className="flex items-center gap-1 bg-muted/50 px-2 py-0.5 rounded-md">
+                                <Clock className="w-3 h-3" />
+                                <span>
+                                  {new Date(focus.startedAt).toLocaleTimeString(
+                                    [],
+                                    { hour: "2-digit", minute: "2-digit" },
+                                  )}
+                                </span>
+                              </div>
                               {focus.keywords.length > 0 && (
-                                <>
-                                  <span>·</span>
-                                  <span>
-                                    {focus.keywords.slice(0, 2).join(", ")}
-                                  </span>
-                                </>
+                                <div className="flex gap-1.5">
+                                  {focus.keywords.slice(0, 2).map(k => (
+                                    <span key={k} className="bg-secondary/10 text-secondary px-2 py-0.5 rounded-md">
+                                      {k}
+                                    </span>
+                                  ))}
+                                </div>
                               )}
                             </div>
                           </div>
                         ))}
                       </>
                     ) : (
-                      <div className="text-center py-8">
-                        <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-                          <Target className="w-6 h-6 text-muted-foreground" />
+                      <div className="text-center py-4 relative">
+                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-muted/5 to-transparent pointer-events-none" />
+                        <div className="w-11 h-11 rounded-xl bg-muted/30 flex items-center justify-center mx-auto mb-2 border border-white/10 shadow-inner">
+                          <Target className="w-5 h-5 text-muted-foreground/50" />
                         </div>
-                        <h3 className="font-semibold mb-1">No Active Focus</h3>
-                        <p className="text-sm text-muted-foreground">
+                        <h3 className="font-bold font-grotesk text-sm">No Active Focus</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
                           Start a focus session to track your progress
                         </p>
                       </div>
                     )}
-                  </div>
+                  </Card>
 
                   {/* Attention Progress / Pomodoro */}
-                  <div
-                    className={`rounded-2xl border p-6 ${
-                      isPomodoroActive
-                        ? "bg-pomodoro/5 border-pomodoro/20"
-                        : "bg-card border-border"
-                    }`}
+                  <Card
+                    className={`p-4 ${isPomodoroActive
+                      ? "bg-pomodoro/5 border-pomodoro/20"
+                      : ""
+                      }`}
                   >
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        <div className="w-7 h-7 rounded-lg bg-muted/50 flex items-center justify-center">
+                          <TrendingUp className="w-3.5 h-3.5 text-muted-foreground" />
+                        </div>
+                        <span className="text-xs font-semibold font-grotesk uppercase tracking-wider text-muted-foreground">
                           Attention Progress
                         </span>
                       </div>
                       {isPomodoroActive && (
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${
-                            isRunning
-                              ? "bg-pomodoro/20 text-pomodoro"
-                              : isPaused
-                                ? "bg-amber-500/20 text-amber-600"
-                                : "bg-cyan-500/20 text-cyan-600"
-                          }`}
+                        <div
+                          className={`text-[10px] font-bold font-grotesk uppercase tracking-widest px-2 py-0.5 rounded-md ${isRunning
+                            ? "bg-pomodoro/20 text-pomodoro"
+                            : isPaused
+                              ? "bg-amber-500/20 text-amber-600"
+                              : "bg-cyan-500/20 text-cyan-600"
+                            }`}
                         >
                           {pomodoroStatus?.state}
-                        </span>
+                        </div>
                       )}
                     </div>
 
                     {isPomodoroActive ? (
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-end justify-between">
                         <div>
                           <p
-                            className={`text-4xl font-bold font-mono ${
-                              isRunning
-                                ? "text-pomodoro"
-                                : isPaused
-                                  ? "text-amber-500"
-                                  : "text-cyan-500"
-                            }`}
+                            className={`text-4xl font-black font-grotesk tracking-tighter ${isRunning
+                              ? "text-pomodoro"
+                              : isPaused
+                                ? "text-amber-500"
+                                : "text-cyan-500"
+                              }`}
                           >
                             {formatTime(pomodoroStatus?.elapsedSeconds || 0)}
                           </p>
-                          <p className="text-sm text-muted-foreground mt-1">
+                          <p className="text-xs font-medium text-muted-foreground mt-2 uppercase tracking-wide">
                             Focus time today
                           </p>
                         </div>
                         {(isRunning || isPaused) && (
                           <Button
                             onClick={handlePomodoroToggle}
-                            variant="outline"
+                            variant="secondary"
                             size="sm"
-                            className="gap-2"
+                            className="gap-2 rounded-full shadow-smooth"
                           >
                             {isPaused ? (
-                              <Play className="w-4 h-4" />
+                              <Play className="w-3.5 h-3.5" />
                             ) : (
-                              <Pause className="w-4 h-4" />
+                              <Pause className="w-3.5 h-3.5" />
                             )}
                             {isPaused ? "Resume" : "Pause"}
                           </Button>
                         )}
                       </div>
                     ) : (
-                      <div className="text-center py-6">
-                        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
-                          <TrendingUp className="w-5 h-5 text-muted-foreground" />
+                      <div className="text-center py-4 relative">
+                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-muted/5 to-transparent pointer-events-none" />
+                        <div className="w-11 h-11 rounded-xl bg-muted/30 flex items-center justify-center mx-auto mb-2 border border-white/10 shadow-inner">
+                          <TrendingUp className="w-5 h-5 text-muted-foreground/50" />
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          No attention data yet
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="font-bold font-grotesk text-sm">No attention data yet</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
                           Start focusing to see your progress
                         </p>
                       </div>
                     )}
-                  </div>
+                  </Card>
 
                   {/* Activity Pulse */}
-                  <div className="rounded-2xl border bg-card border-border p-6">
-                    <div className="flex items-center justify-between mb-4">
+                  <Card className="p-4">
+                    <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-amber-500" />
-                        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        <div className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                          <Zap className="w-3.5 h-3.5 text-amber-500" />
+                        </div>
+                        <span className="text-xs font-semibold font-grotesk uppercase tracking-wider text-muted-foreground">
                           Activity Pulse
                         </span>
                       </div>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs font-medium text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-md">
                         {pulses.length} total
                       </span>
                     </div>
 
                     {pulses.length > 0 ? (
                       <>
-                        <div className="min-h-[80px]">
+                        <div className="min-h-[60px] flex flex-col justify-center">
                           <div className="flex items-start gap-3">
-                            <Sparkles className="w-4 h-4 text-amber-500 mt-1 flex-shrink-0" />
+                            <Sparkles className="w-4 h-4 text-amber-500 mt-1 flex-shrink-0 animate-pulse" />
                             <div>
-                              <p className="text-sm">
+                              <p className="text-sm font-medium leading-relaxed">
                                 {pulses[pulseIndex]?.message}
                               </p>
-                              <p className="text-xs text-muted-foreground mt-1">
+                              <p className="text-[10px] uppercase tracking-widest text-muted-foreground mt-1.5 font-bold font-grotesk">
                                 {pulses[pulseIndex] &&
                                   new Date(
                                     pulses[pulseIndex].createdAt,
@@ -1499,7 +1532,7 @@ export function Dashboard({ initialTab }: DashboardProps) {
                           </div>
                         </div>
                         {pulses.length > 1 && (
-                          <div className="flex items-center justify-center gap-2 mt-4">
+                          <div className="flex items-center justify-center gap-2 mt-3">
                             <button
                               onClick={() =>
                                 setPulseIndex(
@@ -1507,19 +1540,19 @@ export function Dashboard({ initialTab }: DashboardProps) {
                                     (i - 1 + pulses.length) % pulses.length,
                                 )
                               }
-                              className="p-1 text-muted-foreground hover:text-foreground"
+                              className="p-1.5 rounded-full hover:bg-muted text-muted-foreground transition-colors"
                             >
                               <ChevronLeft className="w-4 h-4" />
                             </button>
-                            <div className="flex gap-1">
+                            <div className="flex gap-1.5">
                               {pulses.slice(0, 5).map((_, i) => (
-                                <span
+                                <button
                                   key={i}
-                                  className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                                    i === pulseIndex
-                                      ? "bg-amber-500"
-                                      : "bg-muted"
-                                  }`}
+                                  onClick={() => setPulseIndex(i)}
+                                  className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${i === pulseIndex
+                                    ? "bg-amber-500 w-4"
+                                    : "bg-muted hover:bg-muted-foreground/30"
+                                    }`}
                                 />
                               ))}
                             </div>
@@ -1527,7 +1560,7 @@ export function Dashboard({ initialTab }: DashboardProps) {
                               onClick={() =>
                                 setPulseIndex((i) => (i + 1) % pulses.length)
                               }
-                              className="p-1 text-muted-foreground hover:text-foreground"
+                              className="p-1.5 rounded-full hover:bg-muted text-muted-foreground transition-colors"
                             >
                               <ChevronRight className="w-4 h-4" />
                             </button>
@@ -1535,56 +1568,60 @@ export function Dashboard({ initialTab }: DashboardProps) {
                         )}
                       </>
                     ) : (
-                      <div className="text-center py-4">
-                        <p className="text-sm text-muted-foreground">
-                          No pulses yet
-                        </p>
+                      <div className="text-center py-4 relative">
+                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-muted/5 to-transparent pointer-events-none" />
+                        <div className="w-11 h-11 rounded-xl bg-muted/30 flex items-center justify-center mx-auto mb-2 border border-white/10 shadow-inner">
+                          <Zap className="w-5 h-5 text-muted-foreground/50" />
+                        </div>
+                        <p className="font-bold font-grotesk text-sm">No pulses yet</p>
                       </div>
                     )}
-                  </div>
+                  </Card>
                 </div>
 
                 {/* Right Column */}
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {/* Knowledge Check */}
-                  <div className="rounded-2xl border bg-card border-border p-6">
-                    <div className="flex items-center justify-between mb-4">
+                  <Card className="p-4">
+                    <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <Brain className="w-4 h-4 text-pulse" />
-                        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        <div className="w-7 h-7 rounded-lg bg-pulse/10 flex items-center justify-center">
+                          <Brain className="w-3.5 h-3.5 text-pulse" />
+                        </div>
+                        <span className="text-xs font-semibold font-grotesk uppercase tracking-wider text-muted-foreground">
                           Knowledge Check
                         </span>
                       </div>
                       {quiz && !quiz.completedAt && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs font-medium text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-md">
                           {quiz.answers.length}/{quiz.questions.length}
                         </span>
                       )}
                     </div>
 
                     {quizLoading ? (
-                      <div className="text-center py-8">
-                        <div className="w-12 h-12 rounded-full bg-pulse/10 flex items-center justify-center mx-auto mb-3 animate-pulse">
-                          <Brain className="w-5 h-5 text-pulse" />
+                      <div className="text-center py-4">
+                        <div className="w-11 h-11 rounded-xl bg-pulse/5 flex items-center justify-center mx-auto mb-2 animate-pulse border border-pulse/20">
+                          <Brain className="w-5 h-5 text-pulse/40" />
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          Generating quiz...
+                        <p className="text-sm text-muted-foreground animate-pulse">
+                          Generating your personalized quiz...
                         </p>
                       </div>
                     ) : quiz && !quiz.completedAt && shuffledQuizOptions ? (
-                      <div>
-                        <div className="w-full h-1 bg-muted rounded-full mb-4">
+                      <div className="space-y-3">
+                        <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
                           <div
-                            className="h-1 bg-pulse rounded-full transition-all"
+                            className="h-full bg-pulse rounded-full transition-all duration-500 ease-out"
                             style={{
                               width: `${(quiz.answers.length / quiz.questions.length) * 100}%`,
                             }}
                           />
                         </div>
-                        <p className="font-medium mb-4">
+                        <p className="font-bold font-grotesk text-base leading-snug">
                           {quiz.questions[quizCurrentIndex].question}
                         </p>
-                        <div className="space-y-2">
+                        <div className="grid gap-2">
                           {shuffledQuizOptions.shuffled.map(
                             (option, displayIndex) => {
                               const originalIndex =
@@ -1593,7 +1630,7 @@ export function Dashboard({ initialTab }: DashboardProps) {
                               const isSelected =
                                 hasAnswered &&
                                 quizCurrentAnswer!.selectedIndex ===
-                                  originalIndex;
+                                originalIndex;
                               const isCorrect =
                                 originalIndex ===
                                 quiz.questions[quizCurrentIndex].correctIndex;
@@ -1606,23 +1643,26 @@ export function Dashboard({ initialTab }: DashboardProps) {
                                   key={displayIndex}
                                   onClick={() => submitQuizAnswer(displayIndex)}
                                   disabled={hasAnswered || submittingAnswer}
-                                  className={`w-full p-3 text-left text-sm rounded-lg border transition-all ${
-                                    showCorrect
-                                      ? "bg-accent/20 border-accent"
-                                      : showWrong
-                                        ? "bg-destructive/20 border-destructive"
-                                        : hasAnswered
-                                          ? "bg-muted border-border"
-                                          : "bg-muted/50 border-border hover:bg-muted"
-                                  }`}
+                                  className={`w-full p-3 text-left text-sm rounded-lg border transition-all duration-200 group relative overflow-hidden ${showCorrect
+                                    ? "bg-accent/10 border-accent shadow-[0_0_20px_-5px_rgba(16,185,129,0.3)]"
+                                    : showWrong
+                                      ? "bg-destructive/10 border-destructive shadow-[0_0_20px_-5px_rgba(239,68,68,0.3)]"
+                                      : hasAnswered
+                                        ? "bg-muted/30 border-transparent opacity-60"
+                                        : "bg-muted/50 border-white/5 hover:bg-muted hover:border-white/20 shadow-sm"
+                                    }`}
                                 >
-                                  <div className="flex items-center justify-between">
-                                    <span>{option}</span>
+                                  <div className="flex items-center justify-between relative z-10">
+                                    <span className="font-medium">{option}</span>
                                     {showCorrect && (
-                                      <Check className="w-4 h-4 text-accent" />
+                                      <div className="w-5 h-5 rounded-full bg-accent text-white flex items-center justify-center shadow-lg animate-in zoom-in">
+                                        <Check className="w-3 h-3" strokeWidth={3} />
+                                      </div>
                                     )}
                                     {showWrong && (
-                                      <X className="w-4 h-4 text-destructive" />
+                                      <div className="w-5 h-5 rounded-full bg-destructive text-white flex items-center justify-center shadow-lg animate-in zoom-in">
+                                        <X className="w-3 h-3" strokeWidth={3} />
+                                      </div>
                                     )}
                                   </div>
                                 </button>
@@ -1632,666 +1672,678 @@ export function Dashboard({ initialTab }: DashboardProps) {
                         </div>
                       </div>
                     ) : quiz?.completedAt ? (
-                      <div className="text-center py-6">
-                        <div className="w-14 h-14 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-4">
+                      <div className="text-center py-4">
+                        <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-3 border border-accent/20 shadow-lg shadow-accent/5">
                           <Check className="w-6 h-6 text-accent" />
                         </div>
-                        <h3 className="font-semibold mb-1">All Caught Up!</h3>
+                        <h3 className="text-lg font-bold font-grotesk mb-1">All Caught Up!</h3>
                         <p className="text-sm text-muted-foreground mb-4">
-                          Score: {quizScore}/{quiz.questions.length}
+                          Great job! Your score: <span className="font-bold font-grotesk text-foreground">{quizScore}/{quiz.questions.length}</span>
                         </p>
                         <Button
                           onClick={generateQuiz}
-                          variant="outline"
+                          variant="secondary"
                           size="sm"
-                          className="gap-2"
+                          className="gap-2 rounded-full px-6 shadow-premium"
                         >
-                          <RotateCcw className="w-3 h-3" />
+                          <RotateCcw className="w-3.5 h-3.5" />
                           New Quiz
                         </Button>
                       </div>
                     ) : (
-                      <div className="text-center py-8">
-                        <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-                          <Brain className="w-6 h-6 text-muted-foreground" />
+                      <div className="text-center py-4">
+                        <div className="w-12 h-12 rounded-2xl bg-muted/30 flex items-center justify-center mx-auto mb-3 border border-white/10 shadow-inner">
+                          <Brain className="w-6 h-6 text-muted-foreground/30" />
                         </div>
-                        <h3 className="font-semibold mb-1">
+                        <h3 className="text-base font-bold font-grotesk mb-1">
                           No Quiz Available
                         </h3>
-                        <p className="text-sm text-muted-foreground mb-4">
+                        <p className="text-sm text-muted-foreground mb-4 max-w-[200px] mx-auto">
                           {quizError ||
-                            "Generate a quiz based on your browsing"}
+                            "Generate a personalized quiz based on your focus activity"}
                         </p>
                         <Button
                           onClick={generateQuiz}
                           size="sm"
-                          className="gap-2"
+                          className="gap-2 rounded-full px-8 shadow-premium"
                           disabled={quizLoading}
                         >
                           {quizLoading ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <Loader2 className="w-4 h-4 animate-spin" />
                           ) : (
-                            <Brain className="w-3 h-3" />
+                            <Sparkles className="w-4 h-4" />
                           )}
-                          {quizLoading ? "Generating..." : "Generate Quiz"}
+                          {quizLoading ? "Analyzing..." : "Generate Quiz"}
                         </Button>
                       </div>
                     )}
-                  </div>
+                  </Card>
 
                   {/* Today's Stats */}
-                  <div className="rounded-2xl border bg-card border-border p-6">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Timer className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <Card className="p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-7 h-7 rounded-lg bg-muted/50 flex items-center justify-center">
+                        <Timer className="w-3.5 h-3.5 text-muted-foreground" />
+                      </div>
+                      <span className="text-xs font-semibold font-grotesk uppercase tracking-wider text-muted-foreground">
                         Today&apos;s Stats
                       </span>
                     </div>
 
                     {isPomodoroActive || focuses.length > 0 ? (
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/30 border border-white/5">
+                          <span className="text-sm font-medium text-muted-foreground">
                             Focus sessions
                           </span>
-                          <span className="font-semibold">
+                          <span className="font-bold font-grotesk text-base">
                             {focuses.length}
                           </span>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">
+                        <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/30 border border-white/5">
+                          <span className="text-sm font-medium text-muted-foreground">
                             Time focused
                           </span>
-                          <span className="font-semibold font-mono">
+                          <span className="font-bold font-grotesk text-base tracking-tight">
                             {formatTime(pomodoroStatus?.elapsedSeconds || 0)}
                           </span>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">
+                        <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/30 border border-white/5">
+                          <span className="text-sm font-medium text-muted-foreground">
                             Learning pulses
                           </span>
-                          <span className="font-semibold">{pulses.length}</span>
+                          <span className="font-bold font-grotesk text-base">{pulses.length}</span>
                         </div>
                       </div>
                     ) : (
-                      <div className="text-center py-6">
-                        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
-                          <Clock className="w-5 h-5 text-muted-foreground" />
+                      <div className="text-center py-4 relative">
+                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-muted/5 to-transparent pointer-events-none" />
+                        <div className="w-11 h-11 rounded-xl bg-muted/30 flex items-center justify-center mx-auto mb-2 border border-white/10 shadow-inner">
+                          <Clock className="w-5 h-5 text-muted-foreground/30" />
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          No data yet - start focusing to see stats
+                        <p className="font-bold font-grotesk text-sm">No data yet</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Focus sessions will appear here
                         </p>
                       </div>
                     )}
-                  </div>
+                  </Card>
                 </div>
               </div>
             </div>
           )}
 
-          {activeTab === "focus" && (
-            <div className="space-y-6">
-              {/* Focus Header */}
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-xl font-semibold">Focus History</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Your detected focus sessions and learning activities
-                  </p>
-                </div>
-                <Button
-                  onClick={fetchFocusHistory}
-                  variant="ghost"
-                  size="sm"
-                  disabled={focusHistoryLoading}
-                  className="w-9 h-9 p-0"
-                >
-                  {focusHistoryLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <RotateCcw className="w-4 h-4" />
-                  )}
-                </Button>
-              </div>
-
-              {/* Loading State */}
-              {focusHistoryLoading && (focusHistory === null || focusHistory.length === 0) && (
-                <div className="flex items-center justify-center py-16">
-                  <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-                </div>
-              )}
-
-              {/* Active Focus Sessions */}
-              {focusHistory && focusHistory.filter((f) => f.isActive).length > 0 && (
-                <div className="space-y-3">
-                  <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-focus animate-pulse" />
-                    Active Sessions
-                  </h3>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    {focusHistory
-                      .filter((f) => f.isActive)
-                      .map((focus) => (
-                        <FocusCard key={focus.id} focus={focus} />
-                      ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Past Focus Sessions */}
-              {focusHistory && focusHistory.filter((f) => !f.isActive).length > 0 && (
-                <div className="space-y-3">
-                  <h3 className="text-sm font-medium text-muted-foreground">
-                    Past Sessions
-                  </h3>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    {focusHistory
-                      .filter((f) => !f.isActive)
-                      .map((focus) => (
-                        <FocusCard key={focus.id} focus={focus} />
-                      ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Empty State */}
-              {!focusHistoryLoading && focusHistory !== null && focusHistory.length === 0 && (
-                <div className="rounded-2xl border bg-card border-border p-12 text-center">
-                  <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-                    <Target className="w-8 h-8 text-muted-foreground" />
-                  </div>
-                  <h3 className="text-lg font-semibold mb-2">
-                    No Focus Sessions Yet
-                  </h3>
-                  <p className="text-muted-foreground text-sm">
-                    Start browsing with the extension enabled to see your
-                    detected focus sessions here.
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === "health" && (
-            <HealthTab apiUrl={apiUrl} getToken={getToken} />
-          )}
-
-          {activeTab === "journey" && (
-            <div className="flex gap-6">
-              {/* Main Content */}
-              <div className="flex-1 min-w-0 space-y-4">
-                {/* Journey Header */}
+          {
+            activeTab === "focus" && (
+              <div className="space-y-6">
+                {/* Focus Header */}
                 <div className="flex items-start justify-between">
                   <div>
-                    <h2 className="text-xl font-semibold">Journey Graph</h2>
+                    <h2 className="text-xl font-semibold">Focus History</h2>
                     <p className="text-sm text-muted-foreground">
-                      Visualize your browsing patterns and navigation flow
+                      Your detected focus sessions and learning activities
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      onClick={() => fetchJourneyData(journeyDays)}
-                      variant="ghost"
-                      size="sm"
-                      disabled={journeyLoading}
-                      className="w-9 h-9 p-0"
-                    >
-                      {journeyLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <RotateCcw className="w-4 h-4" />
-                      )}
-                    </Button>
-                    <select
-                      value={journeyDays}
-                      onChange={(e) => {
-                        const days = Number(e.target.value);
-                        setJourneyDays(days);
-                        setJourneyData(null);
-                        fetchJourneyData(days);
-                      }}
-                      className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    >
-                      <option value={1}>Last 24 hours</option>
-                      <option value={3}>Last 3 days</option>
-                      <option value={7}>Last 7 days</option>
-                      <option value={14}>Last 14 days</option>
-                      <option value={30}>Last 30 days</option>
-                    </select>
-                  </div>
+                  <Button
+                    onClick={fetchFocusHistory}
+                    variant="ghost"
+                    size="sm"
+                    disabled={focusHistoryLoading}
+                    className="w-9 h-9 p-0"
+                  >
+                    {focusHistoryLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <RotateCcw className="w-4 h-4" />
+                    )}
+                  </Button>
                 </div>
 
                 {/* Loading State */}
-                {journeyLoading && !journeyData && (
+                {focusHistoryLoading && (focusHistory === null || focusHistory.length === 0) && (
                   <div className="flex items-center justify-center py-16">
                     <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                   </div>
                 )}
 
-                {/* Journey Cards Grid */}
-                {journeyData && journeyData.sites.length > 0 && (
-                  <div className="grid md:grid-cols-2 gap-4">
-                    {journeyData.sites.map((site) => {
-                      const minutes = site.totalActiveTimeMs / 60000;
-                      const timeColor =
-                        minutes < 1
-                          ? "bg-blue-500"
-                          : minutes < 5
-                            ? "bg-purple-500"
-                            : minutes < 15
-                              ? "bg-amber-500"
-                              : "bg-red-500";
-                      const timeColorLight =
-                        minutes < 1
-                          ? "bg-blue-500/20"
-                          : minutes < 5
-                            ? "bg-purple-500/20"
-                            : minutes < 15
-                              ? "bg-amber-500/20"
-                              : "bg-red-500/20";
-
-                      const keywords = site.titles
-                        .flatMap((t) => t.split(/[\s\-|:,]+/))
-                        .filter((w) => w.length > 3 && w.length < 15)
-                        .map((w) => w.toLowerCase())
-                        .filter((w, i, arr) => arr.indexOf(w) === i)
-                        .slice(0, 4);
-
-                      return (
-                        <div
-                          key={site.domain}
-                          className="rounded-2xl border bg-card border-border p-4 hover:border-secondary/50 transition-colors group"
-                        >
-                          {/* Card Header */}
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center overflow-hidden">
-                                <img
-                                  src={`https://www.google.com/s2/favicons?domain=${site.domain}&sz=32`}
-                                  alt=""
-                                  className="w-5 h-5"
-                                  onError={(e) => {
-                                    (
-                                      e.target as HTMLImageElement
-                                    ).style.display = "none";
-                                    (
-                                      e.target as HTMLImageElement
-                                    ).parentElement!.innerHTML =
-                                      '<svg class="w-4 h-4 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path></svg>';
-                                  }}
-                                />
-                              </div>
-                              <div>
-                                <a
-                                  href={`https://${site.domain}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="font-medium hover:text-secondary transition-colors"
-                                >
-                                  {site.domain}
-                                </a>
-                              </div>
-                            </div>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(site.lastVisitedAt).toLocaleTimeString(
-                                [],
-                                { hour: "2-digit", minute: "2-digit" },
-                              )}
-                            </span>
-                          </div>
-
-                          {/* Keywords Tags */}
-                          {keywords.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mb-3">
-                              {keywords.map((keyword) => (
-                                <span
-                                  key={keyword}
-                                  className="px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground"
-                                >
-                                  {keyword}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Journey Info */}
-                          <div className={`rounded-xl p-3 ${timeColorLight}`}>
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <div
-                                  className={`w-2 h-2 rounded-full ${timeColor}`}
-                                />
-                                <span className="text-xs font-medium">
-                                  {site.totalVisits} visit
-                                  {site.totalVisits !== 1 ? "s" : ""}
-                                </span>
-                                {site.topReferrers.length > 0 && (
-                                  <span className="text-xs text-muted-foreground">
-                                    from {site.topReferrers[0].domain}
-                                  </span>
-                                )}
-                              </div>
-                              <span className="text-xs text-muted-foreground">
-                                {site.uniquePages} page
-                                {site.uniquePages !== 1 ? "s" : ""}
-                              </span>
-                            </div>
-
-                            {/* Site Favicon Row */}
-                            <div className="flex items-center gap-1">
-                              <div
-                                className="w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center cursor-help relative group/tip"
-                                title={site.titles[0] || site.domain}
-                              >
-                                <img
-                                  src={`https://www.google.com/s2/favicons?domain=${site.domain}&sz=32`}
-                                  alt=""
-                                  className="w-4 h-4"
-                                />
-                              </div>
-                              {site.topReferrers.slice(0, 3).map((ref) => (
-                                <div
-                                  key={ref.domain}
-                                  className="w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center cursor-help opacity-60 hover:opacity-100 transition-opacity"
-                                  title={`From: ${ref.domain} (${ref.count}x)`}
-                                >
-                                  <img
-                                    src={`https://www.google.com/s2/favicons?domain=${ref.domain}&sz=32`}
-                                    alt=""
-                                    className="w-4 h-4"
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Footer Stats */}
-                          <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
-                            <span>
-                              {site.topReferrers.length} referrer
-                              {site.topReferrers.length !== 1 ? "s" : ""}
-                            </span>
-                            <span>
-                              {formatDuration(site.totalActiveTimeMs)} total
-                            </span>
-                          </div>
-
-                          {/* Hover Summary Tooltip */}
-                          {site.titles[0] && (
-                            <div className="mt-2 pt-2 border-t border-border/50 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <p className="text-xs text-muted-foreground line-clamp-2">
-                                {site.titles[0]}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                {/* Active Focus Sessions */}
+                {focusHistory && focusHistory.filter((f) => f.isActive).length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-focus animate-pulse" />
+                      Active Sessions
+                    </h3>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {focusHistory
+                        .filter((f) => f.isActive)
+                        .map((focus) => (
+                          <FocusCard key={focus.id} focus={focus} />
+                        ))}
+                    </div>
                   </div>
                 )}
 
-                {/* Navigation Flows */}
-                {journeyData && journeyData.referrerFlows.length > 0 && (
-                  <div className="rounded-2xl border bg-card border-border p-4">
-                    <h3 className="text-sm font-medium mb-3">
-                      Navigation Patterns
+                {/* Past Focus Sessions */}
+                {focusHistory && focusHistory.filter((f) => !f.isActive).length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-medium text-muted-foreground">
+                      Past Sessions
                     </h3>
-                    <div className="grid gap-2">
-                      {journeyData.referrerFlows
-                        .slice(0, 8)
-                        .map((flow, idx) => (
-                          <div
-                            key={`${flow.from}-${flow.to}-${idx}`}
-                            className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 text-sm"
-                          >
-                            <img
-                              src={`https://www.google.com/s2/favicons?domain=${flow.from}&sz=32`}
-                              alt=""
-                              className="w-4 h-4"
-                            />
-                            <span className="truncate max-w-[100px]">
-                              {flow.from}
-                            </span>
-                            <ArrowRight className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                            <img
-                              src={`https://www.google.com/s2/favicons?domain=${flow.to}&sz=32`}
-                              alt=""
-                              className="w-4 h-4"
-                            />
-                            <span className="truncate max-w-[100px]">
-                              {flow.to}
-                            </span>
-                            <span className="text-muted-foreground ml-auto flex-shrink-0">
-                              {flow.count}×
-                            </span>
-                          </div>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {focusHistory
+                        .filter((f) => !f.isActive)
+                        .map((focus) => (
+                          <FocusCard key={focus.id} focus={focus} />
                         ))}
                     </div>
                   </div>
                 )}
 
                 {/* Empty State */}
-                {journeyData && journeyData.sites.length === 0 && (
+                {!focusHistoryLoading && focusHistory !== null && focusHistory.length === 0 && (
                   <div className="rounded-2xl border bg-card border-border p-12 text-center">
                     <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-                      <Globe className="w-8 h-8 text-muted-foreground" />
+                      <Target className="w-8 h-8 text-muted-foreground" />
                     </div>
                     <h3 className="text-lg font-semibold mb-2">
-                      No Activity Yet
+                      No Focus Sessions Yet
                     </h3>
                     <p className="text-muted-foreground text-sm">
                       Start browsing with the extension enabled to see your
-                      learning journey here.
+                      detected focus sessions here.
                     </p>
                   </div>
                 )}
               </div>
+            )
+          }
 
-              {/* Right Sidebar */}
-              <aside className="w-56 flex-shrink-0 space-y-4 hidden lg:block">
-                {/* Legend */}
-                <div className="rounded-2xl border bg-card border-border p-4">
-                  <h4 className="text-sm font-medium mb-3">Legend</h4>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Time Spent
-                  </p>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-xs">
-                      <div className="w-3 h-3 rounded-full bg-blue-500" />
-                      <span className="text-muted-foreground">&lt; 1 min</span>
+          {
+            activeTab === "health" && (
+              <HealthTab apiUrl={apiUrl} getToken={getToken} />
+            )
+          }
+
+          {
+            activeTab === "journey" && (
+              <div className="flex gap-6">
+                {/* Main Content */}
+                <div className="flex-1 min-w-0 space-y-4">
+                  {/* Journey Header */}
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h2 className="text-xl font-semibold">Journey Graph</h2>
+                      <p className="text-sm text-muted-foreground">
+                        Visualize your browsing patterns and navigation flow
+                      </p>
                     </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <div className="w-3 h-3 rounded-full bg-purple-500" />
-                      <span className="text-muted-foreground">1-5 min</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <div className="w-3 h-3 rounded-full bg-amber-500" />
-                      <span className="text-muted-foreground">5-15 min</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <div className="w-3 h-3 rounded-full bg-red-500" />
-                      <span className="text-muted-foreground">&gt; 15 min</span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={() => fetchJourneyData(journeyDays)}
+                        variant="ghost"
+                        size="sm"
+                        disabled={journeyLoading}
+                        className="w-9 h-9 p-0"
+                      >
+                        {journeyLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <RotateCcw className="w-4 h-4" />
+                        )}
+                      </Button>
+                      <select
+                        value={journeyDays}
+                        onChange={(e) => {
+                          const days = Number(e.target.value);
+                          setJourneyDays(days);
+                          setJourneyData(null);
+                          fetchJourneyData(days);
+                        }}
+                        className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      >
+                        <option value={1}>Last 24 hours</option>
+                        <option value={3}>Last 3 days</option>
+                        <option value={7}>Last 7 days</option>
+                        <option value={14}>Last 14 days</option>
+                        <option value={30}>Last 30 days</option>
+                      </select>
                     </div>
                   </div>
+
+                  {/* Loading State */}
+                  {journeyLoading && !journeyData && (
+                    <div className="flex items-center justify-center py-16">
+                      <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+
+                  {/* Journey Cards Grid */}
+                  {journeyData && journeyData.sites.length > 0 && (
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {journeyData.sites.map((site) => {
+                        const minutes = site.totalActiveTimeMs / 60000;
+                        const timeColor =
+                          minutes < 1
+                            ? "bg-blue-500"
+                            : minutes < 5
+                              ? "bg-purple-500"
+                              : minutes < 15
+                                ? "bg-amber-500"
+                                : "bg-red-500";
+                        const timeColorLight =
+                          minutes < 1
+                            ? "bg-blue-500/20"
+                            : minutes < 5
+                              ? "bg-purple-500/20"
+                              : minutes < 15
+                                ? "bg-amber-500/20"
+                                : "bg-red-500/20";
+
+                        const keywords = site.titles
+                          .flatMap((t) => t.split(/[\s\-|:,]+/))
+                          .filter((w) => w.length > 3 && w.length < 15)
+                          .map((w) => w.toLowerCase())
+                          .filter((w, i, arr) => arr.indexOf(w) === i)
+                          .slice(0, 4);
+
+                        return (
+                          <div
+                            key={site.domain}
+                            className="rounded-2xl border bg-card border-border p-4 hover:border-secondary/50 transition-colors group"
+                          >
+                            {/* Card Header */}
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center overflow-hidden">
+                                  <img
+                                    src={`https://www.google.com/s2/favicons?domain=${site.domain}&sz=32`}
+                                    alt=""
+                                    className="w-5 h-5"
+                                    onError={(e) => {
+                                      (
+                                        e.target as HTMLImageElement
+                                      ).style.display = "none";
+                                      (
+                                        e.target as HTMLImageElement
+                                      ).parentElement!.innerHTML =
+                                        '<svg class="w-4 h-4 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path></svg>';
+                                    }}
+                                  />
+                                </div>
+                                <div>
+                                  <a
+                                    href={`https://${site.domain}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="font-medium hover:text-secondary transition-colors"
+                                  >
+                                    {site.domain}
+                                  </a>
+                                </div>
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(site.lastVisitedAt).toLocaleTimeString(
+                                  [],
+                                  { hour: "2-digit", minute: "2-digit" },
+                                )}
+                              </span>
+                            </div>
+
+                            {/* Keywords Tags */}
+                            {keywords.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mb-3">
+                                {keywords.map((keyword) => (
+                                  <span
+                                    key={keyword}
+                                    className="px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground"
+                                  >
+                                    {keyword}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Journey Info */}
+                            <div className={`rounded-xl p-3 ${timeColorLight}`}>
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    className={`w-2 h-2 rounded-full ${timeColor}`}
+                                  />
+                                  <span className="text-xs font-medium">
+                                    {site.totalVisits} visit
+                                    {site.totalVisits !== 1 ? "s" : ""}
+                                  </span>
+                                  {site.topReferrers.length > 0 && (
+                                    <span className="text-xs text-muted-foreground">
+                                      from {site.topReferrers[0].domain}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-xs text-muted-foreground">
+                                  {site.uniquePages} page
+                                  {site.uniquePages !== 1 ? "s" : ""}
+                                </span>
+                              </div>
+
+                              {/* Site Favicon Row */}
+                              <div className="flex items-center gap-1">
+                                <div
+                                  className="w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center cursor-help relative group/tip"
+                                  title={site.titles[0] || site.domain}
+                                >
+                                  <img
+                                    src={`https://www.google.com/s2/favicons?domain=${site.domain}&sz=32`}
+                                    alt=""
+                                    className="w-4 h-4"
+                                  />
+                                </div>
+                                {site.topReferrers.slice(0, 3).map((ref) => (
+                                  <div
+                                    key={ref.domain}
+                                    className="w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center cursor-help opacity-60 hover:opacity-100 transition-opacity"
+                                    title={`From: ${ref.domain} (${ref.count}x)`}
+                                  >
+                                    <img
+                                      src={`https://www.google.com/s2/favicons?domain=${ref.domain}&sz=32`}
+                                      alt=""
+                                      className="w-4 h-4"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Footer Stats */}
+                            <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
+                              <span>
+                                {site.topReferrers.length} referrer
+                                {site.topReferrers.length !== 1 ? "s" : ""}
+                              </span>
+                              <span>
+                                {formatDuration(site.totalActiveTimeMs)} total
+                              </span>
+                            </div>
+
+                            {/* Hover Summary Tooltip */}
+                            {site.titles[0] && (
+                              <div className="mt-2 pt-2 border-t border-border/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <p className="text-xs text-muted-foreground line-clamp-2">
+                                  {site.titles[0]}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Navigation Flows */}
+                  {journeyData && journeyData.referrerFlows.length > 0 && (
+                    <div className="rounded-2xl border bg-card border-border p-4">
+                      <h3 className="text-sm font-medium mb-3">
+                        Navigation Patterns
+                      </h3>
+                      <div className="grid gap-2">
+                        {journeyData.referrerFlows
+                          .slice(0, 8)
+                          .map((flow, idx) => (
+                            <div
+                              key={`${flow.from}-${flow.to}-${idx}`}
+                              className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 text-sm"
+                            >
+                              <img
+                                src={`https://www.google.com/s2/favicons?domain=${flow.from}&sz=32`}
+                                alt=""
+                                className="w-4 h-4"
+                              />
+                              <span className="truncate max-w-[100px]">
+                                {flow.from}
+                              </span>
+                              <ArrowRight className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                              <img
+                                src={`https://www.google.com/s2/favicons?domain=${flow.to}&sz=32`}
+                                alt=""
+                                className="w-4 h-4"
+                              />
+                              <span className="truncate max-w-[100px]">
+                                {flow.to}
+                              </span>
+                              <span className="text-muted-foreground ml-auto flex-shrink-0">
+                                {flow.count}×
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Empty State */}
+                  {journeyData && journeyData.sites.length === 0 && (
+                    <div className="rounded-2xl border bg-card border-border p-12 text-center">
+                      <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                        <Globe className="w-8 h-8 text-muted-foreground" />
+                      </div>
+                      <h3 className="text-lg font-semibold mb-2">
+                        No Activity Yet
+                      </h3>
+                      <p className="text-muted-foreground text-sm">
+                        Start browsing with the extension enabled to see your
+                        learning journey here.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
-                {/* Statistics */}
-                {journeyData && (
+                {/* Right Sidebar */}
+                <aside className="w-56 flex-shrink-0 space-y-4 hidden lg:block">
+                  {/* Legend */}
                   <div className="rounded-2xl border bg-card border-border p-4">
-                    <h4 className="text-sm font-medium mb-3">Statistics</h4>
+                    <h4 className="text-sm font-medium mb-3">Legend</h4>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Time Spent
+                    </p>
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Sites</span>
-                        <span className="font-medium">
-                          {journeyData.summary.totalSites}
-                        </span>
+                      <div className="flex items-center gap-2 text-xs">
+                        <div className="w-3 h-3 rounded-full bg-blue-500" />
+                        <span className="text-muted-foreground">&lt; 1 min</span>
                       </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">
-                          Total Visits
-                        </span>
-                        <span className="font-medium">
-                          {journeyData.summary.totalVisits}
-                        </span>
+                      <div className="flex items-center gap-2 text-xs">
+                        <div className="w-3 h-3 rounded-full bg-purple-500" />
+                        <span className="text-muted-foreground">1-5 min</span>
                       </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">
-                          Active Time
-                        </span>
-                        <span className="font-medium">
-                          {formatDuration(
-                            journeyData.summary.totalActiveTimeMs,
-                          )}
-                        </span>
+                      <div className="flex items-center gap-2 text-xs">
+                        <div className="w-3 h-3 rounded-full bg-amber-500" />
+                        <span className="text-muted-foreground">5-15 min</span>
                       </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Avg/Site</span>
-                        <span className="font-medium">
-                          {journeyData.summary.avgVisitsPerSite}
-                        </span>
+                      <div className="flex items-center gap-2 text-xs">
+                        <div className="w-3 h-3 rounded-full bg-red-500" />
+                        <span className="text-muted-foreground">&gt; 15 min</span>
                       </div>
                     </div>
                   </div>
-                )}
 
-                {/* Top Sites */}
-                {journeyData && journeyData.sites.length > 0 && (
-                  <div className="rounded-2xl border bg-card border-border p-4">
-                    <h4 className="text-sm font-medium mb-3">Top Sites</h4>
-                    <div className="space-y-2">
-                      {journeyData.sites.slice(0, 5).map((site) => (
-                        <div
-                          key={site.domain}
-                          className="p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-                        >
-                          <div className="flex items-center gap-2">
-                            <img
-                              src={`https://www.google.com/s2/favicons?domain=${site.domain}&sz=32`}
-                              alt=""
-                              className="w-4 h-4"
-                            />
-                            <span className="text-sm font-medium truncate">
-                              {site.domain}
-                            </span>
+                  {/* Statistics */}
+                  {journeyData && (
+                    <div className="rounded-2xl border bg-card border-border p-4">
+                      <h4 className="text-sm font-medium mb-3">Statistics</h4>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Sites</span>
+                          <span className="font-medium">
+                            {journeyData.summary.totalSites}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">
+                            Total Visits
+                          </span>
+                          <span className="font-medium">
+                            {journeyData.summary.totalVisits}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">
+                            Active Time
+                          </span>
+                          <span className="font-medium">
+                            {formatDuration(
+                              journeyData.summary.totalActiveTimeMs,
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Avg/Site</span>
+                          <span className="font-medium">
+                            {journeyData.summary.avgVisitsPerSite}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Top Sites */}
+                  {journeyData && journeyData.sites.length > 0 && (
+                    <div className="rounded-2xl border bg-card border-border p-4">
+                      <h4 className="text-sm font-medium mb-3">Top Sites</h4>
+                      <div className="space-y-2">
+                        {journeyData.sites.slice(0, 5).map((site) => (
+                          <div
+                            key={site.domain}
+                            className="p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <img
+                                src={`https://www.google.com/s2/favicons?domain=${site.domain}&sz=32`}
+                                alt=""
+                                className="w-4 h-4"
+                              />
+                              <span className="text-sm font-medium truncate">
+                                {site.domain}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {site.totalVisits} visits · {site.uniquePages} pages
+                            </p>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {site.totalVisits} visits · {site.uniquePages} pages
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </aside>
+              </div>
+            )
+          }
+
+          {
+            activeTab === "settings" && (
+              <div className="space-y-4">
+                {/* Quick Settings Card */}
+                <div className="rounded-2xl border bg-card border-border p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold">Quick Settings</h2>
+                    <Link href="/settings">
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <Settings className="w-4 h-4" />
+                        All Settings
+                      </Button>
+                    </Link>
+                  </div>
+
+                  {settings && (
+                    <div className="space-y-4">
+                      {/* Debug Mode */}
+                      <div className="flex items-center justify-between py-3 border-b border-border">
+                        <div>
+                          <p className="font-medium">Debug Mode</p>
+                          <p className="text-sm text-muted-foreground">
+                            Show attention tracking overlay
                           </p>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </aside>
-            </div>
-          )}
-
-          {activeTab === "settings" && (
-            <div className="space-y-4">
-              {/* Quick Settings Card */}
-              <div className="rounded-2xl border bg-card border-border p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold">Quick Settings</h2>
-                  <Link href="/settings">
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <Settings className="w-4 h-4" />
-                      All Settings
-                    </Button>
-                  </Link>
-                </div>
-
-                {settings && (
-                  <div className="space-y-4">
-                    {/* Debug Mode */}
-                    <div className="flex items-center justify-between py-3 border-b border-border">
-                      <div>
-                        <p className="font-medium">Debug Mode</p>
-                        <p className="text-sm text-muted-foreground">
-                          Show attention tracking overlay
-                        </p>
+                        <Button
+                          onClick={() =>
+                            handleSettingsToggle("cognitiveAttentionDebugMode")
+                          }
+                          disabled={settingsSaving}
+                          variant={
+                            settings.cognitiveAttentionDebugMode
+                              ? "default"
+                              : "outline"
+                          }
+                          size="sm"
+                        >
+                          {settings.cognitiveAttentionDebugMode ? "ON" : "OFF"}
+                        </Button>
                       </div>
-                      <Button
-                        onClick={() =>
-                          handleSettingsToggle("cognitiveAttentionDebugMode")
-                        }
-                        disabled={settingsSaving}
-                        variant={
-                          settings.cognitiveAttentionDebugMode
-                            ? "default"
-                            : "outline"
-                        }
-                        size="sm"
-                      >
-                        {settings.cognitiveAttentionDebugMode ? "ON" : "OFF"}
-                      </Button>
-                    </div>
 
-                    {/* Show Overlay */}
-                    <div className="flex items-center justify-between py-3 border-b border-border">
-                      <div>
-                        <p className="font-medium">Show Overlay</p>
-                        <p className="text-sm text-muted-foreground">
-                          Visual attention indicators
-                        </p>
+                      {/* Show Overlay */}
+                      <div className="flex items-center justify-between py-3 border-b border-border">
+                        <div>
+                          <p className="font-medium">Show Overlay</p>
+                          <p className="text-sm text-muted-foreground">
+                            Visual attention indicators
+                          </p>
+                        </div>
+                        <Button
+                          onClick={() =>
+                            handleSettingsToggle("cognitiveAttentionShowOverlay")
+                          }
+                          disabled={settingsSaving}
+                          variant={
+                            settings.cognitiveAttentionShowOverlay
+                              ? "default"
+                              : "outline"
+                          }
+                          size="sm"
+                        >
+                          {settings.cognitiveAttentionShowOverlay ? "ON" : "OFF"}
+                        </Button>
                       </div>
-                      <Button
-                        onClick={() =>
-                          handleSettingsToggle("cognitiveAttentionShowOverlay")
-                        }
-                        disabled={settingsSaving}
-                        variant={
-                          settings.cognitiveAttentionShowOverlay
-                            ? "default"
-                            : "outline"
-                        }
-                        size="sm"
-                      >
-                        {settings.cognitiveAttentionShowOverlay ? "ON" : "OFF"}
-                      </Button>
-                    </div>
 
-                    {/* AI Provider */}
-                    <div className="flex items-center justify-between py-3">
-                      <div>
-                        <p className="font-medium">AI Provider</p>
-                        <p className="text-sm text-muted-foreground">
-                          Current LLM configuration
-                        </p>
-                      </div>
-                      <span className="text-sm font-medium">
-                        {settings.llmProvider
-                          ? PROVIDER_LABELS[
-                              settings.llmProvider as LLMProviderType
+                      {/* AI Provider */}
+                      <div className="flex items-center justify-between py-3">
+                        <div>
+                          <p className="font-medium">AI Provider</p>
+                          <p className="text-sm text-muted-foreground">
+                            Current LLM configuration
+                          </p>
+                        </div>
+                        <span className="text-sm font-medium">
+                          {settings.llmProvider
+                            ? PROVIDER_LABELS[
+                            settings.llmProvider as LLMProviderType
                             ]
-                          : "System Default"}
-                      </span>
+                            : "System Default"}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
 
-              {/* Linked Extensions */}
-              <div className="rounded-2xl border bg-card border-border p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold mb-1">
-                      Linked Extensions
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      Manage browser extensions connected to your account
-                    </p>
+                {/* Linked Extensions */}
+                <div className="rounded-2xl border bg-card border-border p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold mb-1">
+                        Linked Extensions
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        Manage browser extensions connected to your account
+                      </p>
+                    </div>
+                    <Link href="/extensions">
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <Puzzle className="w-4 h-4" />
+                        Manage
+                      </Button>
+                    </Link>
                   </div>
-                  <Link href="/extensions">
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <Puzzle className="w-4 h-4" />
-                      Manage
-                    </Button>
-                  </Link>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
+            )
+          }
+        </div >
       )}
 
       {/* Status Bar */}
@@ -2306,17 +2358,17 @@ export function Dashboard({ initialTab }: DashboardProps) {
             <span className="font-medium">
               {time
                 ? new Date(time).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: "2-digit",
-                  })
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                })
                 : "--:--:--"}
             </span>
             <span className="text-muted-foreground/50">Server Time</span>
           </div>
         </div>
       </footer>
-    </div>
+    </div >
   );
 }
 
@@ -2367,11 +2419,10 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
   return (
     <div
-      className={`max-w-[80%] px-4 py-3 rounded-xl relative overflow-hidden flex-shrink-0 ${
-        isUser
-          ? "self-end bg-primary text-primary-foreground"
-          : "self-start bg-muted"
-      }`}
+      className={`max-w-[80%] px-4 py-3 rounded-xl relative overflow-hidden flex-shrink-0 ${isUser
+        ? "self-end bg-primary text-primary-foreground"
+        : "self-start bg-muted"
+        }`}
     >
       {message.status === "typing" ? (
         <span className="flex gap-1 py-1">
@@ -2419,11 +2470,10 @@ function MessageBubble({ message }: { message: ChatMessage }) {
                 <button
                   key={idx}
                   onClick={() => handleDownload(file)}
-                  className={`flex items-center gap-2 px-2 py-1 rounded text-xs ${
-                    isUser
-                      ? "bg-white/20 hover:bg-white/30"
-                      : "bg-background hover:bg-background/80"
-                  } transition-colors`}
+                  className={`flex items-center gap-2 px-2 py-1 rounded text-xs ${isUser
+                    ? "bg-white/20 hover:bg-white/30"
+                    : "bg-background hover:bg-background/80"
+                    } transition-colors`}
                 >
                   <FileIcon className="w-3 h-3" />
                   <span className="max-w-[100px] truncate">{file.filename}</span>
@@ -2580,11 +2630,10 @@ function FocusCard({ focus }: { focus: Focus }) {
 
   return (
     <div
-      className={`rounded-2xl border p-4 transition-colors ${
-        focus.isActive
-          ? "bg-focus/5 border-focus/30"
-          : "bg-card border-border hover:border-border/80"
-      }`}
+      className={`rounded-2xl border p-4 transition-colors ${focus.isActive
+        ? "bg-focus/5 border-focus/30"
+        : "bg-card border-border hover:border-border/80"
+        }`}
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
@@ -2618,11 +2667,10 @@ function FocusCard({ focus }: { focus: Focus }) {
           {focus.keywords.slice(0, 5).map((keyword) => (
             <span
               key={keyword}
-              className={`px-2 py-0.5 text-xs rounded-full ${
-                focus.isActive
-                  ? "bg-focus/20 text-focus"
-                  : "bg-muted text-muted-foreground"
-              }`}
+              className={`px-2 py-0.5 text-xs rounded-full ${focus.isActive
+                ? "bg-focus/20 text-focus"
+                : "bg-muted text-muted-foreground"
+                }`}
             >
               {keyword}
             </span>

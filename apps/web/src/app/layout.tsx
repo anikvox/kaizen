@@ -15,7 +15,17 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>
-        <body>{children}</body>
+        <head>
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `(function(){try{var t=localStorage.getItem("kaizen-theme");if(t==="dark")document.documentElement.classList.add("dark")}catch(e){}})()`,
+            }}
+          />
+        </head>
+        <body className="relative">
+          <div className="noise-overlay" />
+          {children}
+        </body>
       </html>
     </ClerkProvider>
   );
