@@ -1,0 +1,62 @@
+services:
+  app:
+    build:
+      context: .devcontainer
+      dockerfile: Dockerfile
+    container_name: kaizen-app
+    volumes:
+      - .:/src:ro
+      - workspace:/workspace
+    working_dir: /workspace
+    command: /src/.devcontainer/post-start.sh
+    env_file:
+      - .env.production
+    environment:
+      - DATABASE_URL=postgresql://{{ db_user }}:{{ db_password }}@postgres:5432/{{ db_name }}
+      - CORS_ORIGINS=https://{{ web_domain }},https://{{ api_domain }}
+      - NEXT_PUBLIC_KAIZEN_API_URL=https://{{ api_domain }}
+      - PLASMO_PUBLIC_KAIZEN_API_URL=https://{{ api_domain }}
+      - PLASMO_PUBLIC_KAIZEN_WEB_URL=https://{{ web_domain }}
+    ports:
+      - "{{ web_port }}:60091"
+      - "{{ api_port }}:60092"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kaizen-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:60092/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: kaizen-postgres
+    environment:
+      POSTGRES_USER: {{ db_user }}
+      POSTGRES_PASSWORD: {{ db_password }}
+      POSTGRES_DB: {{ db_name }}
+    ports:
+      - "127.0.0.1:{{ db_port }}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ db_user }} -d {{ db_name }}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kaizen-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  workspace:
+
+networks:
+  kaizen-network:
+    driver: bridge

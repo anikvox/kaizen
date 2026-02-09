@@ -35,6 +35,7 @@
         just
         overmind
         tmux
+        ansible
       ];
       devEnvVars = rec {
         PRISMA_SCHEMA_ENGINE_BINARY = "${pkgs.prisma-engines_6}/bin/schema-engine";

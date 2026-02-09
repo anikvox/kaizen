@@ -52,3 +52,61 @@ prompts-sync:
 # Seed fake activity data for testing focus agent
 seed-activity:
     pnpm --filter @kaizen/api seed:activity
+
+# ============================================
+# Deployment Commands
+# ============================================
+
+# Deploy to production server
+deploy:
+    #!/usr/bin/env bash
+    source deployment/config.env
+    cd deployment && ansible-playbook deploy.yml --ask-become-pass
+
+# Deploy with setup (first-time only - installs Docker)
+deploy-setup:
+    #!/usr/bin/env bash
+    source deployment/config.env
+    cd deployment && ansible-playbook deploy.yml --tags setup,deploy --ask-become-pass
+
+# Deploy only (skip system setup)
+deploy-only:
+    #!/usr/bin/env bash
+    source deployment/config.env
+    cd deployment && ansible-playbook deploy.yml --tags deploy --ask-become-pass
+
+# Update config files only
+deploy-config:
+    #!/usr/bin/env bash
+    source deployment/config.env
+    cd deployment && ansible-playbook deploy.yml --tags config --ask-become-pass
+
+# View production logs
+deploy-logs:
+    #!/usr/bin/env bash
+    source deployment/config.env
+    ssh ${DEPLOY_USER}@${DEPLOY_HOST} "cd /opt/kaizen && docker compose -f docker-compose.prod.yml logs -f"
+
+# SSH into production server
+deploy-ssh:
+    #!/usr/bin/env bash
+    source deployment/config.env
+    ssh ${DEPLOY_USER}@${DEPLOY_HOST}
+
+# Check production service status
+deploy-status:
+    #!/usr/bin/env bash
+    source deployment/config.env
+    ssh ${DEPLOY_USER}@${DEPLOY_HOST} "cd /opt/kaizen && docker compose -f docker-compose.prod.yml ps"
+
+# Encrypt secrets file
+deploy-vault-encrypt:
+    cd deployment && ansible-vault encrypt secrets.yml
+
+# Edit encrypted secrets
+deploy-vault-edit:
+    cd deployment && ansible-vault edit secrets.yml
+
+# View encrypted secrets
+deploy-vault-view:
+    cd deployment && ansible-vault view secrets.yml
