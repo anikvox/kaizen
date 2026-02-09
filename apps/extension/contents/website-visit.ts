@@ -7,7 +7,10 @@ import { ATTENTION_TRACKING_IGNORE_LIST } from "../cognitive-attention/default-s
 import { shouldIgnoreUrlSync } from "../cognitive-attention/url-ignore-list"
 
 export const config: PlasmoCSConfig = {
-  matches: ["<all_urls>"]
+  matches: ["<all_urls>"],
+  exclude_matches: [
+    "http://localhost:60091/*"
+  ]
 }
 
 // Skip tracking on the Kaizen web app itself

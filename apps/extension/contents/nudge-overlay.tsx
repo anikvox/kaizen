@@ -11,6 +11,9 @@ import { AGENT_NUDGE_KEY } from "../background/settings-sync";
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
+  exclude_matches: [
+    "http://localhost:60091/*"
+  ],
   all_frames: false,
 };
 

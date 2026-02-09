@@ -34,6 +34,8 @@ export interface SettingsChangedEvent {
     quizActivityDays?: number;
     // Pomodoro settings
     pomodoroCooldownMs?: number;
+    // Tree growth settings
+    treeGrowthDurationMs?: number;
     // Focus agent settings
     focusAgentEnabled?: boolean;
     focusAgentSensitivity?: number;

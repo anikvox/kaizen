@@ -32,6 +32,7 @@ import {
   Trash2,
   User,
   Shield,
+  TreePine,
 } from "lucide-react";
 
 const apiUrl =
@@ -923,38 +924,86 @@ export default function Settings() {
               </div>
             </div>
 
-            {/* Pomodoro Timer */}
-            <div className="rounded-2xl border border-border bg-card p-6">
-              <div className="flex items-center gap-2 mb-1">
-                <Timer className="w-4 h-4 text-pomodoro" />
-                <h3 className="font-medium">Pomodoro Timer</h3>
-              </div>
-              <p className="text-sm text-muted-foreground mb-6">
-                Automatic timer that runs during focus sessions
-              </p>
-
-              <div className="max-w-xs">
-                <label className="block text-sm font-medium mb-2">
-                  Cooldown Period
-                </label>
-                <select
-                  value={settings.pomodoroCooldownMs ?? 120000}
-                  onChange={(e) =>
-                    handleUpdate({ pomodoroCooldownMs: Number(e.target.value) })
-                  }
-                  disabled={saving}
-                  className="w-full p-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value={30000}>30 seconds</option>
-                  <option value={60000}>1 minute</option>
-                  <option value={120000}>2 minutes</option>
-                  <option value={180000}>3 minutes</option>
-                  <option value={300000}>5 minutes</option>
-                  <option value={600000}>10 minutes</option>
-                </select>
-                <p className="text-xs text-muted-foreground mt-2">
-                  How long the timer continues after focus ends before resetting
+            {/* Pomodoro Timer & Tree of Focus */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="rounded-2xl border border-border bg-card p-6">
+                <div className="flex items-center gap-2 mb-1">
+                  <Timer className="w-4 h-4 text-pomodoro" />
+                  <h3 className="font-medium">Pomodoro Timer</h3>
+                </div>
+                <p className="text-sm text-muted-foreground mb-6">
+                  Automatic timer that runs during focus sessions
                 </p>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Cooldown Period
+                  </label>
+                  <select
+                    value={settings.pomodoroCooldownMs ?? 120000}
+                    onChange={(e) =>
+                      handleUpdate({ pomodoroCooldownMs: Number(e.target.value) })
+                    }
+                    disabled={saving}
+                    className="w-full p-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value={30000}>30 seconds</option>
+                    <option value={60000}>1 minute</option>
+                    <option value={120000}>2 minutes</option>
+                    <option value={180000}>3 minutes</option>
+                    <option value={300000}>5 minutes</option>
+                    <option value={600000}>10 minutes</option>
+                  </select>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    How long the timer continues after focus ends before
+                    resetting
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-card p-6">
+                <div className="flex items-center gap-2 mb-1">
+                  <TreePine className="w-4 h-4 text-green-600" />
+                  <h3 className="font-medium">Tree of Focus</h3>
+                </div>
+                <p className="text-sm text-muted-foreground mb-6">
+                  Your focus tree grows as you stay productive during pomodoro
+                  sessions
+                </p>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Growth Duration:{" "}
+                    {Math.round(
+                      (settings.treeGrowthDurationMs ?? 600000) / 60000
+                    )}{" "}
+                    minutes
+                  </label>
+                  <input
+                    type="range"
+                    min={180000}
+                    max={7200000}
+                    step={60000}
+                    value={settings.treeGrowthDurationMs ?? 600000}
+                    onChange={(e) =>
+                      handleUpdate({
+                        treeGrowthDurationMs: Number(e.target.value),
+                      })
+                    }
+                    disabled={saving}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between mt-1">
+                    <span className="text-xs text-muted-foreground">3 min</span>
+                    <span className="text-xs text-muted-foreground">
+                      2 hours
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Time for the focus tree to reach full height in the
+                    extension
+                  </p>
+                </div>
               </div>
             </div>
 

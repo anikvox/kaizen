@@ -23,6 +23,9 @@ type TextSelectionResponse = {
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
+  exclude_matches: [
+    "http://localhost:60091/*"
+  ],
   all_frames: false,
 };
 

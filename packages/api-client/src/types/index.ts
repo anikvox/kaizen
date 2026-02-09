@@ -350,6 +350,8 @@ export interface UserSettings {
   focusAgentSensitivity?: number; // 0-1, Default 0.5
   focusAgentCooldownMs?: number; // Default 300000 (5 minutes)
   focusAgentIntervalMs?: number; // Default 60000 (1 minute)
+  // Tree growth settings
+  treeGrowthDurationMs?: number; // Default 600000 (10 minutes)
   // Theme settings
   themeMode?: "light" | "dark"; // Default "light"
 }
@@ -377,6 +379,8 @@ export interface UserSettingsUpdateRequest {
   quizActivityDays?: number;
   // Pomodoro settings
   pomodoroCooldownMs?: number;
+  // Tree growth settings
+  treeGrowthDurationMs?: number;
   // Focus agent settings
   focusAgentEnabled?: boolean;
   focusAgentSensitivity?: number;

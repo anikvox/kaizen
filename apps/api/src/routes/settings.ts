@@ -138,6 +138,7 @@ app.get("/", dualAuthMiddleware, async (c) => {
     focusAgentSensitivity: settings.focusAgentSensitivity,
     focusAgentCooldownMs: settings.focusAgentCooldownMs,
     focusAgentIntervalMs: settings.focusAgentIntervalMs,
+    treeGrowthDurationMs: settings.treeGrowthDurationMs,
     themeMode: settings.themeMode as "light" | "dark",
   });
 });
@@ -232,6 +233,8 @@ app.post("/", dualAuthMiddleware, async (c) => {
     quizActivityDays?: number;
     // Pomodoro settings
     pomodoroCooldownMs?: number;
+    // Tree growth settings
+    treeGrowthDurationMs?: number;
     // Focus agent settings
     focusAgentEnabled?: boolean;
     focusAgentSensitivity?: number;
@@ -375,6 +378,13 @@ app.post("/", dualAuthMiddleware, async (c) => {
     createData.pomodoroCooldownMs = cooldown;
   }
 
+  // Tree growth settings
+  if (body.treeGrowthDurationMs !== undefined) {
+    // Enforce range: 3 minutes (180000ms) to 2 hours (7200000ms)
+    const duration = Math.min(7200000, Math.max(180000, body.treeGrowthDurationMs));
+    updateData.treeGrowthDurationMs = duration;
+  }
+
   // Focus agent settings
   if (body.focusAgentEnabled !== undefined) {
     updateData.focusAgentEnabled = body.focusAgentEnabled;
@@ -444,6 +454,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
       quizAnswerOptionsCount: settings.quizAnswerOptionsCount,
       quizActivityDays: settings.quizActivityDays,
       pomodoroCooldownMs: settings.pomodoroCooldownMs,
+      treeGrowthDurationMs: settings.treeGrowthDurationMs,
       focusAgentEnabled: settings.focusAgentEnabled,
       focusAgentSensitivity: settings.focusAgentSensitivity,
       focusAgentCooldownMs: settings.focusAgentCooldownMs,
@@ -474,6 +485,7 @@ app.post("/", dualAuthMiddleware, async (c) => {
     focusAgentSensitivity: settings.focusAgentSensitivity,
     focusAgentCooldownMs: settings.focusAgentCooldownMs,
     focusAgentIntervalMs: settings.focusAgentIntervalMs,
+    treeGrowthDurationMs: settings.treeGrowthDurationMs,
     themeMode: settings.themeMode as "light" | "dark",
   });
 });

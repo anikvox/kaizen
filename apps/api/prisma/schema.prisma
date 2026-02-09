@@ -187,6 +187,8 @@ model UserSettings {
   focusAgentLastRunAt           DateTime?                 // Last time the agent ran for this user
   focusAgentCooldownMs          Int      @default(300000) // Default 5 minutes between nudges
   focusAgentIntervalMs          Int      @default(60000)  // Default 1 minute - how often to run the agent
+  // Tree growth settings
+  treeGrowthDurationMs          Int      @default(600000)  // Default 10 minutes - pomodoro time for tree to reach max height
   // Theme settings
   themeMode                     String   @default("light") // "light" | "dark"
   createdAt                     DateTime @default(now())

@@ -23,7 +23,7 @@ const Logo = React.forwardRef<HTMLImageElement, LogoProps>(
     const width = Math.round(height * ASPECT_RATIO);
 
     return (
-      <div className={cn("inline-flex items-center gap-2", className)}>
+      <div className={cn("inline-flex items-center gap-2 -mt-1", className)}>
         <img
           ref={ref}
           src="/kaizen-logo.png"

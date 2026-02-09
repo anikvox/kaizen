@@ -37,10 +37,8 @@ import {
   Clock,
   Brain
 } from "lucide-react"
-import {
-  COGNITIVE_ATTENTION_DEBUG_MODE,
-  COGNITIVE_ATTENTION_SHOW_OVERLAY,
-} from "./cognitive-attention/default-settings"
+
+import { TreeAnimationSection } from "./sidepanel-components/TreeAnimationSection"
 import "./styles.css"
 
 const apiUrl = process.env.PLASMO_PUBLIC_KAIZEN_API_URL || "http://localhost:60092"
@@ -80,7 +78,6 @@ function SidePanel() {
 
   // Settings state
   const [settings, setSettings] = useState<UserSettings | null>(null)
-  const [savingSettings, setSavingSettings] = useState(false)
 
   // Chat state
   const [sessions, setSessions] = useState<ChatSessionListItem[]>([])
@@ -95,6 +92,9 @@ function SidePanel() {
 
   // Tracking enabled state (local to extension)
   const [trackingEnabled, setTrackingEnabled] = useState(true)
+
+  // Theme state for inline styles that can't use dark: prefix
+  const [isDark, setIsDark] = useState(false)
 
   // Helpers
   const sortSessionsByDate = (sessions: ChatSessionListItem[]) =>
@@ -120,7 +120,9 @@ function SidePanel() {
   useEffect(() => {
     const applyTheme = async () => {
       const theme = await storage.get<string>("themeMode")
-      if (theme === "dark") {
+      const dark = theme === "dark"
+      setIsDark(dark)
+      if (dark) {
         document.documentElement.classList.add("dark")
       } else {
         document.documentElement.classList.remove("dark")
@@ -130,7 +132,9 @@ function SidePanel() {
 
     storage.watch({
       themeMode: (change) => {
-        if (change.newValue === "dark") {
+        const dark = change.newValue === "dark"
+        setIsDark(dark)
+        if (dark) {
           document.documentElement.classList.add("dark")
         } else {
           document.documentElement.classList.remove("dark")
@@ -243,32 +247,17 @@ function SidePanel() {
     setMessages([])
   }
 
-  const handleToggleSetting = async (key: keyof UserSettings) => {
+  const handleUpdateNumericSetting = async (key: keyof UserSettings, value: number) => {
     if (!settings) return
 
-    setSavingSettings(true)
-    const newValue = !settings[key]
+    setSettings({ ...settings, [key]: value })
 
-    try {
-      if (key === "cognitiveAttentionDebugMode") {
-        await storage.set(COGNITIVE_ATTENTION_DEBUG_MODE.key, newValue)
-      } else if (key === "cognitiveAttentionShowOverlay") {
-        await storage.set(COGNITIVE_ATTENTION_SHOW_OVERLAY.key, newValue)
-      }
-
-      setSettings({ ...settings, [key]: newValue })
-
-      const token = await storage.get<string>("deviceToken")
-      if (token) {
-        const api = createApiClient(apiUrl, getTokenFn)
-        api.settings.update({ [key]: newValue }, token).catch((err) => {
-          console.error("Failed to sync setting to server:", err)
-        })
-      }
-    } catch (error) {
-      console.error("Failed to update setting:", error)
-    } finally {
-      setSavingSettings(false)
+    const token = await storage.get<string>("deviceToken")
+    if (token) {
+      const api = createApiClient(apiUrl, getTokenFn)
+      api.settings.update({ [key]: value }, token).catch((err) => {
+        console.error("Failed to sync setting to server:", err)
+      })
     }
   }
 
@@ -597,12 +586,15 @@ function SidePanel() {
     }
   }, [])
 
+  // Tree growth duration from settings (default 10 min = 600000ms)
+  const treeGrowthDurationMs = settings?.treeGrowthDurationMs ?? 600000
+
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4" />
-          <p className="text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-gray-100 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
         </div>
       </div>
     )
@@ -610,9 +602,9 @@ function SidePanel() {
 
   if (!user) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-6 text-center">
+      <div className="h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-950 p-6 text-center">
         <img src="/assets/kaizen-logo.png" alt="Kaizen" className="h-10 mb-4" />
-        <p className="text-gray-600">
+        <p className="text-gray-600 dark:text-gray-400">
           Not logged in. Please click the extension icon to link your account.
         </p>
       </div>
@@ -625,18 +617,26 @@ function SidePanel() {
   )
 
   return (
-    <div className="min-h-screen w-full bg-white relative">
+    <div className="min-h-screen w-full bg-white dark:bg-gray-950 relative">
       {/* Gradient Background */}
       <div
         className="absolute inset-0 z-0"
         style={{
-          backgroundImage: `radial-gradient(125% 125% at 50% 90%, #ffffff 50%, #10b981 100%)`,
+          backgroundImage: isDark
+            ? `radial-gradient(125% 125% at 50% 90%, #0a0a0a 50%, #065f46 100%)`
+            : `radial-gradient(125% 125% at 50% 90%, #ffffff 50%, #10b981 100%)`,
           backgroundSize: "100% 100%",
           filter: "hue-rotate(60deg)"
         }}
       />
 
       <div className="relative h-screen overflow-hidden flex flex-col">
+        {/* Rive Tree Animation */}
+        <TreeAnimationSection
+          elapsedSeconds={pomodoroStatus?.elapsedSeconds ?? 0}
+          growthDurationMs={treeGrowthDurationMs}
+        />
+
         {/* Content Container */}
         <div className="relative z-20 flex flex-col h-full bg-transparent">
           {/* Header */}
@@ -652,15 +652,15 @@ function SidePanel() {
                 status={pomodoroStatus}
                 onToggle={handlePomodoroToggle}
                 compact
-                className="bg-white/40 backdrop-blur-sm border-gray-300/50"
+                className="bg-white/40 dark:bg-white/10 backdrop-blur-sm border-gray-300/50 dark:border-white/10 dark:text-gray-100"
               />
             </div>
 
             {/* Current Focus Display */}
-            <div className="bg-white/30 backdrop-blur-md rounded-xl p-3 border border-gray-300/50 shadow-sm">
+            <div className="bg-white/30 dark:bg-white/[0.06] backdrop-blur-md rounded-xl p-3 border border-gray-300/50 dark:border-white/10 shadow-sm">
               {sortedFocuses.length > 0 ? (
                 <div>
-                  <p className="text-xs text-gray-600 font-medium mb-1">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 font-medium mb-1">
                     {sortedFocuses.length > 1 ? "Current Focuses" : "Current Focus"}
                   </p>
                   {sortedFocuses.map((focus, index) => (
@@ -668,17 +668,17 @@ function SidePanel() {
                       key={focus.id}
                       className={cn(
                         "flex items-center justify-between",
-                        index > 0 && "pt-1.5 mt-1.5 border-t border-gray-200/50"
+                        index > 0 && "pt-1.5 mt-1.5 border-t border-gray-200/50 dark:border-white/10"
                       )}
                     >
                       <p className={cn(
-                        "font-bold text-gray-900 truncate flex-1 min-w-0",
+                        "font-bold text-gray-900 dark:text-gray-100 truncate flex-1 min-w-0",
                         index === 0 ? "text-base" : "text-sm"
                       )}>
                         {focus.item}
                       </p>
                       <p className={cn(
-                        "font-mono font-bold text-gray-900 ml-3 shrink-0",
+                        "font-mono font-bold text-gray-900 dark:text-gray-100 ml-3 shrink-0",
                         index === 0 ? "text-sm" : "text-xs"
                       )}>
                         {focusElapsedTimes[focus.id] || "00:00:00"}
@@ -688,17 +688,17 @@ function SidePanel() {
                 </div>
               ) : (
                 <div className="py-2">
-                  <p className="text-sm text-gray-700 mb-1 text-center font-medium">
+                  <p className="text-sm text-gray-700 dark:text-gray-300 mb-1 text-center font-medium">
                     No active focus session
                   </p>
-                  <p className="text-xs text-gray-600 italic text-center">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 italic text-center">
                     Start browsing to track your focus
                   </p>
                 </div>
               )}
 
-              <div className="border-t border-gray-300/50 my-2" />
-              <p className="text-green-900 text-center text-[10px]">
+              <div className="border-t border-gray-300/50 dark:border-white/10 my-2" />
+              <p className="text-green-900 dark:text-green-300 text-center text-[10px]">
                 Your focus grows with every moment of attention!
               </p>
             </div>
@@ -719,8 +719,8 @@ function SidePanel() {
                   className={cn(
                     "relative flex-1 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-300",
                     activeTab === tab.id
-                      ? "bg-white/80 backdrop-blur-xl text-gray-900 shadow-lg border border-white/40"
-                      : "bg-white/40 backdrop-blur-md text-gray-600 hover:text-gray-900 border border-white/20"
+                      ? "bg-white/80 dark:bg-white/15 backdrop-blur-xl text-gray-900 dark:text-gray-100 shadow-lg border border-white/40 dark:border-white/20"
+                      : "bg-white/40 dark:bg-white/[0.06] backdrop-blur-md text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 border border-white/20 dark:border-white/10"
                   )}
                 >
                   <div className="flex flex-col items-center gap-1">
@@ -759,8 +759,7 @@ function SidePanel() {
             {activeTab === "explore" && (
               <ExploreTab
                 settings={settings}
-                savingSettings={savingSettings}
-                onToggleSetting={handleToggleSetting}
+                onUpdateNumericSetting={handleUpdateNumericSetting}
                 onUnlink={handleUnlink}
                 user={user}
                 trackingEnabled={trackingEnabled}
@@ -823,12 +822,12 @@ function FocusTab({
       <div className="flex-1 overflow-auto p-3 flex flex-col gap-2">
         {messages.length === 0 ? (
           <div className="flex-1 flex items-end justify-center p-4">
-            <div className="bg-white/40 backdrop-blur-sm rounded-xl p-6 border border-gray-300/50 max-w-sm w-full text-center">
+            <div className="bg-white/40 dark:bg-white/[0.06] backdrop-blur-sm rounded-xl p-6 border border-gray-300/50 dark:border-white/10 max-w-sm w-full text-center">
               <div className="p-2 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-xl w-fit mx-auto mb-3">
-                <MessageSquare className="w-7 h-7 text-blue-600" />
+                <MessageSquare className="w-7 h-7 text-blue-600 dark:text-blue-400" />
               </div>
-              <h3 className="text-base font-semibold text-gray-700 mb-1">Start a Conversation</h3>
-              <p className="text-xs text-gray-500">
+              <h3 className="text-base font-semibold text-gray-700 dark:text-gray-200 mb-1">Start a Conversation</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 Ask me anything about your browsing activity, get insights, or just chat!
               </p>
             </div>
@@ -848,7 +847,7 @@ function FocusTab({
           <div className="absolute -top-12 left-1/2 -translate-x-1/2 z-10">
             <button
               onClick={onNewChat}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/60 backdrop-blur-md border border-white/40 rounded-full text-xs font-medium text-gray-700 hover:bg-white/80 hover:text-gray-900 transition-all shadow-lg hover:shadow-xl"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/40 dark:border-white/20 rounded-full text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-white/80 dark:hover:bg-white/20 hover:text-gray-900 dark:hover:text-gray-100 transition-all shadow-lg hover:shadow-xl"
             >
               <Plus className="w-3.5 h-3.5" />
               New Chat
@@ -857,14 +856,14 @@ function FocusTab({
         )}
 
         {/* Input Bar */}
-        <div className="p-3 bg-white/30 backdrop-blur-sm border-t border-gray-200/50">
+        <div className="p-3 bg-white/30 dark:bg-white/[0.04] backdrop-blur-sm border-t border-gray-200/50 dark:border-white/10">
           {/* Attachment Preview */}
           {attachments.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">
               {attachments.map((file, index) => (
                 <div
                   key={index}
-                  className="relative group bg-white/60 backdrop-blur-sm rounded-lg border border-gray-300/50 overflow-hidden"
+                  className="relative group bg-white/60 dark:bg-white/10 backdrop-blur-sm rounded-lg border border-gray-300/50 dark:border-white/10 overflow-hidden"
                 >
                   {isImage(file) ? (
                     <img
@@ -874,8 +873,8 @@ function FocusTab({
                     />
                   ) : (
                     <div className="w-16 h-16 flex flex-col items-center justify-center p-1">
-                      <FileText className="w-6 h-6 text-gray-500" />
-                      <span className="text-[8px] text-gray-500 truncate w-full text-center mt-1">
+                      <FileText className="w-6 h-6 text-gray-500 dark:text-gray-400" />
+                      <span className="text-[8px] text-gray-500 dark:text-gray-400 truncate w-full text-center mt-1">
                         {file.name.slice(0, 10)}
                       </span>
                     </div>
@@ -904,7 +903,7 @@ function FocusTab({
 
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-lg transition-all"
+              className="p-2 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-500/10 rounded-lg transition-all"
               title="Attach file"
             >
               <Paperclip className="w-5 h-5" />
@@ -917,7 +916,7 @@ function FocusTab({
               onKeyDown={onKeyDown}
               placeholder="Type a message..."
               disabled={sending}
-              className="flex-1 bg-white/60 backdrop-blur-sm px-4 py-2.5 rounded-xl text-sm border border-gray-300/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder:text-gray-400"
+              className="flex-1 bg-white/60 dark:bg-white/10 backdrop-blur-sm px-4 py-2.5 rounded-xl text-sm text-gray-900 dark:text-gray-100 border border-gray-300/50 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder:text-gray-400 dark:placeholder:text-gray-500"
             />
 
             <button
@@ -946,8 +945,8 @@ function MessageBubble({ message }: { message: ChatMessage }) {
     const text = formatToolResultMessage(message.toolName, message.content)
     return (
       <div className="flex items-center gap-1.5 py-1">
-        <span className="text-[8px] text-gray-400">●</span>
-        <span className="text-[11px] text-gray-500">{text}</span>
+        <span className="text-[8px] text-gray-400 dark:text-gray-500">●</span>
+        <span className="text-[11px] text-gray-500 dark:text-gray-400">{text}</span>
       </div>
     )
   }
@@ -958,7 +957,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         "max-w-[85%] px-3 py-2 rounded-xl text-sm backdrop-blur-sm",
         isUser
           ? "self-end bg-blue-600 text-white"
-          : "self-start bg-white/60 text-gray-900 border border-gray-200/50"
+          : "self-start bg-white/60 dark:bg-white/10 text-gray-900 dark:text-gray-100 border border-gray-200/50 dark:border-white/10"
       )}
     >
       {message.status === "typing" ? (
@@ -985,7 +984,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
                     key={index}
                     className={cn(
                       "flex items-center gap-2 px-2 py-1 rounded-lg text-xs",
-                      isUser ? "bg-blue-500/50" : "bg-gray-200/50"
+                      isUser ? "bg-blue-500/50" : "bg-gray-200/50 dark:bg-gray-700/50"
                     )}
                   >
                     <FileText className="w-4 h-4" />
@@ -1017,10 +1016,10 @@ function InsightsTab({ insights }: { insights: AttentionInsight[] }) {
     <div className="flex-1 overflow-auto p-3">
       {insights.length === 0 ? (
         <div className="h-full flex flex-col items-center justify-center text-center p-4">
-          <div className="bg-white/40 backdrop-blur-sm rounded-xl p-6 border border-gray-300/50">
-            <Lightbulb className="w-8 h-8 text-purple-500 mx-auto mb-3 opacity-50" />
-            <p className="text-sm font-medium text-gray-700">No insights yet</p>
-            <p className="text-xs text-gray-500">Insights will appear as you browse the web</p>
+          <div className="bg-white/40 dark:bg-white/[0.06] backdrop-blur-sm rounded-xl p-6 border border-gray-300/50 dark:border-white/10">
+            <Lightbulb className="w-8 h-8 text-purple-500 dark:text-purple-400 mx-auto mb-3 opacity-50" />
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">No insights yet</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Insights will appear as you browse the web</p>
           </div>
         </div>
       ) : (
@@ -1028,10 +1027,10 @@ function InsightsTab({ insights }: { insights: AttentionInsight[] }) {
           {insights.map((insight) => (
             <div
               key={insight.id}
-              className="bg-white/40 backdrop-blur-sm p-3 rounded-xl border-l-2 border-purple-500 border border-gray-300/50 flex items-center justify-between gap-2"
+              className="bg-white/40 dark:bg-white/[0.06] backdrop-blur-sm p-3 rounded-xl border-l-2 border-purple-500 border border-gray-300/50 dark:border-white/10 flex items-center justify-between gap-2"
             >
-              <span className="text-sm text-gray-700">{insight.message}</span>
-              <span className="text-[10px] text-gray-500 whitespace-nowrap">
+              <span className="text-sm text-gray-700 dark:text-gray-300">{insight.message}</span>
+              <span className="text-[10px] text-gray-500 dark:text-gray-400 whitespace-nowrap">
                 {new Date(insight.createdAt).toLocaleTimeString([], {
                   hour: "2-digit",
                   minute: "2-digit"
@@ -1069,13 +1068,13 @@ function HealthTab({
 
   const getNudgeColor = (type: string) => {
     switch (type) {
-      case "doomscroll": return "border-red-400 bg-red-50/50"
-      case "distraction": return "border-amber-400 bg-amber-50/50"
-      case "break": return "border-green-400 bg-green-50/50"
-      case "focus_drift": return "border-yellow-400 bg-yellow-50/50"
-      case "encouragement": return "border-blue-400 bg-blue-50/50"
-      case "all_clear": return "border-emerald-400 bg-emerald-50/50"
-      default: return "border-gray-400 bg-gray-50/50"
+      case "doomscroll": return "border-red-400 bg-red-50/50 dark:bg-red-950/30"
+      case "distraction": return "border-amber-400 bg-amber-50/50 dark:bg-amber-950/30"
+      case "break": return "border-green-400 bg-green-50/50 dark:bg-green-950/30"
+      case "focus_drift": return "border-yellow-400 bg-yellow-50/50 dark:bg-yellow-950/30"
+      case "encouragement": return "border-blue-400 bg-blue-50/50 dark:bg-blue-950/30"
+      case "all_clear": return "border-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/30"
+      default: return "border-gray-400 bg-gray-50/50 dark:bg-gray-800/30"
     }
   }
 
@@ -1115,22 +1114,22 @@ function HealthTab({
   return (
     <div className="flex-1 overflow-auto p-3 space-y-3">
       {/* Agent Status Card */}
-      <div className="bg-white/40 backdrop-blur-sm rounded-xl p-4 border border-gray-300/50">
+      <div className="bg-white/40 dark:bg-white/[0.06] backdrop-blur-sm rounded-xl p-4 border border-gray-300/50 dark:border-white/10">
         <div className="flex items-center gap-3 mb-3">
           <div className={cn(
             "w-10 h-10 rounded-xl flex items-center justify-center",
-            settings?.focusAgentEnabled ? "bg-green-100" : "bg-gray-100"
+            settings?.focusAgentEnabled ? "bg-green-100 dark:bg-green-900/30" : "bg-gray-100 dark:bg-gray-800"
           )}>
             <Shield className={cn(
               "w-5 h-5",
-              settings?.focusAgentEnabled ? "text-green-600" : "text-gray-400"
+              settings?.focusAgentEnabled ? "text-green-600 dark:text-green-400" : "text-gray-400"
             )} />
           </div>
           <div className="flex-1">
-            <h3 className="text-sm font-semibold text-gray-900">Focus Guardian</h3>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Focus Guardian</h3>
             <p className={cn(
               "text-[10px] font-medium",
-              settings?.focusAgentEnabled ? "text-green-600" : "text-gray-500"
+              settings?.focusAgentEnabled ? "text-green-600 dark:text-green-400" : "text-gray-500 dark:text-gray-400"
             )}>
               {settings?.focusAgentEnabled ? "Active & Monitoring" : "Disabled"}
             </p>
@@ -1140,29 +1139,29 @@ function HealthTab({
 
         {settings?.focusAgentEnabled && (
           <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="bg-white/50 rounded-lg p-2">
-              <p className="text-lg font-bold text-gray-900">{nudgeStats?.totalNudges || 0}</p>
-              <p className="text-[9px] text-gray-500">Total Nudges</p>
+            <div className="bg-white/50 dark:bg-white/[0.08] rounded-lg p-2">
+              <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{nudgeStats?.totalNudges || 0}</p>
+              <p className="text-[9px] text-gray-500 dark:text-gray-400">Total Nudges</p>
             </div>
-            <div className="bg-white/50 rounded-lg p-2">
-              <p className="text-lg font-bold text-green-600">{nudgeStats?.acknowledgedCount || 0}</p>
-              <p className="text-[9px] text-gray-500">Helpful</p>
+            <div className="bg-white/50 dark:bg-white/[0.08] rounded-lg p-2">
+              <p className="text-lg font-bold text-green-600 dark:text-green-400">{nudgeStats?.acknowledgedCount || 0}</p>
+              <p className="text-[9px] text-gray-500 dark:text-gray-400">Helpful</p>
             </div>
-            <div className="bg-white/50 rounded-lg p-2">
-              <p className="text-lg font-bold text-gray-900">
+            <div className="bg-white/50 dark:bg-white/[0.08] rounded-lg p-2">
+              <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
                 {settings.focusAgentSensitivity !== undefined
                   ? Math.round(settings.focusAgentSensitivity * 100)
                   : 50}%
               </p>
-              <p className="text-[9px] text-gray-500">Sensitivity</p>
+              <p className="text-[9px] text-gray-500 dark:text-gray-400">Sensitivity</p>
             </div>
           </div>
         )}
       </div>
 
       {/* Recent Decisions */}
-      <div className="bg-white/40 backdrop-blur-sm rounded-xl p-4 border border-gray-300/50">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+      <div className="bg-white/40 dark:bg-white/[0.06] backdrop-blur-sm rounded-xl p-4 border border-gray-300/50 dark:border-white/10">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
           <Lightbulb className="w-4 h-4 text-amber-500" />
           Agent Decisions
         </h3>
@@ -1170,8 +1169,8 @@ function HealthTab({
         {nudges.length === 0 ? (
           <div className="text-center py-4">
             <CheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2 opacity-50" />
-            <p className="text-xs text-gray-500">No nudges yet</p>
-            <p className="text-[10px] text-gray-400 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400">No nudges yet</p>
+            <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
               The agent is watching for unfocused patterns
             </p>
           </div>
@@ -1189,31 +1188,31 @@ function HealthTab({
                   <span className="text-base">{getNudgeIcon(nudge.type)}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-medium text-gray-500 uppercase">
+                      <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">
                         {getNudgeLabel(nudge.type)}
                       </span>
                       <div className="flex items-center gap-1">
                         {getResponseIcon(nudge.response)}
-                        <span className="text-[9px] text-gray-400">
+                        <span className="text-[9px] text-gray-400 dark:text-gray-500">
                           {formatTime(nudge.createdAt)}
                         </span>
                       </div>
                     </div>
-                    <p className="text-xs text-gray-700 mt-1">{nudge.message}</p>
+                    <p className="text-xs text-gray-700 dark:text-gray-300 mt-1">{nudge.message}</p>
                     {nudge.reasoning && (
-                      <p className="text-[10px] text-gray-500 mt-1 italic">
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 italic">
                         {nudge.reasoning}
                       </p>
                     )}
                     {nudge.confidence > 0 && (
                       <div className="flex items-center gap-1 mt-1">
-                        <div className="flex-1 h-1 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="flex-1 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-purple-400 rounded-full"
                             style={{ width: `${nudge.confidence * 100}%` }}
                           />
                         </div>
-                        <span className="text-[9px] text-gray-400">
+                        <span className="text-[9px] text-gray-400 dark:text-gray-500">
                           {Math.round(nudge.confidence * 100)}%
                         </span>
                       </div>
@@ -1228,16 +1227,16 @@ function HealthTab({
 
       {/* Nudge Type Breakdown */}
       {nudgeStats && nudgeStats.totalNudges > 0 && (
-        <div className="bg-white/40 backdrop-blur-sm rounded-xl p-4 border border-gray-300/50">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Pattern Breakdown</h3>
+        <div className="bg-white/40 dark:bg-white/[0.06] backdrop-blur-sm rounded-xl p-4 border border-gray-300/50 dark:border-white/10">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Pattern Breakdown</h3>
           <div className="space-y-2">
             {Object.entries(nudgeStats.nudgesByType).map(([type, count]) => (
               <div key={type} className="flex items-center gap-2">
                 <span className="text-sm">{getNudgeIcon(type)}</span>
-                <span className="text-xs text-gray-600 flex-1">
+                <span className="text-xs text-gray-600 dark:text-gray-400 flex-1">
                   {getNudgeLabel(type)}
                 </span>
-                <span className="text-xs font-medium text-gray-900">{count}</span>
+                <span className="text-xs font-medium text-gray-900 dark:text-gray-100">{count}</span>
               </div>
             ))}
           </div>
@@ -1250,16 +1249,14 @@ function HealthTab({
 // Explore Tab (Settings)
 function ExploreTab({
   settings,
-  savingSettings,
-  onToggleSetting,
+  onUpdateNumericSetting,
   onUnlink,
   user,
   trackingEnabled,
   onToggleTracking
 }: {
   settings: UserSettings | null
-  savingSettings: boolean
-  onToggleSetting: (key: keyof UserSettings) => void
+  onUpdateNumericSetting: (key: keyof UserSettings, value: number) => void
   onUnlink: () => void
   user: UserInfo
   trackingEnabled: boolean
@@ -1269,15 +1266,15 @@ function ExploreTab({
     <div className="flex-1 overflow-auto p-3">
       <div className="space-y-3">
         {/* User Info */}
-        <div className="bg-white/40 backdrop-blur-sm rounded-xl p-4 border border-gray-300/50">
+        <div className="bg-white/40 dark:bg-white/[0.06] backdrop-blur-sm rounded-xl p-4 border border-gray-300/50 dark:border-white/10">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-900">{user.name || user.email}</p>
-              <p className="text-xs text-gray-500">{user.email}</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{user.name || user.email}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{user.email}</p>
             </div>
             <button
               onClick={onUnlink}
-              className="text-xs text-red-500 hover:text-red-700 font-medium px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+              className="text-xs text-red-500 hover:text-red-700 dark:hover:text-red-400 font-medium px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
             >
               Unlink
             </button>
@@ -1285,14 +1282,14 @@ function ExploreTab({
         </div>
 
         {/* Tracking Toggle */}
-        <div className="bg-white/40 backdrop-blur-sm rounded-xl p-4 border border-gray-300/50">
+        <div className="bg-white/40 dark:bg-white/[0.06] backdrop-blur-sm rounded-xl p-4 border border-gray-300/50 dark:border-white/10">
           <div className="flex items-center justify-between">
             <div className="flex-1">
-              <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                 <Settings className="w-4 h-4" />
                 Activity Tracking
               </h3>
-              <p className="text-[10px] text-gray-500 mt-1">
+              <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
                 Track browsing activity and website visits
               </p>
             </div>
@@ -1302,71 +1299,58 @@ function ExploreTab({
                 "text-[10px] h-6 px-3 rounded-lg font-medium transition-all",
                 trackingEnabled
                   ? "bg-green-500 text-white"
-                  : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                  : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
               )}
             >
               {trackingEnabled ? "ON" : "OFF"}
             </button>
           </div>
           {!trackingEnabled && (
-            <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+            <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-700/50 rounded-lg flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-              <p className="text-[10px] text-amber-700">
+              <p className="text-[10px] text-amber-700 dark:text-amber-400">
                 All features including focus tracking, insights, quizzes, and learning pulses are disabled when tracking is off.
               </p>
             </div>
           )}
         </div>
 
-        {/* Attention Tracking Settings */}
-        <div className="bg-white/40 backdrop-blur-sm rounded-xl p-4 border border-gray-300/50">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-            <Settings className="w-4 h-4" />
-            Display Settings
-          </h3>
-          {settings ? (
+        {/* Pomodoro Timer Settings */}
+        {settings && (
+          <div className="bg-white/40 dark:bg-white/[0.06] backdrop-blur-sm rounded-xl p-4 border border-gray-300/50 dark:border-white/10">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Tree of Focus
+            </h3>
             <div className="space-y-2">
-              <div className="flex items-center justify-between p-3 bg-white/50 rounded-lg">
-                <div>
-                  <p className="text-xs font-medium text-gray-900">Debug Mode</p>
-                  <p className="text-[10px] text-gray-500">Show debug overlay</p>
+              <div className="p-3 bg-white/50 dark:bg-white/[0.08] rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="text-xs font-medium text-gray-900 dark:text-gray-100">Tree Growth Duration</p>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400">Time for the focus tree to reach full height</p>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-gray-900 dark:text-gray-100">
+                    {Math.round((settings.treeGrowthDurationMs ?? 600000) / 60000)}m
+                  </span>
                 </div>
-                <button
-                  onClick={() => onToggleSetting("cognitiveAttentionDebugMode")}
-                  disabled={savingSettings}
-                  className={cn(
-                    "text-[10px] h-6 px-3 rounded-lg font-medium transition-all",
-                    settings.cognitiveAttentionDebugMode
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-200 text-gray-600 hover:bg-gray-300"
-                  )}
-                >
-                  {settings.cognitiveAttentionDebugMode ? "ON" : "OFF"}
-                </button>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-white/50 rounded-lg">
-                <div>
-                  <p className="text-xs font-medium text-gray-900">Show Overlay</p>
-                  <p className="text-[10px] text-gray-500">Highlight tracked elements</p>
+                <input
+                  type="range"
+                  min={180000}
+                  max={7200000}
+                  step={60000}
+                  value={settings.treeGrowthDurationMs ?? 600000}
+                  onChange={(e) => onUpdateNumericSetting("treeGrowthDurationMs", Number(e.target.value))}
+                  className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full appearance-none cursor-pointer accent-green-500"
+                />
+                <div className="flex justify-between mt-1">
+                  <span className="text-[9px] text-gray-400 dark:text-gray-500">3 min</span>
+                  <span className="text-[9px] text-gray-400 dark:text-gray-500">2 hrs</span>
                 </div>
-                <button
-                  onClick={() => onToggleSetting("cognitiveAttentionShowOverlay")}
-                  disabled={savingSettings}
-                  className={cn(
-                    "text-[10px] h-6 px-3 rounded-lg font-medium transition-all",
-                    settings.cognitiveAttentionShowOverlay
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-200 text-gray-600 hover:bg-gray-300"
-                  )}
-                >
-                  {settings.cognitiveAttentionShowOverlay ? "ON" : "OFF"}
-                </button>
               </div>
             </div>
-          ) : (
-            <p className="text-sm text-gray-500">Loading settings...</p>
-          )}
-        </div>
+          </div>
+        )}
+
       </div>
     </div>
   )
