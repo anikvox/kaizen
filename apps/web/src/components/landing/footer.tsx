@@ -12,8 +12,7 @@ export default function Footer() {
               <Logo size="sm" showText />
             </Link>
             <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
-              Privacy-first Chrome extension that transforms your browsing into
-              meaningful learning.
+              Focus that follows you. A privacy-first extension that gently guides you back on track.
             </p>
           </div>
 
@@ -26,7 +25,7 @@ export default function Footer() {
               Documentation
             </Link>
             <Link
-              href="https://github.com"
+              href="https://github.com/anikvox/kaizen"
               target="_blank"
               className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
             >

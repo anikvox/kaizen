@@ -58,11 +58,10 @@ export function FeaturesWithHeading() {
     <div className="w-full max-w-5xl mx-auto px-4">
       <FadeIn className="text-center mb-12">
         <h2 className="text-2xl md:text-3xl font-bold font-heading tracking-tight mb-3">
-          Not Your Typical Productivity Tool
+          Gentle Nudges, Not Walls
         </h2>
         <p className="max-w-lg mx-auto text-muted-foreground leading-relaxed text-sm">
-          A cognitive architecture that augments your natural focus&mdash;without
-          compromising your digital sovereignty.
+          A multi-agent AI system that learns your patterns and guides you back on track&mdash;without blocking content or shaming you for getting distracted.
         </p>
       </FadeIn>
 
