@@ -122,13 +122,11 @@
     # ============================================
     # PHASE 3: Build and Start Services
     # ============================================
-    - name: Stop existing containers (if any)
-      community.docker.docker_compose_v2:
-        project_src: "{{ app_dir }}"
-        files:
-          - docker-compose.prod.yml
-        state: absent
-      become_user: "{{ ansible_user }}"
+    - name: Force cleanup existing containers
+      shell: |
+        cd {{ app_dir }}
+        docker compose -f docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
+        docker rm -f kaizen-postgres kaizen-app 2>/dev/null || true
       ignore_errors: yes
       tags: [deploy]
 
@@ -140,7 +138,6 @@
         state: present
         build: always
         pull: always
-      become_user: "{{ ansible_user }}"
       tags: [deploy]
 
     - name: Wait for services to be healthy

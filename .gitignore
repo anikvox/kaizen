@@ -46,3 +46,4 @@ coverage
 # deployment
 deployment/config.env
 deployment/secrets.yml
+deployment/inventory.ini

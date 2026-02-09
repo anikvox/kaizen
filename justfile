@@ -57,24 +57,29 @@ seed-activity:
 # Deployment Commands
 # ============================================
 
-# Helper to load deploy config
-_deploy-config := "source deployment/config.env"
-
 # Deploy to production server
 deploy:
-    cd deployment && source config.env && ansible-playbook deploy.yml
+    #!/usr/bin/env bash
+    source deployment/config.env
+    cd deployment && ansible-playbook deploy.yml --ask-become-pass
 
 # Deploy with setup (first-time only - installs Docker)
 deploy-setup:
-    cd deployment && source config.env && ansible-playbook deploy.yml --tags setup,deploy
+    #!/usr/bin/env bash
+    source deployment/config.env
+    cd deployment && ansible-playbook deploy.yml --tags setup,deploy --ask-become-pass
 
 # Deploy only (skip system setup)
 deploy-only:
-    cd deployment && source config.env && ansible-playbook deploy.yml --tags deploy
+    #!/usr/bin/env bash
+    source deployment/config.env
+    cd deployment && ansible-playbook deploy.yml --tags deploy --ask-become-pass
 
 # Update config files only
 deploy-config:
-    cd deployment && source config.env && ansible-playbook deploy.yml --tags config
+    #!/usr/bin/env bash
+    source deployment/config.env
+    cd deployment && ansible-playbook deploy.yml --tags config --ask-become-pass
 
 # View production logs
 deploy-logs:
