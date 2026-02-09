@@ -67,17 +67,17 @@ export default function Comparison() {
 }
 
 const othersItems = [
-  { icon: <X size={14} />, text: "Centralized Cloud Indexing" },
-  { icon: <X size={14} />, text: "Opaque Data Harvesting" },
-  { icon: <X size={14} />, text: "Forced Subscription Models" },
-  { icon: <X size={14} />, text: "Algorithmically Biased Feeds" },
-  { icon: <X size={14} />, text: "Thermal Throttling & Lag" },
+  { icon: <X size={14} />, text: "Blocks websites & restricts access" },
+  { icon: <X size={14} />, text: "Cloud-only data processing" },
+  { icon: <X size={14} />, text: "Manual time tracking required" },
+  { icon: <X size={14} />, text: "No context on what you're learning" },
+  { icon: <X size={14} />, text: "One-size-fits-all approach" },
 ];
 
 const productItems = [
-  { icon: <Check size={14} />, text: "Gemini Flash with Local LLM Option" },
-  { icon: <Settings2 size={14} />, text: "Privacy-First Architecture" },
-  { icon: <Zap size={14} />, text: "Comet Opik Observability" },
-  { icon: <FileText size={14} />, text: "GDPR-Compliant Data Control" },
-  { icon: <PenTool size={14} />, text: "Non-Intrusive Focus Support" },
+  { icon: <Check size={14} />, text: "Nudges without blocking content" },
+  { icon: <Settings2 size={14} />, text: "Optional on-device LLM processing" },
+  { icon: <Zap size={14} />, text: "Automatic attention tracking" },
+  { icon: <FileText size={14} />, text: "AI that learns your patterns" },
+  { icon: <PenTool size={14} />, text: "Personalized cognitive insights" },
 ];

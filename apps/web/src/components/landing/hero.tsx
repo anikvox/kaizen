@@ -24,18 +24,18 @@ export function Hero({ onDownloadExtension }: HeroProps) {
       </div>
 
       <h1 className="hero-enter hero-enter-2 mt-6 font-bold text-4xl md:text-5xl lg:text-6xl text-center font-heading leading-[1.1] tracking-tight max-w-3xl">
-        Your Browser,{" "}
-        <span className="text-gradient">Supercharged</span>
+        Your Personal{" "}
+        <span className="text-gradient">Focus &amp; Wellness</span>
         <br />
-        with AI
+        Companion
       </h1>
 
       <p className="hero-enter hero-enter-3 mt-5 text-base lg:text-lg text-muted-foreground text-center max-w-xl leading-relaxed">
         <strong className="font-semibold font-heading text-gradient">
           Kaizen
         </strong>{" "}
-        turns browsing into learning. Focus tracking, smart summaries, and
-        adaptive quizzes&mdash;all private by default.
+        tracks your attention, nudges you when you drift, and helps you retain
+        what you learn&mdash;all without blocking content or harvesting your data.
       </p>
 
       {/* CTAs */}

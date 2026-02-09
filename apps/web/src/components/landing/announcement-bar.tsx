@@ -10,7 +10,7 @@ export default function AnnouncementBar() {
       <span className="flex items-center justify-center w-6 h-6 rounded-full bg-white/20">
         <Sparkles size={11} />
       </span>
-      <span className="tracking-wide">Kaizen v1.0 &mdash; Now in Beta</span>
+      <span className="tracking-wide">Focus Guardian &mdash; AI Nudges Now Live</span>
       <ArrowRight
         size={12}
         className="opacity-70 group-hover:translate-x-0.5 transition-transform"

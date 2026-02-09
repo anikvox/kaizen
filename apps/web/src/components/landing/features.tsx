@@ -4,7 +4,7 @@ import {
   Sparkles,
   Brain,
   Activity,
-  Chrome,
+  Bell,
 } from "lucide-react";
 import { FadeIn } from "./fade-in";
 
@@ -16,40 +16,40 @@ interface Feature {
 
 const features: Feature[] = [
   {
-    name: "Privacy Guardian",
+    name: "Focus Guardian",
     description:
-      "Your data stays on your device. Local AI inference with GDPR compliance built in from day one.",
-    icon: <Shield size={19} />,
+      "An AI agent that learns your patterns and nudges you when you doomscroll, drift off-topic, or need a break.",
+    icon: <Bell size={19} />,
   },
   {
-    name: "Smart Focus Tracking",
+    name: "Attention Tracking",
     description:
-      "Understand your attention patterns without disruption. No content blocking, just intelligent insights.",
+      "Automatically tracks what you read, watch, and listen to. Understand your digital attention without manual effort.",
     icon: <Target size={19} />,
   },
   {
-    name: "AI Summaries",
+    name: "Cognitive Health Reports",
     description:
-      "Transform hours of browsing into concise, actionable knowledge with AI-powered summaries.",
+      "Get insights on focus duration, late-night usage, browsing fragmentation, and media diet over time.",
+    icon: <Activity size={19} />,
+  },
+  {
+    name: "AI-Powered Chat",
+    description:
+      "Ask questions about your browsing history. Get context-aware answers from an AI that knows what you've been reading.",
     icon: <Sparkles size={19} />,
   },
   {
     name: "Knowledge Quizzes",
     description:
-      "Auto-generated quizzes from your actual browsing history. Active recall that actually sticks.",
+      "Auto-generated quizzes from your actual browsing. Active recall that helps you retain what you consume.",
     icon: <Brain size={19} />,
   },
   {
-    name: "Real-Time Analytics",
+    name: "Privacy-First",
     description:
-      "Monitor focus sessions and track learning patterns as they happen on your personal dashboard.",
-    icon: <Activity size={19} />,
-  },
-  {
-    name: "One-Click Setup",
-    description:
-      "Install the Chrome extension and start tracking in seconds. Works with all Chromium browsers.",
-    icon: <Chrome size={19} />,
+      "Optional local LLM keeps data on-device. GDPR compliant with full data control and export capabilities.",
+    icon: <Shield size={19} />,
   },
 ];
 

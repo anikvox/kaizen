@@ -73,26 +73,31 @@ const faqs = [
   {
     question: "What is Kaizen?",
     answer:
-      "Kaizen is a privacy-first Chrome extension for personal growth and learning. Built by CS students who understand the challenges of focus and retention, it helps you stay on track without blocking content or enforcing rigid workflows.",
+      "Kaizen is a focus and wellness companion that tracks your digital attention, sends intelligent nudges when you doomscroll or drift off-topic, and helps you retain what you learn through AI-powered quizzes and insights\u2014all without blocking content.",
+  },
+  {
+    question: "How does the Focus Guardian work?",
+    answer:
+      "The Focus Guardian is an AI agent that monitors your browsing patterns. It detects doomscrolling, distraction, and focus drift, then sends gentle nudges to help you stay on track. It learns from your feedback to reduce false positives over time.",
   },
   {
     question: "Is my browsing data really private?",
     answer:
-      "Yes. Privacy is a core principle. We offer local LLM inference so your data stays on your device and remains GDPR compliant. Your browsing data never leaves your machine unless you choose otherwise.",
+      "Yes. You can run AI inference locally on your device using a local LLM, keeping all data on-device. We\u2019re GDPR compliant, and you have full control to export or delete your data at any time.",
   },
   {
-    question: "What AI technology does Kaizen use?",
+    question: "What kind of attention does Kaizen track?",
     answer:
-      "Kaizen uses Gemini Flash for fast reasoning and insights. We\u2019ve integrated Comet Opik for observability and evaluation, allowing continuous improvement of prompt quality while maintaining your privacy.",
+      "Kaizen tracks text you read, images you view, audio you listen to, and YouTube videos you watch. This multimodal tracking helps understand what you\u2019re actually paying attention to, not just which websites you visit.",
   },
   {
-    question: "Can I export my data?",
+    question: "What are Cognitive Health Reports?",
     answer:
-      "We provide a full dashboard to view insights and track progress. We\u2019re also working on additional data portability features to give you complete control over your information.",
+      "These reports show metrics like focus duration, late-night usage, browsing fragmentation (rapid tab switching), and your media diet breakdown. They help you understand your digital habits over 7, 14, 30, or 90-day windows.",
   },
   {
     question: "Which browsers are supported?",
     answer:
-      "Kaizen is available as a Chrome extension and works on any Chromium-based browser including Chrome, Edge, Brave, and Arc.",
+      "Kaizen works on any Chromium-based browser including Chrome, Edge, Brave, Arc, and Opera.",
   },
 ];

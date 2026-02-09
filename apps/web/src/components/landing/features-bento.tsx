@@ -15,11 +15,11 @@ export function FeaturesBento() {
     <FadeIn className="w-full max-w-5xl mx-auto px-4">
       <div className="text-center mb-10">
         <h2 className="text-2xl md:text-3xl font-bold font-heading tracking-tight mb-3">
-          Built for How You Actually Work
+          Understand Your Digital Attention
         </h2>
         <p className="max-w-lg mx-auto text-muted-foreground leading-relaxed text-sm">
-          Every feature designed around real browsing habits and learning
-          patterns.
+          Track what you read, watch, and listen to. Get nudged when you drift.
+          Retain more of what you consume.
         </p>
       </div>
 
@@ -116,25 +116,25 @@ const SkeletonFive = () => (
 
 const items = [
   {
-    title: "Smart Focus Sessions",
+    title: "Focus Guardian Agent",
     description:
-      "Track attention patterns without disruption. Understand what helps you focus.",
+      "AI that learns your patterns and sends intelligent nudges when you doomscroll or drift off-topic.",
     header: <SkeletonOne />,
     className: "md:col-span-1",
     icon: <Target className="h-4 w-4 text-blue-500" />,
   },
   {
-    title: "AI-Powered Insights",
+    title: "Cognitive Health Reports",
     description:
-      "Gemini Flash analyzes your browsing to generate actionable learning insights.",
+      "Track focus duration, late-night usage, fragmentation rate, and media diet over 7-90 days.",
     header: <SkeletonTwo />,
     className: "md:col-span-1",
     icon: <Brain className="h-4 w-4 text-emerald-500" />,
   },
   {
-    title: "Knowledge Retention",
+    title: "Knowledge Quizzes",
     description:
-      "Auto-generated quizzes from your browsing. Active recall that sticks.",
+      "Auto-generated quizzes from what you actually read. Active recall that sticks.",
     header: <SkeletonThree />,
     className: "md:col-span-1",
     icon: <Brain className="h-4 w-4 text-purple-500" />,
@@ -142,15 +142,15 @@ const items = [
   {
     title: "Privacy by Design",
     description:
-      "Local LLM keeps data on-device. GDPR compliant with full control.",
+      "Optional local LLM keeps data on-device. GDPR compliant with full data control and export.",
     header: <SkeletonFour />,
     className: "md:col-span-2",
     icon: <Shield className="h-4 w-4 text-purple-500" />,
   },
   {
-    title: "Real-Time Tracking",
+    title: "Attention Tracking",
     description:
-      "Monitor focus sessions as they happen. Instant productivity feedback.",
+      "Tracks text, images, audio, and video you consume. Understands what you're paying attention to.",
     header: <SkeletonFive />,
     className: "md:col-span-1",
     icon: <Eye className="h-4 w-4 text-teal-500" />,

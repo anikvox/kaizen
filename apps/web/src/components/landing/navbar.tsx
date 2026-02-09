@@ -14,7 +14,7 @@ export default function Navbar() {
 
       <div className="flex items-center gap-1.5">
         <a
-          href="https://github.com"
+          href="https://github.com/anikvox/kaizen"
           target="_blank"
           rel="noopener noreferrer"
           className="hidden md:inline-flex items-center justify-center rounded-lg h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
